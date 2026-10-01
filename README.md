@@ -1,92 +1,67 @@
 # Voice Tools
 
-A macOS menu bar app that runs **tracks**: hotkey-triggered pipelines of building blocks.
-Audio or text goes in, passes through steps (local or cloud transcription, LLM, HTTP, templates),
-and comes out as pasted text, clipboard, speech, or a POST somewhere.
+A macOS menu bar app for voice: dictate into any app, have text read aloud, or ask questions — each as a
+**track**, a hotkey-triggered pipeline of building blocks you assemble yourself.
 
-Default tracks:
+```
+⌥ Space (hold)      Mic → Parakeet v3 (on this Mac) → Fix words → Paste             ~50–150 ms after you let go
+⌥ ⇧ Space (toggle)  Mic → MAI-Transcribe-2 → Fix words → Claude Haiku cleanup → Paste  (OpenRouter)
+⌥ R (toggle)        Selection / page / clipboard → Speak (Pocket TTS, on this Mac)     pause/resume with ⌥ R
+```
 
-| Track | Trigger | Pipeline |
-|---|---|---|
-| Fast dictation | ⌥ Space (hold) | Mic → Parakeet v3 (on-device) → Fix words → Paste |
-| Clean dictation | ⌥ ⇧ Space (toggle) | Mic → MAI-Transcribe-2 (OpenRouter) → Fix words → Claude Haiku cleanup → Paste |
-| Read aloud | ⌥ R (toggle: start / pause / resume) | Selection → page → clipboard → Speak (OpenRouter MAI-Voice-2.1, on-device Pocket TTS / Supertonic-3, or a macOS voice) |
+Every block is swappable: transcription on this Mac or any OpenRouter model, cleanup with any LLM, speech from
+on-device models, macOS voices or any OpenRouter voice, plus HTTP requests, templates, paste, copy and more.
+
+Apple silicon, macOS 14 or later. Self-updating.
 
 ## Install
 
-1. Download `Voice-Tools-<version>-arm64.zip` from the [releases](https://github.com/brancusi/voice-tools-releases/releases) and unzip it.
-2. Move **Voice Tools.app** to Applications.
-3. The app isn't notarized yet, so the first time: **right-click → Open → Open**. After that it opens normally.
-4. It lives in the menu bar (the mic icon). To start it at login: System Settings → General → Login Items → add Voice Tools.
+1. Download `Voice-Tools-<version>-arm64.zip` from the
+   [releases](https://github.com/brancusi/voice-tools-releases/releases/latest), unzip it, and move
+   **Voice Tools.app** to Applications.
+2. The app isn't notarized, so the first time: **right-click → Open → Open**.
+3. Allow **Microphone** and **Accessibility** when asked (Accessibility is needed to paste and to read selected
+   text). The panel's **Checks** list shows anything missing, with a **Fix…** button for each.
+4. Add your **OpenRouter** key (and optionally a **TypeSafe Jev** key) in **Open Voice Tools… → Setup**. Keys are
+   stored in the Keychain.
+5. Optional: System Settings → General → Login Items → add Voice Tools.
 
-On first launch it asks for **Microphone** and **Accessibility** (needed to paste and to read selected text);
-the panel's **Checks** list shows what's missing, with a button to fix each. Parakeet v3 (~460 MB) downloads once
-and is cached. Add your OpenRouter key in **Open Voice Tools… → Setup**; it's stored in the Keychain.
+It checks for updates every 5 minutes; when one is out the menu bar icon becomes a download arrow and the panel
+offers **Install…**. Permissions carry over between versions.
 
-After that it keeps itself up to date.
+## A quick tour
+
+- **Menu bar panel** — a launcher: your tracks (click to run), what's playing, the last few runs, and one line
+  when something needs fixing.
+- **Voice Tools window** (panel → *Open Voice Tools…*) — **Tracks** (build and edit pipelines), **Activity**
+  (every run's text and step timings), **Vocabulary** (words transcription gets wrong, with training), **Setup**
+  (checks, keys, on-device models, updates). While it's open the app is in the Dock and ⌘Tab.
+- **HUD** — a small translucent tag at the bottom of the screen: `■ REC 00:04`, `PROC 312ms`, `OK 186ms`,
+  `READ 42%`. It ignores the mouse.
+
+## Documentation
+
+| | |
+|---|---|
+| [User guide](docs/user-guide.md) | Tracks, triggers, every building block, Vocabulary and training, the HUD, Setup |
+| [Architecture](docs/architecture.md) | How the code is organised and how a track runs, file by file |
+| [Building and releasing](docs/releasing.md) | Local builds, signing, the release pipeline, secrets and keys |
+| [Research and benchmarks](docs/research.md) | Every model comparison and measurement behind the defaults |
+| [Gotchas](docs/gotchas.md) | macOS, OpenRouter, FluidAudio and Jev lessons learned the hard way |
+| [Release notes](RELEASE_NOTES.md) | What changed in each version |
 
 ## Build
 
 ```sh
-./build.sh                 # → dist/Voice-Tools-<VERSION>-arm64.zip
 DEV=1 ./build.sh           # → build/Voice Tools.app, for local iteration
-open "build/Voice Tools.app"
+./build.sh                 # → dist/Voice-Tools-<VERSION>-arm64.zip
 ```
 
-Needs macOS 14+ and Swift 6 (Command Line Tools are enough). The icon is drawn in code (`Tools/make_icon.swift`).
-Sparkle (the updater) comes in through SwiftPM, pinned to the same version as `SPARKLE_VERSION` in `build.sh`,
-which also fetches that release's `sign_update` tool into `.cache/` (checked against its SHA-256).
+Needs macOS 14+ and Swift 6; the Command Line Tools are enough (no Xcode). Releases are cut by pushing a
+`v<VERSION>` tag — see [Building and releasing](docs/releasing.md).
 
-### Code signing and permissions
+## Repositories
 
-macOS remembers Microphone and Accessibility permissions per app *identity*. An ad hoc signature changes with
-every build, so each update would look like a new app and lose its permissions. Releases are therefore signed
-with **Voice Tools Signing**, a self-signed code-signing certificate (no Apple developer account needed): the
-app's identity becomes "`io.github.brancusi.voice-tools` signed by that certificate", which stays the same
-across versions. `build.sh` fails if a signed build's requirement doesn't name the certificate.
-
-The certificate (`.p12`) and its password live in the `SIGNING_CERT_P12` (base64) and `SIGNING_CERT_PASSWORD`
-Actions secrets and in a password manager. Keep using the same one: a new certificate means everyone grants
-permissions once more (updates still install, since Sparkle accepts a changed certificate when the EdDSA
-signature is valid).
-
-To sign local builds the same way (so a dev build shares the installed app's permissions), import the `.p12`
-into your login keychain once (double-click it), then `SIGN_IDENTITY="Voice Tools Signing" DEV=1 ./build.sh`.
-Without it, local builds are ad hoc.
-
-## Releases and updates
-
-Releases are built by GitHub Actions: update `RELEASE_NOTES.md`, bump `VERSION`, then push a tag `v<VERSION>`.
-The workflow builds the app, signs the zip with the update key, writes the update feed (`appcast.xml`, via
-`Tools/appcast.py`), and publishes all three to the public releases repo,
-[brancusi/voice-tools-releases](https://github.com/brancusi/voice-tools-releases/releases). This repo stays
-private; that one holds only the app.
-
-Installed copies read `https://github.com/brancusi/voice-tools-releases/releases/latest/download/appcast.xml`
-every 5 minutes and when the panel opens, and install only an update signed by the key whose public half is in
-`UPDATE_PUBLIC_KEY` (built into the app). Versions must go up: Sparkle compares them.
-
-The key pair is made once with `Tools/make_update_key.swift`. The private half lives in the
-`SPARKLE_ED_PRIVATE_KEY` Actions secret and in a password manager, never in the repo. The workflow refuses to
-publish if it doesn't match `UPDATE_PUBLIC_KEY`. If it's ever lost, make a new pair, and everyone installs the
-next version by hand once. A build without `UPDATE_PUBLIC_KEY` has updates turned off.
-
-## How it works
-
-- **Tracks** live in `~/Library/Application Support/VoiceTools/tracks.json` and can be edited by hand.
-- **Triggers**: any number per track. *Toggle* = press to start, press to stop. *Press & hold* = record
-  while held. Pressing a speaking track's trigger pauses/resumes. Esc cancels a recording.
-- **Steps** declare input/output types (`none`, `audio`, `text`); the editor flags mismatches.
-- **Fast path**: when Parakeet directly follows Microphone, audio is split at pauses and each phrase is
-  transcribed while you're still talking, so release only waits for the last phrase.
-- **Cloud path**: audio uploads on release; the OpenRouter connection is pre-warmed when recording starts.
-
-| Layer | Files |
-|---|---|
-| Model | `Model/Track.swift`, `KeyCombo.swift`, `TrackStore.swift`, `Vocabulary.swift` (word list + Fix words) |
-| Engine | `Pipeline/AppState.swift` (trigger handling, capture, step execution) |
-| Audio | `Audio/AudioRecorder.swift`, `PauseChunker.swift`, `ParakeetService.swift`, `LocalVoices.swift` (on-device TTS) |
-| Services | `Services/OpenRouterClient.swift`, `OpenRouterCatalog.swift` (model list for pickers), `HTTPStep.swift`, `Keychain.swift` |
-| System I/O | `IO/Clipboard.swift`, `TextCapture.swift`, `Speaker.swift` |
-| UI | `UI/MenuView.swift` (menu bar launcher), `MainWindow.swift` (Tracks, Activity, Setup), `TrackEditorView.swift`, `ModelPicker.swift`, `HUD.swift` |
-| Updates & checks | `Updates/Updates.swift` (Sparkle), `Updates/Diagnostics.swift` |
+- [`brancusi/voice-tools`](https://github.com/brancusi/voice-tools) (private) — this source.
+- [`brancusi/voice-tools-releases`](https://github.com/brancusi/voice-tools-releases) (public) — release zips and
+  the update feed only.
