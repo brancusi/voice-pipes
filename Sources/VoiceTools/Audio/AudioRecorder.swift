@@ -30,6 +30,15 @@ final class AudioRecorder: @unchecked Sendable {
         try engine.start()
     }
 
+    /// Returns what's been recorded since the last cut and keeps recording (for back-to-back takes).
+    func cut() -> [Float] {
+        lock.withLock {
+            let taken = samples
+            samples.removeAll(keepingCapacity: true)
+            return taken
+        }
+    }
+
     /// Stops capture and returns everything recorded.
     func stop() -> [Float] {
         engine.inputNode.removeTap(onBus: 0)

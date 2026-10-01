@@ -33,4 +33,5 @@ enum Keychain {
 
 enum SecretKey {
     static let openRouter = "openrouter"
+    static let typesafe = "typesafe"
 }

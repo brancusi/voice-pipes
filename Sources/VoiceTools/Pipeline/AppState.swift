@@ -118,6 +118,13 @@ final class AppState {
         refreshChecks()
     }
 
+    var hasJevKey = JevClient.hasKey
+
+    func setJevKey(_ key: String) {
+        Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.typesafe)
+        hasJevKey = JevClient.hasKey
+    }
+
     func setOpenRouterKey(_ key: String) {
         Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.openRouter)
         hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil

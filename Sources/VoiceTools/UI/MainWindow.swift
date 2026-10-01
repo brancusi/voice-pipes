@@ -138,6 +138,7 @@ private struct SetupView: View {
     let app: AppState
     @EnvironmentObject var updates: Updates
     @State private var key = ""
+    @State private var jevKey = ""
     private var catalog: OpenRouterCatalog { .shared }
 
     var body: some View {
@@ -183,6 +184,21 @@ private struct SetupView: View {
                     }
                 }
                 if let error = catalog.error { Text(error).font(.caption).foregroundStyle(.orange) }
+            }
+
+            Section {
+                LabeledContent("Jev API key") {
+                    HStack {
+                        SecureField(app.hasJevKey ? "Saved in Keychain — paste to replace" : "TypeSafe key", text: $jevKey)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Save") { app.setJevKey(jevKey); jevKey = "" }.disabled(jevKey.isEmpty)
+                    }
+                }
+            } header: {
+                Text("TypeSafe (Jev)")
+            } footer: {
+                Text("Used when training vocabulary: Jev judges which mishearings are safe to replace everywhere.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("On this Mac") {

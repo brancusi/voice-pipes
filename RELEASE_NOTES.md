@@ -1,5 +1,9 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.8.0**
+- **Faster takes when training a word.** Click **Start takes** and say it; **Next take** (or Space) ends that take and starts the next one straight away; **Finish** (or Return) ends the last. No more stop/start for every take. A live level meter shows it's hearing you, and silent takes are caught instead of quietly kept.
+- **Jev judges the results.** Add your TypeSafe (Jev) key in Setup → TypeSafe (Jev). After training, every way the word came out is sent to Jev, which scores how safe it is to replace everywhere — garbled versions of your word score high; real words, other names and coding or specialist terms score low. Each result shows its Jev score; those at 60% or more are pre-ticked. Without a key, the old dictionary check is used.
+
 **0.7.0**
 - **Train a word** (Vocabulary → **Train…** on any row). Record yourself saying it a few times; Voice Tools replays each take about 30 ways (faster, slower, quieter, with background noise) through Parakeet, and can also have the 36 on-device voices say it. You get every distinct way it came out, how often, and how often it was already right. Tick the ones to keep and **Add to Heard as**.
 - Results that came up at least twice are pre-ticked; one-offs are listed but left unticked. Anything made only of ordinary words (like "aaron's attacking") is flagged, since adding it would also change those words when you mean them.
