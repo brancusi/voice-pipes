@@ -14,9 +14,10 @@ struct VoiceToolsApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Tracks", id: "tracks") {
-            TrackEditorView(app: app)
+        Window("Voice Tools", id: "main") {
+            MainWindowView(app: app).environmentObject(updates)
         }
+        .defaultSize(width: 1100, height: 760)
         .windowResizability(.contentMinSize)
     }
 

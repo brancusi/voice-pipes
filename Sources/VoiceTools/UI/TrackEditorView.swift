@@ -1,94 +1,7 @@
 import AVFoundation
 import SwiftUI
 
-struct TrackEditorView: View {
-    @Bindable var app: AppState
-    @State private var selection: Track.ID?
-
-    var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 250)
-        } detail: {
-            if let index = app.store.tracks.firstIndex(where: { $0.id == selection }) {
-                TrackDetailView(app: app, track: Bindable(app.store).tracks[index]) {
-                    app.store.tracks.remove(at: index)
-                    selection = app.store.tracks.first?.id
-                }
-                .id(app.store.tracks[index].id)
-            } else {
-                Text("Select a track").foregroundStyle(.secondary)
-            }
-        }
-        .frame(minWidth: 860, minHeight: 640)
-        .onAppear { selection = selection ?? app.store.tracks.first?.id }
-    }
-
-    private var sidebar: some View {
-        List(selection: $selection) {
-            Section("Tracks") {
-                ForEach(app.store.tracks) { track in
-                    HStack {
-                        Circle().fill(Color(hex: track.colorHex)).frame(width: 8, height: 8)
-                        Text(track.name)
-                        Spacer()
-                        Text("\(track.steps.count) steps").font(.caption).foregroundStyle(.secondary)
-                    }
-                    .tag(track.id)
-                }
-                .onMove { app.store.tracks.move(fromOffsets: $0, toOffset: $1) }
-                Button("+ New track") {
-                    let track = Track(name: "New track", colorHex: "#1F9D55", triggers: [],
-                                      steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
-                                              Step(kind: .paste(restoreClipboard: true))])
-                    app.store.tracks.append(track)
-                    selection = track.id
-                }
-                .buttonStyle(.borderless)
-            }
-            Section("Connections") {
-                ConnectionsView(app: app)
-            }
-        }
-    }
-}
-
-private struct ConnectionsView: View {
-    let app: AppState
-    @State private var key = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("OpenRouter")
-                Spacer()
-                Text(app.hasOpenRouterKey ? "Key in Keychain" : "No key")
-                    .font(.caption).foregroundStyle(app.hasOpenRouterKey ? .green : .secondary)
-            }
-            HStack {
-                SecureField("sk-or-…", text: $key).textFieldStyle(.roundedBorder)
-                Button("Save") { app.setOpenRouterKey(key); key = "" }.disabled(key.isEmpty)
-            }
-            HStack {
-                Text("Parakeet v3")
-                Spacer()
-                Text(parakeetLabel).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var parakeetLabel: String {
-        switch app.parakeetState {
-        case .notLoaded: "Not loaded"
-        case .loading: "Loading…"
-        case .ready: "Local · loaded"
-        case .failed: "Failed"
-        }
-    }
-}
-
-private struct TrackDetailView: View {
+struct TrackDetailView: View {
     let app: AppState
     @Binding var track: Track
     let onDelete: () -> Void
@@ -133,7 +46,7 @@ private struct TrackDetailView: View {
 
             Section {
                 ForEach($track.steps) { $step in
-                    StepRow(step: $step, expanded: expandedStep == step.id) {
+                    StepRow(step: $step, speaker: app.speaker, expanded: expandedStep == step.id) {
                         expandedStep = expandedStep == step.id ? nil : step.id
                     } onDelete: {
                         track.steps.removeAll { $0.id == step.id }
@@ -191,6 +104,7 @@ private struct TrackDetailView: View {
 
 private struct StepRow: View {
     @Binding var step: Step
+    let speaker: Speaker
     let expanded: Bool
     let onToggle: () -> Void
     let onDelete: () -> Void
@@ -214,7 +128,7 @@ private struct StepRow: View {
                 Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
             }
             if expanded {
-                StepConfigView(kind: $step.kind).padding(.leading, 40)
+                StepConfigView(kind: $step.kind, speaker: speaker).padding(.leading, 40)
             }
         }
         .padding(.vertical, 2)
@@ -231,7 +145,7 @@ private struct StepRow: View {
         case .template: "curlybraces"
         case .paste: "doc.on.clipboard"
         case .copy: "doc.on.doc"
-        case .speak: "speaker.wave.2"
+        case .speak, .openRouterSpeech: "speaker.wave.2"
         case .showHUD: "rectangle.bottomthird.inset.filled"
         }
     }
@@ -240,6 +154,7 @@ private struct StepRow: View {
 /// Edits the associated values of a step kind in place.
 private struct StepConfigView: View {
     @Binding var kind: StepKind
+    let speaker: Speaker
 
     var body: some View {
         switch kind {
@@ -280,12 +195,14 @@ private struct StepConfigView: View {
             }
 
         case .openRouterSTT(let model):
-            TextField("Model", text: Binding { model } set: { kind = .openRouterSTT(model: $0) })
-                .font(.system(.body, design: .monospaced))
+            LabeledContent("Model") {
+                ModelPicker(capability: .transcription, modelID: Binding { model } set: { kind = .openRouterSTT(model: $0) })
+            }
 
         case .llm(let model, let prompt, let policy):
-            TextField("Model", text: Binding { model } set: { kind = .llm(model: $0, prompt: prompt, onFailure: policy) })
-                .font(.system(.body, design: .monospaced))
+            LabeledContent("Model") {
+                ModelPicker(capability: .text, modelID: Binding { model } set: { kind = .llm(model: $0, prompt: prompt, onFailure: policy) })
+            }
             Picker("If this step fails", selection: Binding { policy } set: { kind = .llm(model: model, prompt: prompt, onFailure: $0) }) {
                 Text("Pass input through").tag(FailurePolicy.passThrough)
                 Text("Stop the track").tag(FailurePolicy.stop)
@@ -331,6 +248,7 @@ private struct StepConfigView: View {
             Text("Leaves the text on the clipboard.").font(.caption).foregroundStyle(.secondary)
 
         case .speak(let voiceID, let rate):
+            enginePicker
             Picker("Voice", selection: Binding { voiceID ?? "" } set: { kind = .speak(voiceID: $0.isEmpty ? nil : $0, rate: rate) }) {
                 Text("System default (best installed)").tag("")
                 ForEach(Self.voices, id: \.identifier) { voice in
@@ -344,9 +262,50 @@ private struct StepConfigView: View {
                 Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
             }
 
+        case .openRouterSpeech(let model, let voice, let rate):
+            enginePicker
+            LabeledContent("Model") {
+                ModelPicker(capability: .speech, modelID: Binding { model } set: { _ in }) { picked in
+                    // A new model has its own voices: keep the voice only if the new model offers it.
+                    let keep = picked.voices.contains(voice) ? voice : picked.defaultVoice ?? ""
+                    kind = .openRouterSpeech(model: picked.id, voice: keep, rate: rate)
+                }
+            }
+            LabeledContent("Voice") {
+                VoicePicker(modelID: model, voice: Binding { voice } set: { kind = .openRouterSpeech(model: model, voice: $0, rate: rate) },
+                            speaker: speaker)
+            }
+            HStack {
+                Text("Speed")
+                Slider(value: Binding { Double(rate) } set: { kind = .openRouterSpeech(model: model, voice: voice, rate: Float($0)) },
+                       in: 0.6...2.0, step: 0.1)
+                Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
+            }
+            Text("Long text is read in passages: the first starts within a second or two, the next downloads while you listen.")
+                .font(.caption).foregroundStyle(.secondary)
+
         case .showHUD:
             Text("Shows the text in the HUD for a few seconds.").font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    /// Switches a Speak step between a macOS voice and an OpenRouter speech model, keeping its speed.
+    private var enginePicker: some View {
+        Picker("Engine", selection: Binding {
+            if case .openRouterSpeech = kind { 1 } else { 0 }
+        } set: { engine in
+            let rate: Float = switch kind {
+            case .speak(_, let r), .openRouterSpeech(_, _, let r): r
+            default: 1
+            }
+            kind = engine == 1
+                ? .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: rate)
+                : .speak(voiceID: nil, rate: rate)
+        }) {
+            Text("macOS voice").tag(0)
+            Text("OpenRouter").tag(1)
+        }
+        .pickerStyle(.segmented)
     }
 
     private static let voices: [AVSpeechSynthesisVoice] = {

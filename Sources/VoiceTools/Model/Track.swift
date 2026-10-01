@@ -106,13 +106,14 @@ enum StepKind: Codable, Hashable {
     case paste(restoreClipboard: Bool)
     case copy
     case speak(voiceID: String?, rate: Float)
+    case openRouterSpeech(model: String, voice: String, rate: Float)
     case showHUD
 
     var input: DataKind {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .http, .template, .paste, .copy, .speak, .showHUD: .text
+        case .llm, .http, .template, .paste, .copy, .speak, .openRouterSpeech, .showHUD: .text
         }
     }
 
@@ -122,7 +123,7 @@ enum StepKind: Codable, Hashable {
         case .text, .parakeet, .openRouterSTT, .llm, .http, .template: .text
         // Outputs pass their text through so a track can, e.g., paste and then POST.
         case .paste, .copy, .showHUD: .text
-        case .speak: .none
+        case .speak, .openRouterSpeech: .none
         }
     }
 
@@ -131,7 +132,7 @@ enum StepKind: Codable, Hashable {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
         case .llm, .http, .template: "Transform"
-        case .paste, .copy, .speak, .showHUD: "Output"
+        case .paste, .copy, .speak, .openRouterSpeech, .showHUD: "Output"
         }
     }
 
@@ -151,7 +152,9 @@ enum StepKind: Codable, Hashable {
         case .template: "Text template"
         case .paste: "Paste at cursor"
         case .copy: "Copy to clipboard"
-        case .speak: "Speak"
+        case .speak: "Speak · macOS voice"
+        case .openRouterSpeech(let model, let voice, _):
+            "Speak · \(model.split(separator: "/").last ?? "") · \(OpenRouterCatalog.Model.voiceLabel(voice))"
         case .showHUD: "Show in HUD"
         }
     }
@@ -169,9 +172,13 @@ enum StepKind: Codable, Hashable {
         case .paste: "Paste"
         case .copy: "Copy"
         case .speak: "Speak"
+        case .openRouterSpeech(_, let voice, _): "Speak · \(OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first ?? voice)"
         case .showHUD: "HUD"
         }
     }
+
+    static let defaultSpeechModel = "microsoft/mai-voice-2.1"
+    static let defaultSpeechVoice = "en-US-Harper:MAI-Voice-2.1"
 
     /// Catalog for the "Add step" menu.
     static let catalog: [StepKind] = [
@@ -185,6 +192,7 @@ enum StepKind: Codable, Hashable {
         .template("{{input}}"),
         .paste(restoreClipboard: true),
         .copy,
+        .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: 1.0),
         .speak(voiceID: nil, rate: 1.0),
         .showHUD,
     ]
@@ -220,6 +228,7 @@ extension Track {
         Track(name: "Read aloud", colorHex: "#6B4FD1",
               triggers: [Trigger(combo: KeyCombo(key: .r, modifiers: [.option]), mode: .toggle)],
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
-                      Step(kind: .speak(voiceID: nil, rate: 1.0))]),
+                      Step(kind: .openRouterSpeech(model: StepKind.defaultSpeechModel,
+                                                   voice: StepKind.defaultSpeechVoice, rate: 1.0))]),
     ]
 }

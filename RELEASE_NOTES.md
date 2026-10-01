@@ -1,5 +1,12 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.4.0**
+- **Read aloud with OpenRouter voices.** The Speak step now has an engine switch: **macOS voice** or **OpenRouter**. With OpenRouter, pick a speech model (MAI-Voice, Gemini, MiniMax, Deepgram Aura, Kokoro and more) and one of its voices; every voice has a ▶ preview. Long text is read in passages: the first starts within a second or two and the next downloads while you listen. Pause, resume, speed and replay-this-passage all work.
+- **Model pickers** for every OpenRouter step: search the live list of transcription, language and speech models, with prices. Or type any model id.
+- **A full Voice Tools window** (menu bar → **Open Voice Tools…**): **Tracks** to build and edit, **Activity** with every run's full text and how long each step took, and **Setup** with checks, your OpenRouter key, the model list and updates.
+- The menu bar panel is now a quick launcher: tracks, what's playing, the last few runs, and a single line when something needs fixing.
+- To switch an existing Read aloud track: Open Voice Tools… → Read aloud → expand the Speak step → **OpenRouter**.
+
 **0.3.1**
 - **This update shouldn't ask for any permission.** From 0.3.0 on, macOS recognises new versions as the same app, so Microphone and Accessibility stay allowed.
 - **Fix…** buttons in Checks: if Accessibility or the Microphone is ever missing, one click clears the old entry macOS kept (the kind that shows as switched on but doesn't work), asks again, and opens the right Settings page. No more removing and re-adding the app by hand. The panel updates by itself once it's allowed.

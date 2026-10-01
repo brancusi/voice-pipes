@@ -10,7 +10,7 @@ Default tracks:
 |---|---|---|
 | Fast dictation | ⌥ Space (hold) | Mic → Parakeet v3 (on-device, chunked on pauses) → Paste |
 | Clean dictation | ⌥ ⇧ Space (toggle) | Mic → MAI-Transcribe-2 (OpenRouter) → Claude Haiku cleanup → Paste |
-| Read aloud | ⌥ R (toggle: start / pause / resume) | Selection → page → clipboard → Speak |
+| Read aloud | ⌥ R (toggle: start / pause / resume) | Selection → page → clipboard → Speak (OpenRouter MAI-Voice-2.1, or a macOS voice) |
 
 ## Install
 
@@ -21,7 +21,7 @@ Default tracks:
 
 On first launch it asks for **Microphone** and **Accessibility** (needed to paste and to read selected text);
 the panel's **Checks** list shows what's missing, with a button to fix each. Parakeet v3 (~460 MB) downloads once
-and is cached. Add your OpenRouter key under **Edit tracks… → Connections**; it's stored in the Keychain.
+and is cached. Add your OpenRouter key in **Open Voice Tools… → Setup**; it's stored in the Keychain.
 
 After that it keeps itself up to date.
 
@@ -86,7 +86,7 @@ next version by hand once. A build without `UPDATE_PUBLIC_KEY` has updates turne
 | Model | `Model/Track.swift`, `KeyCombo.swift`, `TrackStore.swift` |
 | Engine | `Pipeline/AppState.swift` (trigger handling, capture, step execution) |
 | Audio | `Audio/AudioRecorder.swift`, `PauseChunker.swift`, `ParakeetService.swift` |
-| Services | `Services/OpenRouterClient.swift`, `HTTPStep.swift`, `Keychain.swift` |
+| Services | `Services/OpenRouterClient.swift`, `OpenRouterCatalog.swift` (model list for pickers), `HTTPStep.swift`, `Keychain.swift` |
 | System I/O | `IO/Clipboard.swift`, `TextCapture.swift`, `Speaker.swift` |
-| UI | `UI/MenuView.swift`, `TrackEditorView.swift`, `HUD.swift` |
+| UI | `UI/MenuView.swift` (menu bar launcher), `MainWindow.swift` (Tracks, Activity, Setup), `TrackEditorView.swift`, `ModelPicker.swift`, `HUD.swift` |
 | Updates & checks | `Updates/Updates.swift` (Sparkle), `Updates/Diagnostics.swift` |

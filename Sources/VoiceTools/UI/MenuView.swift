@@ -17,7 +17,7 @@ struct MenuView: View {
                 section("Tracks") { tracks }
                 if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
                 if !app.history.isEmpty { section("Recent runs") { recent } }
-                checksList
+                if app.worstCheck >= .warning { issuesCard }
                 Divider()
                 footer
             }
@@ -76,34 +76,34 @@ struct MenuView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
     }
 
-    private var checksList: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("CHECKS").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 4)
-            ForEach(app.checks) { check in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: check.symbol).foregroundStyle(Self.color(check.level)).frame(width: 16)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(check.title).font(.callout)
-                        Text(check.detail).font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    if let fix = check.fix {
-                        Button(fix == .editTracks ? "Edit…" : "Fix…") {
-                            fix == .editTracks ? openEditor() : app.fix(fix)
-                        }
-                        .controlSize(.small)
-                    }
+    /// Problems only, in one line; the details and fixes live in the main window's Setup.
+    private var issuesCard: some View {
+        let issues = app.checks.filter { $0.level >= .warning }
+        let worst = issues.map(\.level).max() ?? .warning
+        return Button { openMain(.setup) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: worst == .problem ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(Self.color(worst))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(issues.count == 1 ? issues[0].title : "\(issues.count) things need attention").font(.callout)
+                    Text(issues.count == 1 ? issues[0].detail : issues.map(\.title).joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
+                Spacer()
+                Text("Fix…").font(.callout).foregroundStyle(.tint)
             }
+            .padding(12)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Self.color(worst).opacity(0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
     }
 
     private var footer: some View {
         HStack {
-            Button { openEditor() } label: { Label("Edit tracks…", systemImage: "slider.horizontal.3") }
-                .help("Edit tracks, triggers and connections")
-            Button { app.refreshChecks() } label: { Image(systemName: "arrow.clockwise") }.help("Check again")
+            Button { openMain(nil) } label: { Label("Open Voice Tools…", systemImage: "macwindow") }
+                .help("Tracks, activity and setup in a full window")
             Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
                 .help("Copy a report for troubleshooting")
             Button { updates.check() } label: { Image(systemName: "arrow.down.circle") }
@@ -139,7 +139,7 @@ struct MenuView: View {
     private var nowPlaying: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(app.speaker.state == .paused ? "Paused" : "Speaking")
+                Text(app.speaker.state == .paused ? "Paused" : app.speaker.state == .loading ? "Loading" : "Speaking")
                     .font(.system(size: 11, weight: .semibold))
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(Capsule().fill(Color.orange.opacity(0.18)))
@@ -147,9 +147,19 @@ struct MenuView: View {
             }
             ProgressView(value: app.speaker.progress)
             HStack {
-                Button(app.speaker.state == .paused ? "Resume" : "Pause") { app.speaker.togglePause() }
-                    .buttonStyle(.borderedProminent)
+                if app.speaker.state == .loading {
+                    ProgressView().controlSize(.small)
+                    Text("Preparing voice…").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Button(app.speaker.state == .paused ? "Resume" : "Pause") { app.speaker.togglePause() }
+                        .buttonStyle(.borderedProminent)
+                }
+                if app.speaker.canGoBack {
+                    Button { app.speaker.back() } label: { Image(systemName: "backward.fill") }.help("Replay this passage")
+                }
                 Button("Clear") { app.speaker.clear() }
+                Spacer()
+                Text(app.speaker.voiceLabel).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .padding(12)
@@ -158,7 +168,7 @@ struct MenuView: View {
 
     private var recent: some View {
         VStack(spacing: 0) {
-            ForEach(Array(app.history.prefix(5).enumerated()), id: \.element.id) { index, record in
+            ForEach(Array(app.history.prefix(3).enumerated()), id: \.element.id) { index, record in
                 if index > 0 { Divider() }
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -185,8 +195,10 @@ struct MenuView: View {
         }
     }
 
-    private func openEditor() {
-        openWindow(id: "tracks")
+    /// Opens the main window, optionally at a section (Setup for problems).
+    private func openMain(_ section: MainSection?) {
+        if let section { app.mainSection = section }
+        openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
     }
 }

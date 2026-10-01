@@ -1,66 +1,206 @@
 import AVFoundation
+import NaturalLanguage
 import Observation
 
-/// Read-aloud playback that can pause and resume at the exact word, and reports progress for the UI.
+/// Read-aloud playback with either a macOS voice or an OpenRouter speech model. Both can pause and resume where
+/// they left off, step back a sentence, and report progress for the UI.
 @MainActor
 @Observable
 final class Speaker: NSObject {
-    enum State { case idle, speaking, paused }
+    enum State { case idle, loading, speaking, paused }
 
     private(set) var state: State = .idle
-    private(set) var text = ""
-    private(set) var spokenRange = NSRange(location: 0, length: 0)
     private(set) var sourceLabel = ""
+    private(set) var voiceLabel = ""
+    /// 0...1 through the whole text.
+    private(set) var progress: Double = 0
 
+    // macOS voices
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
+    @ObservationIgnored private var systemTextLength = 0
+
+    // OpenRouter voices: the text is split into segments, each fetched while the previous one plays.
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var segments: [String] = []
+    @ObservationIgnored private var segmentIndex = 0
+    @ObservationIgnored private var fetches: [Int: Task<Data, Error>] = [:]
+    @ObservationIgnored private var playbackRate: Float = 1
+    @ObservationIgnored private var progressTimer: Timer?
+
     @ObservationIgnored private var finished: CheckedContinuation<Void, Never>?
+    @ObservationIgnored private var segmentDone: CheckedContinuation<Void, Never>?
+    @ObservationIgnored private var generation = 0
 
     override init() {
         super.init()
         synthesizer.delegate = self
     }
 
-    var progress: Double {
-        text.isEmpty ? 0 : Double(spokenRange.location + spokenRange.length) / Double((text as NSString).length)
-    }
+    // MARK: - macOS voice
 
     /// Speaks and returns when playback finishes or is cleared.
-    func speak(_ text: String, voiceID: String?, rate: Float, label: String) async {
+    func speakSystem(_ text: String, voiceID: String?, rate: Float, label: String) async {
         clear()
-        self.text = text
         sourceLabel = label
+        let voice = voiceID.flatMap(AVSpeechSynthesisVoice.init(identifier:)) ?? Self.bestDefaultVoice
+        voiceLabel = voice?.name ?? "System voice"
+        systemTextLength = (text as NSString).length
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voiceID.flatMap(AVSpeechSynthesisVoice.init(identifier:)) ?? Self.bestDefaultVoice
+        utterance.voice = voice
         utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * rate)
         state = .speaking
         synthesizer.speak(utterance)
         await withCheckedContinuation { finished = $0 }
     }
 
+    // MARK: - OpenRouter voice
+
+    /// Fetches and plays speech segment by segment. Throws if the first segment can't be synthesized.
+    func speakCloud(_ text: String, model: String, voice: String, rate: Float, label: String) async throws {
+        clear()
+        generation += 1
+        let run = generation
+        sourceLabel = label
+        voiceLabel = OpenRouterCatalog.Model.voiceLabel(voice)
+        segments = Self.segments(of: text)
+        playbackRate = rate
+        state = .loading
+
+        let fetch: (Int) -> Task<Data, Error> = { index in
+            let piece = self.segments[index]
+            return Task { try await OpenRouterClient.shared.speech(model: model, voice: voice, text: piece) }
+        }
+
+        for index in segments.indices {
+            guard generation == run else { return }
+            segmentIndex = index
+            let current = fetches[index] ?? fetch(index)
+            fetches[index] = current
+            // Keep the next segment downloading while this one plays.
+            if index + 1 < segments.count, fetches[index + 1] == nil { fetches[index + 1] = fetch(index + 1) }
+
+            let audio: Data
+            do {
+                audio = try await current.value
+            } catch {
+                guard generation == run else { return }
+                clear()
+                throw error
+            }
+            guard generation == run else { return }
+
+            let player = try AVAudioPlayer(data: audio)
+            player.delegate = self
+            player.enableRate = true
+            player.rate = playbackRate
+            self.player = player
+            if state != .paused { state = .speaking; player.play() }
+            startProgressTimer()
+            await withCheckedContinuation { segmentDone = $0 }
+            fetches[index] = nil
+        }
+        if generation == run { finishPlayback() }
+    }
+
+    /// Previews a voice with a short sentence, interrupting anything playing.
+    func preview(model: String, voice: String) async throws {
+        let name = OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first ?? "this voice"
+        try await speakCloud("Hi, I'm \(name). This is how I'll sound reading to you.", model: model, voice: voice,
+                             rate: 1, label: "Voice preview")
+    }
+
+    // MARK: - Controls
+
     func togglePause() {
         switch state {
         case .speaking:
-            synthesizer.pauseSpeaking(at: .word)
+            if let player { player.pause() } else { synthesizer.pauseSpeaking(at: .word) }
             state = .paused
         case .paused:
-            synthesizer.continueSpeaking()
+            if let player { player.play() } else { synthesizer.continueSpeaking() }
             state = .speaking
-        case .idle:
+        case .idle, .loading:
             break
         }
     }
 
-    func clear() {
-        synthesizer.stopSpeaking(at: .immediate)
-        finish()
-        text = ""
-        spokenRange = NSRange(location: 0, length: 0)
+    /// Replays the current passage from its start (OpenRouter voices; macOS voices can't seek).
+    func back() {
+        player?.currentTime = 0
     }
 
-    private func finish() {
+    var canGoBack: Bool { player != nil }
+
+    func clear() {
+        generation += 1
+        synthesizer.stopSpeaking(at: .immediate)
+        player?.stop()
+        player = nil
+        fetches.values.forEach { $0.cancel() }
+        fetches.removeAll()
+        segments = []
+        progressTimer?.invalidate()
+        progressTimer = nil
+        segmentDone?.resume()
+        segmentDone = nil
+        finishPlayback()
+        progress = 0
+    }
+
+    private func finishPlayback() {
         state = .idle
+        progressTimer?.invalidate()
+        progressTimer = nil
         finished?.resume()
         finished = nil
+    }
+
+    private func startProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+            MainActor.assumeIsolated { self.updateCloudProgress() }
+        }
+    }
+
+    private func updateCloudProgress() {
+        guard !segments.isEmpty else { return }
+        let total = segments.reduce(0) { $0 + $1.count }
+        let done = segments.prefix(segmentIndex).reduce(0) { $0 + $1.count }
+        let fraction = player.map { $0.duration > 0 ? $0.currentTime / $0.duration : 0 } ?? 0
+        progress = (Double(done) + fraction * Double(segments[segmentIndex].count)) / Double(max(total, 1))
+    }
+
+    /// Splits text into sentence groups: a short first segment so audio starts quickly, longer ones after.
+    static func segments(of text: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        var sentences: [String] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            let s = text[range].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !s.isEmpty { sentences.append(s) }
+            return true
+        }
+        if sentences.isEmpty { sentences = [text] }
+
+        var result: [String] = []
+        var current = ""
+        for sentence in sentences {
+            let limit = result.isEmpty ? 240 : 1_200
+            if !current.isEmpty, current.count + sentence.count + 1 > limit {
+                result.append(current)
+                current = ""
+            }
+            current += current.isEmpty ? sentence : " " + sentence
+            // Split a single very long "sentence" (no punctuation) at word boundaries.
+            while current.count > 2_000 {
+                let cut = current.index(current.startIndex, offsetBy: 1_500)
+                let space = current[..<cut].lastIndex(of: " ") ?? cut
+                result.append(String(current[..<space]))
+                current = String(current[space...]).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
     }
 
     /// Highest-quality installed voice for the user's language.
@@ -76,10 +216,22 @@ final class Speaker: NSObject {
 extension Speaker: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString range: NSRange,
                                        utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.spokenRange = range }
+        Task { @MainActor in
+            self.progress = Double(range.location + range.length) / Double(max(self.systemTextLength, 1))
+        }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finish() }
+        Task { @MainActor in self.finishPlayback() }
+    }
+}
+
+extension Speaker: AVAudioPlayerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            guard player === self.player else { return }
+            self.segmentDone?.resume()
+            self.segmentDone = nil
+        }
     }
 }

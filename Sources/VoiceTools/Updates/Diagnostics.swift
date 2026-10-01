@@ -67,12 +67,12 @@ enum Diagnostics {
         if steps.contains(where: \.usesOpenRouter) {
             if !app.hasOpenRouterKey {
                 checks.append(Check(level: .problem, title: "OpenRouter key missing",
-                                    detail: "Add it in Edit tracks → Connections.", fix: .editTracks))
+                                    detail: "Add it in Voice Tools → Setup → OpenRouter.", fix: .editTracks))
             } else {
                 switch await OpenRouterClient.shared.validateKey() {
                 case .valid: checks.append(Check(level: .ok, title: "OpenRouter", detail: "Key valid"))
                 case .rejected: checks.append(Check(level: .problem, title: "OpenRouter key rejected",
-                                                    detail: "Replace it in Edit tracks → Connections.", fix: .editTracks))
+                                                    detail: "Replace it in Voice Tools → Setup → OpenRouter.", fix: .editTracks))
                 case .unreachable: checks.append(Check(level: .warning, title: "OpenRouter unreachable",
                                                        detail: "Can't reach openrouter.ai. Cloud steps will fail until it's back."))
                 }

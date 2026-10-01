@@ -33,11 +33,17 @@ struct ActiveRun {
 }
 
 struct RunRecord: Identifiable {
+    struct StepTiming {
+        let title: String
+        let ms: Int
+    }
+
     let id = UUID()
     let trackName: String
     let date: Date
     let text: String
     let totalMs: Int
+    var steps: [StepTiming] = []
 }
 
 @MainActor
@@ -53,6 +59,8 @@ final class AppState {
     private(set) var checking = false
     @ObservationIgnored private var recheckPending = false
     var hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
+    /// What the main window shows; the menu bar panel sets it to jump straight to Setup.
+    var mainSection: MainSection?
     /// Set while the editor records a new key combo, so existing hotkeys don't fire.
     var hotkeysSuspended = false {
         didSet { registerHotkeys(for: store.tracks) }
@@ -182,7 +190,8 @@ final class AppState {
 
         // Pressing a speaking track's trigger pauses or resumes it.
         if speakingTrack == trackID, speaker.state != .idle {
-            speaker.togglePause()
+            // Still fetching the first passage: a second press means "never mind".
+            speaker.state == .loading ? speaker.clear() : speaker.togglePause()
             return
         }
         guard capture == nil else { return }
@@ -312,8 +321,13 @@ final class AppState {
 
         let total = Int(Date().timeIntervalSince(startedAt) * 1000)
         if let text = run?.liveText, !text.isEmpty {
-            history.insert(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total), at: 0)
-            if history.count > 20 { history.removeLast() }
+            let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().compactMap { index, pair -> RunRecord.StepTiming? in
+                // The microphone's time is how long you spoke, not processing.
+                guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return nil }
+                return RunRecord.StepTiming(title: pair.0, ms: ms)
+            }
+            history.insert(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total, steps: steps), at: 0)
+            if history.count > 100 { history.removeLast() }
         }
         run?.phase = .done
         try? await Task.sleep(for: .milliseconds(900))
@@ -372,8 +386,16 @@ final class AppState {
             let input = try text(of: payload)
             speakingTrack = track.id
             run?.phase = .speaking
-            await speaker.speak(input, voiceID: voiceID, rate: rate, label: track.name)
+            await speaker.speakSystem(input, voiceID: voiceID, rate: rate, label: track.name)
             speakingTrack = nil
+            return .none
+
+        case .openRouterSpeech(let model, let voice, let rate):
+            let input = try text(of: payload)
+            speakingTrack = track.id
+            run?.phase = .speaking
+            defer { speakingTrack = nil }
+            try await speaker.speakCloud(input, model: model, voice: voice, rate: rate, label: track.name)
             return .none
 
         case .showHUD:
@@ -419,7 +441,7 @@ enum PipelineError: LocalizedError {
 extension StepKind {
     var usesOpenRouter: Bool {
         switch self {
-        case .openRouterSTT, .llm: true
+        case .openRouterSTT, .llm, .openRouterSpeech: true
         default: false
         }
     }

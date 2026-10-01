@@ -61,6 +61,29 @@ final class OpenRouterClient: Sendable {
         return try await send(request, as: Response.self).text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Synthesizes speech as MP3. Speed is applied at playback, since only some providers honor it.
+    func speech(model: String, voice: String?, text: String) async throws -> Data {
+        struct Request: Encodable {
+            let model: String
+            let input: String
+            let voice: String?
+            let response_format = "mp3"
+        }
+        var request = URLRequest(url: base.appendingPathComponent("audio/speech"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("Bearer \(try apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Request(model: model, input: text, voice: voice?.isEmpty == true ? nil : voice))
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw OpenRouterError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        guard !data.isEmpty else { throw OpenRouterError.emptyResponse }
+        return data
+    }
+
     func complete(model: String, system: String?, user: String) async throws -> String {
         struct Message: Codable { let role: String; let content: String }
         struct Request: Encodable { let model: String; let messages: [Message] }
