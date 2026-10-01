@@ -78,7 +78,7 @@ struct TrackDetailView: View {
             ForEach(["Input", "Transcribe", "Transform", "Output"], id: \.self) { category in
                 Section(category) {
                     ForEach(StepKind.catalog.filter { $0.category == category }, id: \.self) { kind in
-                        Button("\(kind.title)   \(kind.input.rawValue) → \(kind.output.rawValue)") {
+                        Button("\(kind.blockTitle)   \(kind.input.rawValue) → \(kind.output.rawValue)") {
                             let step = Step(kind: kind)
                             track.steps.append(step)
                             expandedStep = step.id
@@ -178,6 +178,7 @@ private struct StepConfigView: View {
 
         case .parakeet(let pauseMs, let storedMode):
             let mode = storedMode ?? .onRelease
+            transcriptionPicker
             Picker("Mode", selection: Binding { mode } set: { kind = .parakeet(chunkOnPauseMs: pauseMs, mode: $0) }) {
                 ForEach(ParakeetMode.allCases) { Text($0.label).tag($0) }
             }
@@ -195,10 +196,8 @@ private struct StepConfigView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-        case .openRouterSTT(let model):
-            LabeledContent("Model") {
-                ModelPicker(capability: .transcription, modelID: Binding { model } set: { kind = .openRouterSTT(model: $0) })
-            }
+        case .openRouterSTT:
+            transcriptionPicker
 
         case .llm(let model, let prompt, let policy):
             LabeledContent("Model") {
@@ -249,7 +248,7 @@ private struct StepConfigView: View {
             Text("Leaves the text on the clipboard.").font(.caption).foregroundStyle(.secondary)
 
         case .speak(let voiceID, let rate):
-            enginePicker
+            speechPicker
             Picker("Voice", selection: Binding { voiceID ?? "" } set: { kind = .speak(voiceID: $0.isEmpty ? nil : $0, rate: rate) }) {
                 Text("System default (best installed)").tag("")
                 ForEach(Self.voices, id: \.identifier) { voice in
@@ -264,14 +263,7 @@ private struct StepConfigView: View {
             }
 
         case .openRouterSpeech(let model, let voice, let rate):
-            enginePicker
-            LabeledContent("Model") {
-                ModelPicker(capability: .speech, modelID: Binding { model } set: { _ in }) { picked in
-                    // A new model has its own voices: keep the voice only if the new model offers it.
-                    let keep = picked.voices.contains(voice) ? voice : picked.defaultVoice ?? ""
-                    kind = .openRouterSpeech(model: picked.id, voice: keep, rate: rate)
-                }
-            }
+            speechPicker
             LabeledContent("Voice") {
                 VoicePicker(modelID: model, voice: Binding { voice } set: { kind = .openRouterSpeech(model: model, voice: $0, rate: rate) },
                             speaker: speaker)
@@ -286,7 +278,7 @@ private struct StepConfigView: View {
                 .font(.caption).foregroundStyle(.secondary)
 
         case .localSpeech(let engine, let voice, let rate):
-            enginePicker
+            speechPicker
             LabeledContent("Voice") {
                 HStack {
                     Picker("Voice", selection: Binding { voice } set: { kind = .localSpeech(engine: engine, voice: $0, rate: rate) }) {
@@ -310,33 +302,56 @@ private struct StepConfigView: View {
         }
     }
 
-    /// Switches a Speak step between engines (macOS voice, OpenRouter, or an on-device model), keeping its speed.
-    private var enginePicker: some View {
-        Picker("Engine", selection: Binding {
-            switch kind {
-            case .openRouterSpeech: 1
-            case .localSpeech(.pocket, _, _): 2
-            case .localSpeech(.supertonic, _, _): 3
-            default: 0
-            }
-        } set: { engine in
-            let rate: Float = switch kind {
-            case .speak(_, let r), .openRouterSpeech(_, _, let r), .localSpeech(_, _, let r): r
-            default: 1
-            }
-            kind = switch engine {
-            case 1: .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: rate)
-            case 2: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: rate)
-            case 3: .localSpeech(engine: .supertonic, voice: LocalVoiceEngine.supertonic.defaultVoice, rate: rate)
-            default: .speak(voiceID: nil, rate: rate)
-            }
-        }) {
-            Text("macOS").tag(0)
-            Text("OpenRouter").tag(1)
-            Text("Pocket TTS").tag(2)
-            Text("Supertonic").tag(3)
+    static let parakeetOption = LocalModelOption(id: "local:parakeet", name: "Parakeet v3",
+                                                 detail: "NVIDIA's model, on this Mac · about 50–150 ms after you stop")
+    static let speechOptions = [
+        LocalModelOption(id: "local:pocket", name: "Pocket TTS", detail: "Streams as it speaks · first sound in ~20 ms · 26 voices"),
+        LocalModelOption(id: "local:supertonic", name: "Supertonic-3", detail: "~80× faster than real time · small · 10 voices"),
+        LocalModelOption(id: "local:macos", name: "macOS voices", detail: "The voices installed in System Settings"),
+    ]
+
+    /// Transcribe is one block: Parakeet on this Mac, or any OpenRouter transcription model.
+    private var transcriptionPicker: some View {
+        let selection = switch kind {
+        case .openRouterSTT(let model): model
+        default: Self.parakeetOption.id
         }
-        .pickerStyle(.segmented)
+        return LabeledContent("Model") {
+            ModelPicker(capability: .transcription, selection: selection, local: [Self.parakeetOption]) { pick in
+                switch pick {
+                case .local:
+                    if case .parakeet = kind { return }
+                    kind = .parakeet(chunkOnPauseMs: 500, mode: .onRelease)
+                case .openRouter(let model):
+                    kind = .openRouterSTT(model: model.id)
+                }
+            }
+        }
+    }
+
+    /// Speak is one block: an on-device model, a macOS voice, or any OpenRouter speech model. Speed carries over.
+    private var speechPicker: some View {
+        let (selection, rate, currentVoice): (String, Float, String?) = switch kind {
+        case .localSpeech(let engine, let voice, let r): ("local:\(engine.rawValue)", r, voice)
+        case .openRouterSpeech(let model, let voice, let r): (model, r, voice)
+        case .speak(_, let r): ("local:macos", r, nil)
+        default: ("", 1, nil)
+        }
+        return LabeledContent("Model") {
+            ModelPicker(capability: .speech, selection: selection, local: Self.speechOptions) { pick in
+                switch pick {
+                case .local(let option) where option.id == "local:macos":
+                    kind = .speak(voiceID: nil, rate: rate)
+                case .local(let option):
+                    let engine = LocalVoiceEngine(rawValue: String(option.id.dropFirst("local:".count))) ?? .pocket
+                    let voice = currentVoice.flatMap { engine.voices.contains($0) ? $0 : nil } ?? engine.defaultVoice
+                    kind = .localSpeech(engine: engine, voice: voice, rate: rate)
+                case .openRouter(let model):
+                    let voice = currentVoice.flatMap { model.voices.contains($0) ? $0 : nil } ?? model.defaultVoice ?? ""
+                    kind = .openRouterSpeech(model: model.id, voice: voice, rate: rate)
+                }
+            }
+        }
     }
 
     private static let voices: [AVSpeechSynthesisVoice] = {

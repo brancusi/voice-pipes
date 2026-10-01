@@ -183,22 +183,28 @@ enum StepKind: Codable, Hashable {
     static let defaultSpeechModel = "microsoft/mai-voice-2.1"
     static let defaultSpeechVoice = "en-US-Harper:MAI-Voice-2.1"
 
+    /// The block's name in the "Add step" menu: one Transcribe and one Speak block, whose model is picked inside.
+    var blockTitle: String {
+        switch self {
+        case .parakeet, .openRouterSTT: "Transcribe"
+        case .speak, .openRouterSpeech, .localSpeech: "Speak"
+        case .llm: "LLM · OpenRouter"
+        default: title
+        }
+    }
+
     /// Catalog for the "Add step" menu.
     static let catalog: [StepKind] = [
         .microphone,
         .text(sources: [.selection, .page, .clipboard]),
         .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
-        .openRouterSTT(model: "microsoft/mai-transcribe-2"),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
         .http(url: "https://", method: "POST", headers: ["Content-Type": "application/json"],
               bodyTemplate: #"{"text": {{input_json}}}"#, responseField: ""),
         .template("{{input}}"),
         .paste(restoreClipboard: true),
         .copy,
-        .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: 1.0),
         .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0),
-        .localSpeech(engine: .supertonic, voice: LocalVoiceEngine.supertonic.defaultVoice, rate: 1.0),
-        .speak(voiceID: nil, rate: 1.0),
         .showHUD,
     ]
 }
@@ -233,8 +239,7 @@ extension Track {
         Track(name: "Read aloud", colorHex: "#6B4FD1",
               triggers: [Trigger(combo: KeyCombo(key: .r, modifiers: [.option]), mode: .toggle)],
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
-                      Step(kind: .openRouterSpeech(model: StepKind.defaultSpeechModel,
-                                                   voice: StepKind.defaultSpeechVoice, rate: 1.0))]),
+                      Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))]),
     ]
 }
 

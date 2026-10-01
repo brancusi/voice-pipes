@@ -16,6 +16,7 @@ final class TrackStore {
         if let data = try? Data(contentsOf: fileURL) {
             do {
                 tracks = try JSONDecoder().decode([Track].self, from: data)
+                if Self.migrateReadAloudToPocket(&tracks) { save() }
             } catch {
                 // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
                 let backup = fileURL.deletingPathExtension()
@@ -29,6 +30,27 @@ final class TrackStore {
             tracks = Track.defaults
             save()
         }
+    }
+
+    /// One-time (0.5.1): Pocket TTS became the default Read aloud voice. Switch an existing "Read aloud" track's
+    /// macOS or OpenRouter Speak step to it, keeping the speed. Later changes by the user are left alone.
+    private static func migrateReadAloudToPocket(_ tracks: inout [Track]) -> Bool {
+        let key = "migration.readAloudPocket.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
+        UserDefaults.standard.set(true, forKey: key)
+        var changed = false
+        for i in tracks.indices where tracks[i].name == "Read aloud" {
+            for j in tracks[i].steps.indices {
+                switch tracks[i].steps[j].kind {
+                case .speak(_, let rate), .openRouterSpeech(_, _, let rate):
+                    tracks[i].steps[j].kind = .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: rate)
+                    changed = true
+                default:
+                    break
+                }
+            }
+        }
+        return changed
     }
 
     nonisolated static var defaultURL: URL {

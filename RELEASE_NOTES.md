@@ -1,5 +1,10 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.5.1**
+- **Transcribe and Speak are each one building block.** Add the block, then choose its model from a single list. **On this Mac** comes first (Parakeet v3 for Transcribe; Pocket TTS, Supertonic-3 or macOS voices for Speak), then every OpenRouter model for that job. The voice list below the model always matches what you picked, and speed carries over when you switch.
+- **Pocket TTS is the default for Read aloud.** Your existing Read aloud track switches to it once (Alba voice, your speed kept). Pick any other model in the Speak block whenever you like.
+- The Add step menu is shorter: one Transcribe, one Speak, instead of an entry per engine.
+
 **0.5.0**
 - **Voices that run on this Mac.** The Speak step has two new engines next to macOS and OpenRouter:
   - **Pocket TTS** streams speech as it's generated, so reading starts almost instantly (about 20 ms after the model is loaded). 26 voices. About 770 MB, downloaded once. It's Kyutai's research model, so check its license before any commercial use.
