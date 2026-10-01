@@ -1,5 +1,12 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.6.0**
+- **Vocabulary and Fix words.** A shared list of words transcription keeps getting wrong (Open Voice Tools… → **Vocabulary**): for each, the spelling you want and what comes out instead, e.g. **Claude Code** ← "cloud code, clawed code". The new **Fix words** block replaces them instantly (no model, nothing leaves your Mac): whole words only, any capitalization, punctuation kept.
+- Capitalization: spellings with capitals ("OpenRouter", "macOS") are always written exactly; all-lowercase ones get a capital at the start of a sentence, unless you tick **Always exact** (for things like `kubectl`).
+- A **Try it** box on the Vocabulary page shows the result as you type.
+- Fix words is added once, right after transcription, to your dictation tracks. It starts with Claude Code, OpenRouter and FluidAudio; edit or remove them.
+- LLM steps (like the Haiku cleanup) get your vocabulary as a glossary, so they keep your spellings too.
+
 **0.5.1**
 - **Transcribe and Speak are each one building block.** Add the block, then choose its model from a single list. **On this Mac** comes first (Parakeet v3 for Transcribe; Pocket TTS, Supertonic-3 or macOS voices for Speak), then every OpenRouter model for that job. The voice list below the model always matches what you picked, and speed carries over when you switch.
 - **Pocket TTS is the default for Read aloud.** Your existing Read aloud track switches to it once (Alba voice, your speed kept). Pick any other model in the Speak block whenever you like.

@@ -101,6 +101,8 @@ enum StepKind: Codable, Hashable {
     case llm(model: String, prompt: String, onFailure: FailurePolicy)
     case http(url: String, method: String, headers: [String: String], bodyTemplate: String, responseField: String)
     case template(String)
+    /// Find-and-replace from the shared vocabulary (Voice Tools → Vocabulary).
+    case fixWords
 
     // Outputs
     case paste(restoreClipboard: Bool)
@@ -114,14 +116,14 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .http, .template, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
+        case .llm, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
         }
     }
 
     var output: DataKind {
         switch self {
         case .microphone: .audio
-        case .text, .parakeet, .openRouterSTT, .llm, .http, .template: .text
+        case .text, .parakeet, .openRouterSTT, .llm, .http, .template, .fixWords: .text
         // Outputs pass their text through so a track can, e.g., paste and then POST.
         case .paste, .copy, .showHUD: .text
         case .speak, .openRouterSpeech, .localSpeech: .none
@@ -132,7 +134,7 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
-        case .llm, .http, .template: "Transform"
+        case .llm, .http, .template, .fixWords: "Transform"
         case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: "Output"
         }
     }
@@ -151,6 +153,7 @@ enum StepKind: Codable, Hashable {
         case .llm(let model, _, _): "LLM · \(model)"
         case .http(let url, let method, _, _, _): "\(method) \(URL(string: url)?.host ?? url)"
         case .template: "Text template"
+        case .fixWords: "Fix words"
         case .paste: "Paste at cursor"
         case .copy: "Copy to clipboard"
         case .speak: "Speak · macOS voice"
@@ -171,6 +174,7 @@ enum StepKind: Codable, Hashable {
         case .llm(let model, _, _): model.split(separator: "/").last.map(String.init) ?? model
         case .http(_, let method, _, _, _): method
         case .template: "Template"
+        case .fixWords: "Fix words"
         case .paste: "Paste"
         case .copy: "Copy"
         case .speak: "Speak"
@@ -201,6 +205,7 @@ enum StepKind: Codable, Hashable {
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
         .http(url: "https://", method: "POST", headers: ["Content-Type": "application/json"],
               bodyTemplate: #"{"text": {{input_json}}}"#, responseField: ""),
+        .fixWords,
         .template("{{input}}"),
         .paste(restoreClipboard: true),
         .copy,
@@ -230,10 +235,10 @@ extension Track {
         Track(name: "Fast dictation", colorHex: "#D9731A",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option]), mode: .hold)],
               steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
-                      Step(kind: .paste(restoreClipboard: true))]),
+                      Step(kind: .fixWords), Step(kind: .paste(restoreClipboard: true))]),
         Track(name: "Clean dictation", colorHex: "#0A66D8",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option, .shift]), mode: .toggle)],
-              steps: [Step(kind: .microphone), Step(kind: .openRouterSTT(model: "microsoft/mai-transcribe-2")),
+              steps: [Step(kind: .microphone), Step(kind: .openRouterSTT(model: "microsoft/mai-transcribe-2")), Step(kind: .fixWords),
                       Step(kind: .llm(model: "anthropic/claude-haiku-4.5", prompt: cleanupPrompt, onFailure: .passThrough)),
                       Step(kind: .paste(restoreClipboard: true))]),
         Track(name: "Read aloud", colorHex: "#6B4FD1",

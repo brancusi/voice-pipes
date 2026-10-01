@@ -16,7 +16,9 @@ final class TrackStore {
         if let data = try? Data(contentsOf: fileURL) {
             do {
                 tracks = try JSONDecoder().decode([Track].self, from: data)
-                if Self.migrateReadAloudToPocket(&tracks) { save() }
+                let pocket = Self.migrateReadAloudToPocket(&tracks)
+                let fixWords = Self.addFixWords(&tracks)
+                if pocket || fixWords { save() }
             } catch {
                 // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
                 let backup = fileURL.deletingPathExtension()
@@ -49,6 +51,22 @@ final class TrackStore {
                     break
                 }
             }
+        }
+        return changed
+    }
+
+    /// One-time (0.6.0): put a Fix words step right after the transcription step of every dictation track.
+    private static func addFixWords(_ tracks: inout [Track]) -> Bool {
+        let key = "migration.fixWords.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
+        UserDefaults.standard.set(true, forKey: key)
+        var changed = false
+        for i in tracks.indices where !tracks[i].steps.contains(where: { $0.kind == .fixWords }) {
+            guard let index = tracks[i].steps.firstIndex(where: {
+                switch $0.kind { case .parakeet, .openRouterSTT: true; default: false }
+            }) else { continue }
+            tracks[i].steps.insert(Step(kind: .fixWords), at: index + 1)
+            changed = true
         }
         return changed
     }

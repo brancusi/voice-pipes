@@ -373,11 +373,15 @@ final class AppState {
 
         case .llm(let model, let prompt, _):
             let input = try text(of: payload)
+            // The shared vocabulary rides along as a glossary, so the model keeps your spellings.
+            let glossary = VocabularyStore.shared.glossary
+            let instructions = glossary.isEmpty ? prompt
+                : prompt + "\n\nGlossary (always use these exact spellings): " + glossary.joined(separator: ", ") + "."
             if prompt.contains("{{input") {
                 return .text(try await OpenRouterClient.shared.complete(
-                    model: model, system: nil, user: Template.render(prompt, input: input)))
+                    model: model, system: nil, user: Template.render(instructions, input: input)))
             }
-            return .text(try await OpenRouterClient.shared.complete(model: model, system: prompt, user: input))
+            return .text(try await OpenRouterClient.shared.complete(model: model, system: instructions, user: input))
 
         case .http(let url, let method, let headers, let body, let field):
             return .text(try await HTTPStep.run(input: try text(of: payload), url: url, method: method,
@@ -385,6 +389,9 @@ final class AppState {
 
         case .template(let template):
             return .text(Template.render(template, input: try text(of: payload)))
+
+        case .fixWords:
+            return .text(FixWords.apply(try text(of: payload), entries: VocabularyStore.shared.entries))
 
         case .paste(let restore):
             let input = try text(of: payload)

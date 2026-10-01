@@ -8,8 +8,8 @@ Default tracks:
 
 | Track | Trigger | Pipeline |
 |---|---|---|
-| Fast dictation | ⌥ Space (hold) | Mic → Parakeet v3 (on-device, chunked on pauses) → Paste |
-| Clean dictation | ⌥ ⇧ Space (toggle) | Mic → MAI-Transcribe-2 (OpenRouter) → Claude Haiku cleanup → Paste |
+| Fast dictation | ⌥ Space (hold) | Mic → Parakeet v3 (on-device) → Fix words → Paste |
+| Clean dictation | ⌥ ⇧ Space (toggle) | Mic → MAI-Transcribe-2 (OpenRouter) → Fix words → Claude Haiku cleanup → Paste |
 | Read aloud | ⌥ R (toggle: start / pause / resume) | Selection → page → clipboard → Speak (OpenRouter MAI-Voice-2.1, on-device Pocket TTS / Supertonic-3, or a macOS voice) |
 
 ## Install
@@ -83,7 +83,7 @@ next version by hand once. A build without `UPDATE_PUBLIC_KEY` has updates turne
 
 | Layer | Files |
 |---|---|
-| Model | `Model/Track.swift`, `KeyCombo.swift`, `TrackStore.swift` |
+| Model | `Model/Track.swift`, `KeyCombo.swift`, `TrackStore.swift`, `Vocabulary.swift` (word list + Fix words) |
 | Engine | `Pipeline/AppState.swift` (trigger handling, capture, step execution) |
 | Audio | `Audio/AudioRecorder.swift`, `PauseChunker.swift`, `ParakeetService.swift`, `LocalVoices.swift` (on-device TTS) |
 | Services | `Services/OpenRouterClient.swift`, `OpenRouterCatalog.swift` (model list for pickers), `HTTPStep.swift`, `Keychain.swift` |

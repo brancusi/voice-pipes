@@ -3,6 +3,7 @@ import SwiftUI
 enum MainSection: Hashable {
     case track(Track.ID)
     case activity
+    case vocabulary
     case setup
 }
 
@@ -44,6 +45,7 @@ struct MainWindowView: View {
             }
             Section("Voice Tools") {
                 Label("Activity", systemImage: "clock.arrow.circlepath").tag(MainSection.activity)
+                Label("Vocabulary", systemImage: "character.book.closed").tag(MainSection.vocabulary)
                 HStack {
                     Label("Setup", systemImage: "checklist")
                     Spacer()
@@ -72,6 +74,8 @@ struct MainWindowView: View {
             }
         case .activity:
             ActivityView(app: app).navigationTitle("Activity")
+        case .vocabulary:
+            VocabularyView().navigationTitle("Vocabulary")
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }
@@ -223,5 +227,57 @@ private struct SetupView: View {
         case .ready: "Loaded"
         case .failed(let error): "Failed: \(error)"
         }
+    }
+}
+
+/// The shared word list used by Fix words steps (and given to LLM steps as a glossary).
+private struct VocabularyView: View {
+    @Bindable private var store = VocabularyStore.shared
+    @State private var sample = "i use cloud code and open router every day. para keet is fast."
+
+    var body: some View {
+        Form {
+            Section {
+                Text("Words transcription keeps getting wrong. **Write** is the spelling you want; **Heard as** lists what comes out instead, separated by commas. Replacement is mechanical and instant: whole words only, any capitalization. Spellings with capitals are always written exactly; all-lowercase ones get a capital at the start of a sentence unless **Always exact** is on.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+
+            Section("Words") {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    GridRow {
+                        Text("Write").font(.caption).foregroundStyle(.secondary)
+                        Text("Heard as").font(.caption).foregroundStyle(.secondary)
+                        Text("Always exact").font(.caption).foregroundStyle(.secondary)
+                        Color.clear.frame(width: 1, height: 1)
+                    }
+                    ForEach($store.entries) { $entry in
+                        GridRow {
+                            TextField("Claude Code", text: $entry.write)
+                                .textFieldStyle(.roundedBorder).frame(minWidth: 160)
+                            TextField("cloud code, clawed code", text: Binding {
+                                entry.heardAs.joined(separator: ", ")
+                            } set: { text in
+                                entry.heardAs = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                            })
+                            .textFieldStyle(.roundedBorder).frame(minWidth: 260)
+                            Toggle("", isOn: $entry.alwaysExact).labelsHidden()
+                            Button { store.entries.removeAll { $0.id == entry.id } } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless).help("Remove")
+                        }
+                    }
+                }
+                Button { store.entries.append(VocabularyEntry(write: "", heardAs: [])) } label: { Label("Add word", systemImage: "plus") }
+                    .buttonStyle(.borderless)
+            }
+
+            Section("Try it") {
+                TextField("Type or paste a sentence", text: $sample, axis: .vertical)
+                LabeledContent("Result") {
+                    Text(FixWords.apply(sample, entries: store.entries)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }

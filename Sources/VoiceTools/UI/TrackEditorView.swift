@@ -143,6 +143,7 @@ private struct StepRow: View {
         case .llm: "sparkles"
         case .http: "network"
         case .template: "curlybraces"
+        case .fixWords: "character.cursor.ibeam"
         case .paste: "doc.on.clipboard"
         case .copy: "doc.on.doc"
         case .speak, .openRouterSpeech: "speaker.wave.2"
@@ -240,6 +241,9 @@ private struct StepConfigView: View {
 
         case .template(let template):
             TextField("Template ({{input}})", text: Binding { template } set: { kind = .template($0) }, axis: .vertical)
+
+        case .fixWords:
+            FixWordsSummary()
 
         case .paste(let restore):
             Toggle("Restore previous clipboard after pasting", isOn: Binding { restore } set: { kind = .paste(restoreClipboard: $0) })
@@ -425,5 +429,14 @@ private struct LocalPreviewButton: View {
         }
         .buttonStyle(.borderless)
         .help(error ?? "Preview this voice (first use downloads the model)")
+    }
+}
+
+/// The Fix words step uses the shared list; this shows how many words it has and links to it.
+private struct FixWordsSummary: View {
+    var body: some View {
+        let count = VocabularyStore.shared.entries.count
+        Text("Replaces mishearings from your Vocabulary (\(count) \(count == 1 ? "word" : "words")) — instant, no model. Edit the list under Vocabulary in the sidebar.")
+            .font(.caption).foregroundStyle(.secondary)
     }
 }
