@@ -13,9 +13,18 @@ final class TrackStore {
 
     init(fileURL: URL = TrackStore.defaultURL) {
         self.fileURL = fileURL
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([Track].self, from: data) {
-            tracks = decoded
+        if let data = try? Data(contentsOf: fileURL) {
+            do {
+                tracks = try JSONDecoder().decode([Track].self, from: data)
+            } catch {
+                // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
+                let backup = fileURL.deletingPathExtension()
+                    .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? FileManager.default.moveItem(at: fileURL, to: backup)
+                NSLog("VoiceTools: couldn't read tracks (\(error)); moved them to \(backup.lastPathComponent)")
+                tracks = Track.defaults
+                save()
+            }
         } else {
             tracks = Track.defaults
             save()

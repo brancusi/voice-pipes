@@ -1,5 +1,13 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.2.0**
+- **Parakeet mode** (Edit tracks → the Parakeet step): **On release** (the default, and the most accurate: the whole recording is transcribed when you stop, about 0.2 s for 20 s of speech), **Chunk at pauses** (each phrase is transcribed when you pause), or **Streaming** (overlapping windows with live text in the HUD while you talk).
+- Fixed: chunked dictation could cut phrases mid-word or lose quiet speech, because the pause detector slowly started treating speech as silence. It now follows the room's background level over the last few seconds and never drops speech.
+- Chunks are at least 3 s long, so Parakeet has enough context; the default pause before a cut is 500 ms.
+- If live transcription fails or comes back empty, the whole recording is transcribed instead.
+- Existing tracks switch to **On release**; pick another mode per track if you want it.
+- Tracks that can't be read are set aside as `tracks.unreadable-<time>.json` instead of being replaced.
+
 **0.1.0**
 - **Tracks**: each one is a pipeline of steps you build in **Edit tracks…**. Audio or text goes in (microphone, selected text, current page, clipboard, previous clipboard), passes through steps (Parakeet v3 on this Mac, OpenRouter transcription, an LLM, an HTTP request, a template) and comes out pasted, copied, spoken, or posted somewhere.
 - **Triggers**: any number of hotkeys per track, each **Toggle** (press to start, press to stop) or **Press & hold**. Esc cancels a recording.

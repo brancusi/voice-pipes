@@ -1,3 +1,4 @@
+@preconcurrency import AVFoundation
 import FluidAudio
 import Foundation
 
@@ -6,6 +7,7 @@ actor ParakeetService {
     enum State: Equatable { case notLoaded, loading, ready, failed(String) }
 
     private var manager: AsrManager?
+    private var models: AsrModels?
     private var loadTask: Task<Void, Never>?
     private(set) var state: State = .notLoaded
 
@@ -24,6 +26,7 @@ actor ParakeetService {
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
             self.manager = manager
+            self.models = models
             state = .ready
         } catch {
             state = .failed(error.localizedDescription)
@@ -40,6 +43,78 @@ actor ParakeetService {
         return try await manager.transcribe(padded, decoderState: &state).text
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    /// A sliding-window streaming session sharing the already-loaded models (no reload).
+    func startStreamingSession() async throws -> SlidingWindowAsrManager {
+        if models == nil { await load() }
+        guard let models else { throw ParakeetError.notLoaded }
+        let session = SlidingWindowAsrManager(config: .streaming)
+        try await session.loadModels(models)
+        try await session.startStreaming(source: .microphone)
+        return session
+    }
+}
+
+/// Transcribes while the user is still recording, so release only waits for the tail.
+protocol LiveTranscriber: AnyObject, Sendable {
+    func feed(_ samples: [Float])
+    func finish() async throws -> String
+    func cancel()
+}
+
+/// Feeds a live recording to a Parakeet sliding-window session, in order, and reports live text.
+final class StreamingTranscriber: LiveTranscriber, @unchecked Sendable {
+    private let input: AsyncStream<[Float]>.Continuation
+    private let worker: Task<String, Error>
+
+    init(parakeet: ParakeetService, onPartial: @escaping @Sendable (String) -> Void) {
+        let (stream, continuation) = AsyncStream<[Float]>.makeStream()
+        input = continuation
+        worker = Task {
+            let session = try await parakeet.startStreamingSession()
+            let updates = Task {
+                var confirmed = ""
+                for await update in await session.transcriptionUpdates {
+                    if update.isConfirmed {
+                        confirmed = [confirmed, update.text].filter { !$0.isEmpty }.joined(separator: " ")
+                        onPartial(confirmed)
+                    } else {
+                        onPartial([confirmed, update.text].filter { !$0.isEmpty }.joined(separator: " "))
+                    }
+                }
+            }
+            defer { updates.cancel() }
+            // Audio recorded while the session was starting is buffered in the stream, so nothing is lost.
+            for await samples in stream {
+                if let buffer = Self.buffer(samples) { await session.streamAudio(buffer) }
+            }
+            return try await session.finish().trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /// Audio-thread entry point.
+    func feed(_ samples: [Float]) { input.yield(samples) }
+
+    func finish() async throws -> String {
+        input.finish()
+        return try await worker.value
+    }
+
+    func cancel() {
+        input.finish()
+        worker.cancel()
+    }
+
+    private static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1,
+                                              interleaved: false)!
+
+    private static func buffer(_ samples: [Float]) -> AVAudioPCMBuffer? {
+        guard !samples.isEmpty,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return nil }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+        return buffer
+    }
 }
 
 enum ParakeetError: LocalizedError {
@@ -49,7 +124,7 @@ enum ParakeetError: LocalizedError {
 
 /// Transcribes phrase chunks as they arrive during recording, in order, so that on release
 /// only the final short chunk is left to process.
-final class ChunkedTranscriber: @unchecked Sendable {
+final class ChunkedTranscriber: LiveTranscriber, @unchecked Sendable {
     private let parakeet: ParakeetService
     private let lock = NSLock()
     private var chunker: PauseChunker
@@ -74,6 +149,10 @@ final class ChunkedTranscriber: @unchecked Sendable {
         if let last = lock.withLock({ chunker.flush() }) { enqueue(last) }
         let parts = await lock.withLock { tail }.value
         return parts.joined(separator: " ")
+    }
+
+    func cancel() {
+        lock.withLock { tail.cancel() }
     }
 
     private func enqueue(_ chunk: [Float]) {

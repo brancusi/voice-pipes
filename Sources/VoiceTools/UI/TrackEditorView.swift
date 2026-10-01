@@ -39,7 +39,7 @@ struct TrackEditorView: View {
                 .onMove { app.store.tracks.move(fromOffsets: $0, toOffset: $1) }
                 Button("+ New track") {
                     let track = Track(name: "New track", colorHex: "#1F9D55", triggers: [],
-                                      steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 300)),
+                                      steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
                                               Step(kind: .paste(restoreClipboard: true))])
                     app.store.tracks.append(track)
                     selection = track.id
@@ -260,14 +260,24 @@ private struct StepConfigView: View {
                 }
             }
 
-        case .parakeet(let pauseMs):
-            HStack {
-                Text("Chunk on pauses longer than")
-                Slider(value: Binding { Double(pauseMs) } set: { kind = .parakeet(chunkOnPauseMs: Int($0)) },
-                       in: 150...800, step: 50)
-                Text("\(pauseMs) ms").monospacedDigit().frame(width: 60, alignment: .trailing)
+        case .parakeet(let pauseMs, let storedMode):
+            let mode = storedMode ?? .onRelease
+            Picker("Mode", selection: Binding { mode } set: { kind = .parakeet(chunkOnPauseMs: pauseMs, mode: $0) }) {
+                ForEach(ParakeetMode.allCases) { Text($0.label).tag($0) }
             }
-            Text("Chunking applies when this step directly follows Microphone.").font(.caption).foregroundStyle(.secondary)
+            Text(mode.detail).font(.caption).foregroundStyle(.secondary)
+            if mode == .pauseChunks {
+                HStack {
+                    Text("Cut at pauses longer than")
+                    Slider(value: Binding { Double(pauseMs) } set: { kind = .parakeet(chunkOnPauseMs: Int($0), mode: mode) },
+                           in: 300...1200, step: 50)
+                    Text("\(pauseMs) ms").monospacedDigit().frame(width: 60, alignment: .trailing)
+                }
+            }
+            if mode != .onRelease {
+                Text("Chunking and streaming apply when this step directly follows Microphone.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
 
         case .openRouterSTT(let model):
             TextField("Model", text: Binding { model } set: { kind = .openRouterSTT(model: $0) })

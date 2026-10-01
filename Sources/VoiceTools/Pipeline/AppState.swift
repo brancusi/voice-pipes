@@ -69,7 +69,7 @@ final class AppState {
     private struct Capture {
         let track: Track
         let mode: Trigger.Mode
-        let chunked: ChunkedTranscriber?
+        let live: LiveTranscriber?
         let started: Date
     }
 
@@ -189,17 +189,25 @@ final class AppState {
     }
 
     private func beginCapture(_ track: Track, mode: Trigger.Mode) {
-        var chunked: ChunkedTranscriber?
-        if track.steps.count > 1, case .parakeet(let pauseMs) = track.steps[1].kind {
-            let transcriber = ChunkedTranscriber(parakeet: parakeet, pauseMs: pauseMs)
-            transcriber.onPartial = { [weak self] text in
-                Task { @MainActor in self?.run?.liveText = text }
+        let showPartial: @Sendable (String) -> Void = { [weak self] text in
+            Task { @MainActor in self?.run?.liveText = text }
+        }
+        var live: LiveTranscriber?
+        if track.steps.count > 1, case .parakeet(let pauseMs, let parakeetMode) = track.steps[1].kind {
+            switch parakeetMode ?? .onRelease {
+            case .onRelease:
+                break
+            case .pauseChunks:
+                let transcriber = ChunkedTranscriber(parakeet: parakeet, pauseMs: pauseMs)
+                transcriber.onPartial = showPartial
+                live = transcriber
+            case .streaming:
+                live = StreamingTranscriber(parakeet: parakeet, onPartial: showPartial)
             }
-            chunked = transcriber
         }
         if track.steps.contains(where: \.kind.usesOpenRouter) { OpenRouterClient.shared.prewarm() }
 
-        recorder.onSamples = chunked.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
+        recorder.onSamples = live.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
         recorder.onLevel = { [weak self] level in
             Task { @MainActor in self?.run?.level = level }
         }
@@ -209,7 +217,7 @@ final class AppState {
             show(failure: "Microphone unavailable: \(error.localizedDescription)", for: track)
             return
         }
-        capture = Capture(track: track, mode: mode, chunked: chunked, started: Date())
+        capture = Capture(track: track, mode: mode, live: live, started: Date())
         run?.phase = .recording
         run?.recordingStarted = Date()
         cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
@@ -218,8 +226,9 @@ final class AppState {
     }
 
     func cancelCapture() {
-        guard capture != nil else { return }
+        guard let live = capture.map({ $0.live }) else { return }
         _ = recorder.stop()
+        live?.cancel()
         endCaptureHotkeys()
         capture = nil
         run = nil
@@ -244,10 +253,15 @@ final class AppState {
             return
         }
 
-        if let chunked = capture.chunked {
+        if let live = capture.live {
             run?.currentStep = 1
             let released = Date()
-            let text = await chunked.finish()
+            var text = (try? await live.finish()) ?? ""
+            if text.isEmpty {
+                // Live transcription failed or found nothing: fall back to the whole recording.
+                NSLog("VoiceTools: live transcription returned nothing; transcribing the whole recording")
+                text = (try? await parakeet.transcribe(samples)) ?? ""
+            }
             run?.stepMs[1] = Int(Date().timeIntervalSince(released) * 1000)
             await runSteps(capture.track, from: 2, payload: .text(text), startedAt: released)
         } else {

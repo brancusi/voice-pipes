@@ -54,6 +54,34 @@ enum TextSource: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// How the on-device Parakeet step handles a live recording.
+enum ParakeetMode: String, Codable, CaseIterable, Identifiable {
+    /// Transcribe the whole recording on release. Most accurate; still ~0.2 s for 20 s of speech.
+    case onRelease
+    /// Transcribe each phrase at natural pauses while recording; release only waits for the last phrase.
+    case pauseChunks
+    /// Sliding-window streaming with overlapping context; live text while you talk.
+    case streaming
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .onRelease: "On release (most accurate)"
+        case .pauseChunks: "Chunk at pauses"
+        case .streaming: "Streaming (live text)"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .onRelease: "Transcribes the whole recording when you stop. Parakeet does ~20 s of speech in about 0.2 s."
+        case .pauseChunks: "Transcribes each phrase when you pause, so long dictations finish sooner. Each phrase is decoded on its own, so accuracy can drop at the cuts."
+        case .streaming: "Transcribes in overlapping windows as you talk and shows live text. Release waits for the last window (up to ~11 s of audio)."
+        }
+    }
+}
+
 enum FailurePolicy: String, Codable, CaseIterable {
     case passThrough
     case stop
@@ -65,7 +93,8 @@ enum StepKind: Codable, Hashable {
     case text(sources: [TextSource])
 
     // Transcribe (audio -> text)
-    case parakeet(chunkOnPauseMs: Int)
+    /// `mode` is optional so tracks saved before it existed still load (nil = on release).
+    case parakeet(chunkOnPauseMs: Int, mode: ParakeetMode?)
     case openRouterSTT(model: String)
 
     // Transform (text -> text)
@@ -110,7 +139,12 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone: "Microphone"
         case .text(let sources): sources.map(\.label).joined(separator: " → ")
-        case .parakeet: "Parakeet v3 · local"
+        case .parakeet(_, let mode):
+            switch mode ?? .onRelease {
+            case .onRelease: "Parakeet v3 · local"
+            case .pauseChunks: "Parakeet v3 · chunked"
+            case .streaming: "Parakeet v3 · streaming"
+            }
         case .openRouterSTT(let model): model
         case .llm(let model, _, _): "LLM · \(model)"
         case .http(let url, let method, _, _, _): "\(method) \(URL(string: url)?.host ?? url)"
@@ -143,7 +177,7 @@ enum StepKind: Codable, Hashable {
     static let catalog: [StepKind] = [
         .microphone,
         .text(sources: [.selection, .page, .clipboard]),
-        .parakeet(chunkOnPauseMs: 300),
+        .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
         .openRouterSTT(model: "microsoft/mai-transcribe-2"),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
         .http(url: "https://", method: "POST", headers: ["Content-Type": "application/json"],
@@ -176,7 +210,7 @@ extension Track {
     static let defaults: [Track] = [
         Track(name: "Fast dictation", colorHex: "#D9731A",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option]), mode: .hold)],
-              steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 300)),
+              steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
                       Step(kind: .paste(restoreClipboard: true))]),
         Track(name: "Clean dictation", colorHex: "#0A66D8",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option, .shift]), mode: .toggle)],
