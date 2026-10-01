@@ -37,9 +37,22 @@ Needs macOS 14+ and Swift 6 (Command Line Tools are enough). The icon is drawn i
 Sparkle (the updater) comes in through SwiftPM, pinned to the same version as `SPARKLE_VERSION` in `build.sh`,
 which also fetches that release's `sign_update` tool into `.cache/` (checked against its SHA-256).
 
-Ad hoc signed builds look like a new app to macOS on every rebuild, so Accessibility must be granted again. To
-avoid that locally, create a self-signed certificate in Keychain Access (Certificate Assistant → Create a
-Certificate → type *Code Signing*) and build with `SIGN_IDENTITY="<its name>" DEV=1 ./build.sh`.
+### Code signing and permissions
+
+macOS remembers Microphone and Accessibility permissions per app *identity*. An ad hoc signature changes with
+every build, so each update would look like a new app and lose its permissions. Releases are therefore signed
+with **Voice Tools Signing**, a self-signed code-signing certificate (no Apple developer account needed): the
+app's identity becomes "`io.github.brancusi.voice-tools` signed by that certificate", which stays the same
+across versions. `build.sh` fails if a signed build's requirement doesn't name the certificate.
+
+The certificate (`.p12`) and its password live in the `SIGNING_CERT_P12` (base64) and `SIGNING_CERT_PASSWORD`
+Actions secrets and in a password manager. Keep using the same one: a new certificate means everyone grants
+permissions once more (updates still install, since Sparkle accepts a changed certificate when the EdDSA
+signature is valid).
+
+To sign local builds the same way (so a dev build shares the installed app's permissions), import the `.p12`
+into your login keychain once (double-click it), then `SIGN_IDENTITY="Voice Tools Signing" DEV=1 ./build.sh`.
+Without it, local builds are ad hoc.
 
 ## Releases and updates
 

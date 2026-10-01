@@ -337,7 +337,12 @@ final class AppState {
 
         case .paste(let restore):
             let input = try text(of: payload)
-            await Clipboard.shared.paste(input, restore: restore)
+            do {
+                try await Clipboard.shared.paste(input, restore: restore)
+            } catch {
+                refreshChecks()
+                throw error
+            }
             return payload
 
         case .copy:

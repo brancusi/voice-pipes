@@ -11,8 +11,11 @@
 # checks FEED_URL (every 5 minutes itself; Sparkle hourly, its minimum). Without a key the app builds with updates
 # off; REQUIRE_UPDATES=1 makes that an error.
 #
-# Signing: ad hoc by default. Set SIGN_IDENTITY to a code-signing identity to keep macOS permissions
-# (Accessibility, Microphone) across local rebuilds.
+# Signing: releases are signed with the "Voice Tools Signing" certificate (self-signed, from the
+# SIGNING_CERT_P12 secret), so macOS keeps Microphone and Accessibility permissions across updates: it
+# remembers the app by its identifier and certificate instead of by one build's hash. Set SIGN_IDENTITY to
+# that certificate's name to sign local builds the same way. Without it the build is ad hoc, which macOS
+# treats as a new app every time; REQUIRE_SIGNING=1 makes that an error.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -95,8 +98,16 @@ $UPDATE_KEYS
 PLIST
 
 IDENTITY="${SIGN_IDENTITY:--}"
+if [[ "$IDENTITY" == "-" && "${REQUIRE_SIGNING:-0}" == 1 ]]; then
+  echo "REQUIRE_SIGNING=1 but no SIGN_IDENTITY; users would have to grant permissions again." >&2; exit 1
+fi
 echo "==> sign (${IDENTITY/#-/ad hoc})"
 codesign --force --deep --sign "$IDENTITY" "$APP"
+if [[ "$IDENTITY" != "-" ]]; then
+  # The designated requirement must name the certificate, or permissions won't carry over between versions.
+  codesign -d -r- "$APP" 2>&1 | grep -q 'certificate root' \
+    || { echo "Signed app's requirement doesn't name the certificate:" >&2; codesign -d -r- "$APP" >&2; exit 1; }
+fi
 
 if [[ "${DEV:-0}" == 1 ]]; then
   mkdir -p build && rm -rf "build/$NAME.app" && ditto "$APP" "build/$NAME.app"

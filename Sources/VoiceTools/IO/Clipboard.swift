@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 /// Clipboard access plus a tiny history so tracks can read the *previous* clipboard entry.
 @MainActor
@@ -39,15 +40,22 @@ final class Clipboard {
     }
 
     /// Pastes into the focused app with ⌘V, optionally restoring what was on the clipboard.
-    func paste(_ text: String, restore: Bool) async {
+    /// Without Accessibility permission macOS drops the keystroke silently, so in that case the text is left on
+    /// the clipboard and this throws, rather than pretending it pasted.
+    func paste(_ text: String, restore: Bool) async throws {
+        guard AXIsProcessTrusted() else {
+            copy(text)
+            throw PasteError.notTrusted
+        }
         let saved = restore ? snapshot() : nil
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         suppressUntilChange = pasteboard.changeCount + (restore ? 1 : 0)
-        Keystroke.send(keyCode: 9, flags: .maskCommand) // V
+        await Keystroke.waitForModifiersReleased()
+        Keystroke.send("v", flags: .maskCommand)
         guard let saved else { return }
         // Give the target app time to read the pasteboard before restoring.
-        try? await Task.sleep(for: .milliseconds(250))
+        try? await Task.sleep(for: .milliseconds(400))
         restoreSnapshot(saved)
     }
 
@@ -56,7 +64,8 @@ final class Clipboard {
         let saved = snapshot()
         let before = pasteboard.changeCount
         suppressUntilChange = before + 2
-        Keystroke.send(keyCode: 8, flags: .maskCommand) // C
+        await Keystroke.waitForModifiersReleased()
+        Keystroke.send("c", flags: .maskCommand)
         for _ in 0..<20 where pasteboard.changeCount == before {
             try? await Task.sleep(for: .milliseconds(15))
         }
@@ -82,14 +91,38 @@ final class Clipboard {
     }
 }
 
+enum PasteError: LocalizedError {
+    case notTrusted
+
+    var errorDescription: String? {
+        "Couldn't paste: Voice Tools needs Accessibility permission (macOS may reset it after an update). The text is on the clipboard; press ⌘V."
+    }
+}
+
 enum Keystroke {
-    static func send(keyCode: CGKeyCode, flags: CGEventFlags) {
-        let source = CGEventSource(stateID: .combinedSessionState)
-        let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+    private static let modifierMask: CGEventFlags = [.maskCommand, .maskAlternate, .maskControl, .maskShift]
+
+    /// Waits until the trigger's modifier keys are let go: held keys would otherwise merge into the
+    /// synthetic shortcut (⌥ held from ⌥ Space turns ⌘V into ⌥⌘V, which most apps ignore).
+    static func waitForModifiersReleased(timeout: Duration = .milliseconds(1500)) async {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline,
+              !CGEventSource.flagsState(.hidSystemState).intersection(modifierMask).isEmpty {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    /// Sends a shortcut by character, so it works on any keyboard layout (V isn't key code 9 on Dvorak).
+    static func send(_ character: Character, flags: CGEventFlags) {
+        let fallback: CGKeyCode = character == "c" ? 8 : 9
+        let code = KeyCombo.keyCode(producing: character).map { CGKeyCode($0) } ?? fallback
+        // A private event source carries only the flags set here, never the keys physically held.
+        let source = CGEventSource(stateID: .privateState)
+        let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false)
         down?.flags = flags
         up?.flags = flags
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
+        down?.post(tap: .cgSessionEventTap)
+        up?.post(tap: .cgSessionEventTap)
     }
 }

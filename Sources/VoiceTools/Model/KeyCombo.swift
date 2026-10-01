@@ -66,6 +66,12 @@ struct KeyCombo: Codable, Hashable {
         kVK_F18: "F18", kVK_F19: "F19", kVK_F20: "F20",
     ]
 
+    /// The key code that types `character` in the current keyboard layout.
+    static func keyCode(producing character: Character) -> UInt32? {
+        let target = String(character).uppercased()
+        return (0..<128).first { characterName(for: UInt32($0)) == target }.map(UInt32.init)
+    }
+
     /// Uses the current keyboard layout so letters show as the user sees them.
     private static func characterName(for code: UInt32) -> String? {
         guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
