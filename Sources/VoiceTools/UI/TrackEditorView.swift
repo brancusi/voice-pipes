@@ -146,6 +146,7 @@ private struct StepRow: View {
         case .paste: "doc.on.clipboard"
         case .copy: "doc.on.doc"
         case .speak, .openRouterSpeech: "speaker.wave.2"
+        case .localSpeech: "speaker.wave.2.bubble"
         case .showHUD: "rectangle.bottomthird.inset.filled"
         }
     }
@@ -284,26 +285,56 @@ private struct StepConfigView: View {
             Text("Long text is read in passages: the first starts within a second or two, the next downloads while you listen.")
                 .font(.caption).foregroundStyle(.secondary)
 
+        case .localSpeech(let engine, let voice, let rate):
+            enginePicker
+            LabeledContent("Voice") {
+                HStack {
+                    Picker("Voice", selection: Binding { voice } set: { kind = .localSpeech(engine: engine, voice: $0, rate: rate) }) {
+                        ForEach(engine.voices, id: \.self) { Text(engine.voiceLabel($0)).tag($0) }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 220)
+                    LocalPreviewButton(engine: engine, voice: voice, speaker: speaker)
+                }
+            }
+            HStack {
+                Text("Speed")
+                Slider(value: Binding { Double(rate) } set: { kind = .localSpeech(engine: engine, voice: voice, rate: Float($0)) },
+                       in: 0.6...2.0, step: 0.1)
+                Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
+            }
+            Text(engine.detail).font(.caption).foregroundStyle(.secondary)
+
         case .showHUD:
             Text("Shows the text in the HUD for a few seconds.").font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    /// Switches a Speak step between a macOS voice and an OpenRouter speech model, keeping its speed.
+    /// Switches a Speak step between engines (macOS voice, OpenRouter, or an on-device model), keeping its speed.
     private var enginePicker: some View {
         Picker("Engine", selection: Binding {
-            if case .openRouterSpeech = kind { 1 } else { 0 }
+            switch kind {
+            case .openRouterSpeech: 1
+            case .localSpeech(.pocket, _, _): 2
+            case .localSpeech(.supertonic, _, _): 3
+            default: 0
+            }
         } set: { engine in
             let rate: Float = switch kind {
-            case .speak(_, let r), .openRouterSpeech(_, _, let r): r
+            case .speak(_, let r), .openRouterSpeech(_, _, let r), .localSpeech(_, _, let r): r
             default: 1
             }
-            kind = engine == 1
-                ? .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: rate)
-                : .speak(voiceID: nil, rate: rate)
+            kind = switch engine {
+            case 1: .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: rate)
+            case 2: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: rate)
+            case 3: .localSpeech(engine: .supertonic, voice: LocalVoiceEngine.supertonic.defaultVoice, rate: rate)
+            default: .speak(voiceID: nil, rate: rate)
+            }
         }) {
-            Text("macOS voice").tag(0)
+            Text("macOS").tag(0)
             Text("OpenRouter").tag(1)
+            Text("Pocket TTS").tag(2)
+            Text("Supertonic").tag(3)
         }
         .pickerStyle(.segmented)
     }
@@ -350,5 +381,34 @@ private struct KeyRecorder: View {
         monitor = nil
         if recording { app.hotkeysSuspended = false }
         recording = false
+    }
+}
+
+/// Plays a short sample of an on-device voice (downloading the engine the first time).
+private struct LocalPreviewButton: View {
+    let engine: LocalVoiceEngine
+    let voice: String
+    let speaker: Speaker
+    @State private var playing = false
+    @State private var error: String?
+
+    var body: some View {
+        Button {
+            if playing {
+                speaker.clear()
+                playing = false
+                return
+            }
+            playing = true
+            error = nil
+            Task {
+                do { try await speaker.previewLocal(engine: engine, voice: voice) } catch { self.error = error.localizedDescription }
+                playing = false
+            }
+        } label: {
+            Image(systemName: playing ? "stop.circle" : "play.circle")
+        }
+        .buttonStyle(.borderless)
+        .help(error ?? "Preview this voice (first use downloads the model)")
     }
 }

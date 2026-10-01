@@ -107,13 +107,14 @@ enum StepKind: Codable, Hashable {
     case copy
     case speak(voiceID: String?, rate: Float)
     case openRouterSpeech(model: String, voice: String, rate: Float)
+    case localSpeech(engine: LocalVoiceEngine, voice: String, rate: Float)
     case showHUD
 
     var input: DataKind {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .http, .template, .paste, .copy, .speak, .openRouterSpeech, .showHUD: .text
+        case .llm, .http, .template, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
         }
     }
 
@@ -123,7 +124,7 @@ enum StepKind: Codable, Hashable {
         case .text, .parakeet, .openRouterSTT, .llm, .http, .template: .text
         // Outputs pass their text through so a track can, e.g., paste and then POST.
         case .paste, .copy, .showHUD: .text
-        case .speak, .openRouterSpeech: .none
+        case .speak, .openRouterSpeech, .localSpeech: .none
         }
     }
 
@@ -132,7 +133,7 @@ enum StepKind: Codable, Hashable {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
         case .llm, .http, .template: "Transform"
-        case .paste, .copy, .speak, .openRouterSpeech, .showHUD: "Output"
+        case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: "Output"
         }
     }
 
@@ -153,6 +154,7 @@ enum StepKind: Codable, Hashable {
         case .paste: "Paste at cursor"
         case .copy: "Copy to clipboard"
         case .speak: "Speak · macOS voice"
+        case .localSpeech(let engine, let voice, _): "Speak · \(engine.label) · \(engine.voiceLabel(voice))"
         case .openRouterSpeech(let model, let voice, _):
             "Speak · \(model.split(separator: "/").last ?? "") · \(OpenRouterCatalog.Model.voiceLabel(voice))"
         case .showHUD: "Show in HUD"
@@ -172,6 +174,7 @@ enum StepKind: Codable, Hashable {
         case .paste: "Paste"
         case .copy: "Copy"
         case .speak: "Speak"
+        case .localSpeech(let engine, let voice, _): "Speak · \(engine.voiceLabel(voice))"
         case .openRouterSpeech(_, let voice, _): "Speak · \(OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first ?? voice)"
         case .showHUD: "HUD"
         }
@@ -193,6 +196,8 @@ enum StepKind: Codable, Hashable {
         .paste(restoreClipboard: true),
         .copy,
         .openRouterSpeech(model: StepKind.defaultSpeechModel, voice: StepKind.defaultSpeechVoice, rate: 1.0),
+        .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0),
+        .localSpeech(engine: .supertonic, voice: LocalVoiceEngine.supertonic.defaultVoice, rate: 1.0),
         .speak(voiceID: nil, rate: 1.0),
         .showHUD,
     ]
@@ -231,4 +236,57 @@ extension Track {
                       Step(kind: .openRouterSpeech(model: StepKind.defaultSpeechModel,
                                                    voice: StepKind.defaultSpeechVoice, rate: 1.0))]),
     ]
+}
+
+/// Text-to-speech models that run on this Mac (through FluidAudio), no network needed after the first download.
+enum LocalVoiceEngine: String, Codable, CaseIterable, Identifiable {
+    /// Kyutai Pocket TTS: streams audio as it generates, so the first sound comes in ~25 ms.
+    case pocket
+    /// Supertonic-3: synthesizes a passage at ~80× real time; 31 languages.
+    case supertonic
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .pocket: "Pocket TTS"
+        case .supertonic: "Supertonic-3"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .pocket:
+            "Runs on this Mac and streams: the first sound starts in a few dozen milliseconds. About 770 MB, downloaded once. Kyutai's research model; check its license before commercial use."
+        case .supertonic:
+            "Runs on this Mac, about 80× faster than real time. About 100 MB, downloaded once; each voice is a small extra download."
+        }
+    }
+
+    var voices: [String] {
+        switch self {
+        case .pocket:
+            ["alba", "anna", "azelma", "bill_boerst", "caro_davy", "charles", "cosette", "eponine", "estelle", "eve",
+             "fantine", "george", "giovanni", "jane", "javert", "jean", "juergen", "lola", "marius", "mary",
+             "michael", "paul", "peter_yearsley", "rafael", "stuart_bell", "vera"]
+        case .supertonic:
+            ["F1", "F2", "F3", "F4", "F5", "M1", "M2", "M3", "M4", "M5"]
+        }
+    }
+
+    var defaultVoice: String {
+        switch self {
+        case .pocket: "alba"
+        case .supertonic: "F1"
+        }
+    }
+
+    func voiceLabel(_ voice: String) -> String {
+        switch self {
+        case .pocket:
+            voice.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        case .supertonic:
+            voice.hasPrefix("F") ? "Female \(voice.dropFirst())" : voice.hasPrefix("M") ? "Male \(voice.dropFirst())" : voice
+        }
+    }
 }

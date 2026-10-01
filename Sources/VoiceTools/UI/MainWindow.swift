@@ -172,6 +172,18 @@ private struct SetupView: View {
 
             Section("On this Mac") {
                 LabeledContent("Parakeet v3", value: parakeetLabel)
+                ForEach(LocalVoiceEngine.allCases) { engine in
+                    LabeledContent(engine.label) {
+                        HStack {
+                            let state = app.localVoiceStates[engine] ?? .notLoaded
+                            if state == .loading { ProgressView().controlSize(.small) }
+                            Text(Self.label(state)).foregroundStyle(.secondary)
+                            if state == .notLoaded || { if case .failed = state { true } else { false } }() {
+                                Button("Load now") { Task { try? await LocalVoices.shared.prepare(engine) } }.controlSize(.small)
+                            }
+                        }
+                    }
+                }
             }
 
             Section("Updates") {
@@ -193,6 +205,15 @@ private struct SetupView: View {
         guard !catalog.models.isEmpty else { return "Not loaded" }
         let when = catalog.updated.map { " · \($0.formatted(.relative(presentation: .named)))" } ?? ""
         return "\(text) language · \(stt) transcription · \(speech) speech\(when)"
+    }
+
+    static func label(_ state: LocalVoices.State) -> String {
+        switch state {
+        case .notLoaded: "Downloads and loads on first use"
+        case .loading: "Downloading / loading…"
+        case .ready: "Loaded"
+        case .failed(let error): "Failed: \(error)"
+        }
     }
 
     private var parakeetLabel: String {

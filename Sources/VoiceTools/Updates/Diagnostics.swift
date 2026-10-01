@@ -64,6 +64,18 @@ enum Diagnostics {
             }
         }
 
+        let localEngines = Set(steps.compactMap { kind -> LocalVoiceEngine? in
+            if case .localSpeech(let engine, _, _) = kind { engine } else { nil }
+        })
+        for engine in LocalVoiceEngine.allCases where localEngines.contains(engine) {
+            switch app.localVoiceStates[engine] ?? .notLoaded {
+            case .ready: checks.append(Check(level: .ok, title: engine.label, detail: "Loaded on this Mac"))
+            case .loading: checks.append(Check(level: .info, title: engine.label, detail: "Downloading / loading (first time only)…"))
+            case .notLoaded: checks.append(Check(level: .info, title: engine.label, detail: "Loads on first use"))
+            case .failed(let error): checks.append(Check(level: .problem, title: "\(engine.label) failed", detail: error))
+            }
+        }
+
         if steps.contains(where: \.usesOpenRouter) {
             if !app.hasOpenRouterKey {
                 checks.append(Check(level: .problem, title: "OpenRouter key missing",

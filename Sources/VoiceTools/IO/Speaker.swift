@@ -2,8 +2,8 @@ import AVFoundation
 import NaturalLanguage
 import Observation
 
-/// Read-aloud playback with either a macOS voice or an OpenRouter speech model. Both can pause and resume where
-/// they left off, step back a sentence, and report progress for the UI.
+/// Read-aloud playback with a macOS voice, an OpenRouter speech model, or an on-device model (Pocket TTS,
+/// Supertonic-3). All can pause and resume where they left off and report progress for the UI.
 @MainActor
 @Observable
 final class Speaker: NSObject {
@@ -26,6 +26,15 @@ final class Speaker: NSObject {
     @ObservationIgnored private var fetches: [Int: Task<Data, Error>] = [:]
     @ObservationIgnored private var playbackRate: Float = 1
     @ObservationIgnored private var progressTimer: Timer?
+
+    // On-device voices: generated audio is scheduled on a player node as it arrives.
+    @ObservationIgnored private var audioEngine: AVAudioEngine?
+    @ObservationIgnored private var playerNode: AVAudioPlayerNode?
+    @ObservationIgnored private var pendingBuffers = 0
+    @ObservationIgnored private var scheduledSamples: Int64 = 0
+    @ObservationIgnored private var scheduledChars = 0
+    @ObservationIgnored private var totalChars = 0
+    @ObservationIgnored private var drained: CheckedContinuation<Void, Never>?
 
     @ObservationIgnored private var finished: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var segmentDone: CheckedContinuation<Void, Never>?
@@ -102,6 +111,114 @@ final class Speaker: NSObject {
         if generation == run { finishPlayback() }
     }
 
+    // MARK: - On-device voice
+
+    /// Generates and plays speech on this Mac. Audio starts as soon as the first frames exist; later passages
+    /// are generated while earlier ones play. Throws if the engine can't load or the first passage fails.
+    func speakLocal(_ text: String, engine kind: LocalVoiceEngine, voice: String, rate: Float, label: String) async throws {
+        clear()
+        generation += 1
+        let run = generation
+        sourceLabel = label
+        voiceLabel = "\(kind.voiceLabel(voice)) · \(kind.label)"
+        state = .loading
+        let passages = Self.segments(of: text)
+        totalChars = passages.reduce(0) { $0 + $1.count }
+        scheduledChars = 0
+        scheduledSamples = 0
+        pendingBuffers = 0
+
+        let format = AVAudioFormat(standardFormatWithSampleRate: LocalVoices.sampleRate(kind), channels: 1)!
+        let engine = AVAudioEngine()
+        let node = AVAudioPlayerNode()
+        let timePitch = AVAudioUnitTimePitch()
+        timePitch.rate = rate
+        engine.attach(node)
+        engine.attach(timePitch)
+        engine.connect(node, to: timePitch, format: format)
+        engine.connect(timePitch, to: engine.mainMixerNode, format: format)
+        try engine.start()
+        audioEngine = engine
+        playerNode = node
+        startLocalProgressTimer()
+
+        do {
+            for passage in passages {
+                for try await samples in try await LocalVoices.shared.stream(kind, text: passage, voice: voice) {
+                    guard generation == run else { return }
+                    schedule(samples, format: format, on: node, run: run)
+                    if state == .loading {
+                        state = .speaking
+                        node.play()
+                    }
+                }
+                guard generation == run else { return }
+                scheduledChars += passage.count
+            }
+        } catch {
+            guard generation == run else { return }
+            clear()
+            throw error
+        }
+        // Everything is generated; wait for the last buffer to finish playing.
+        if pendingBuffers > 0 { await withCheckedContinuation { drained = $0 } }
+        if generation == run {
+            teardownLocal()
+            finishPlayback()
+        }
+    }
+
+    private func schedule(_ samples: [Float], format: AVAudioFormat, on node: AVAudioPlayerNode, run: Int) {
+        guard !samples.isEmpty,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+        pendingBuffers += 1
+        scheduledSamples += Int64(samples.count)
+        node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.generation == run else { return }
+                self.pendingBuffers -= 1
+                if self.pendingBuffers == 0 {
+                    self.drained?.resume()
+                    self.drained = nil
+                }
+            }
+        }
+    }
+
+    private func startLocalProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+            MainActor.assumeIsolated { self.updateLocalProgress() }
+        }
+    }
+
+    private func updateLocalProgress() {
+        guard let node = playerNode, let nodeTime = node.lastRenderTime,
+              let playerTime = node.playerTime(forNodeTime: nodeTime), scheduledSamples > 0, totalChars > 0 else { return }
+        // Estimate the whole text's length in samples from what's been generated so far.
+        let charsSoFar = max(scheduledChars, 1)
+        let estimatedTotal = Double(scheduledSamples) * Double(totalChars) / Double(charsSoFar)
+        progress = min(1, Double(playerTime.sampleTime) / max(estimatedTotal, 1))
+    }
+
+    private func teardownLocal() {
+        playerNode?.stop()
+        audioEngine?.stop()
+        playerNode = nil
+        audioEngine = nil
+        drained?.resume()
+        drained = nil
+        pendingBuffers = 0
+    }
+
+    func previewLocal(engine: LocalVoiceEngine, voice: String) async throws {
+        let name = engine.voiceLabel(voice)
+        try await speakLocal("Hi, I'm \(name). This is how I'll sound reading to you.", engine: engine, voice: voice,
+                             rate: 1, label: "Voice preview")
+    }
+
     /// Previews a voice with a short sentence, interrupting anything playing.
     func preview(model: String, voice: String) async throws {
         let name = OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first ?? "this voice"
@@ -114,10 +231,10 @@ final class Speaker: NSObject {
     func togglePause() {
         switch state {
         case .speaking:
-            if let player { player.pause() } else { synthesizer.pauseSpeaking(at: .word) }
+            if let playerNode { playerNode.pause() } else if let player { player.pause() } else { synthesizer.pauseSpeaking(at: .word) }
             state = .paused
         case .paused:
-            if let player { player.play() } else { synthesizer.continueSpeaking() }
+            if let playerNode { playerNode.play() } else if let player { player.play() } else { synthesizer.continueSpeaking() }
             state = .speaking
         case .idle, .loading:
             break
@@ -136,6 +253,7 @@ final class Speaker: NSObject {
         synthesizer.stopSpeaking(at: .immediate)
         player?.stop()
         player = nil
+        teardownLocal()
         fetches.values.forEach { $0.cancel() }
         fetches.removeAll()
         segments = []

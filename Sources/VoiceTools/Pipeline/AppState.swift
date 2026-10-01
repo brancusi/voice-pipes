@@ -58,6 +58,7 @@ final class AppState {
     private(set) var run: ActiveRun?
     private(set) var history: [RunRecord] = []
     private(set) var parakeetState: ParakeetService.State = .notLoaded
+    private(set) var localVoiceStates: [LocalVoiceEngine: LocalVoices.State] = [:]
     private(set) var unavailableCombos: [KeyCombo] = []
     private(set) var checks: [Check] = []
     private(set) var checking = false
@@ -95,6 +96,17 @@ final class AppState {
 
     private func prepare() async {
         _ = Clipboard.shared
+        await LocalVoices.shared.observe { engine, state in
+            Task { @MainActor [weak self] in
+                self?.localVoiceStates[engine] = state
+                self?.refreshChecks()
+            }
+        }
+        // Load on-device voices that enabled tracks use, so the first read-aloud doesn't wait for it.
+        let engines = Set(store.tracks.filter(\.enabled).flatMap(\.steps).compactMap { step -> LocalVoiceEngine? in
+            if case .localSpeech(let engine, _, _) = step.kind { engine } else { nil }
+        })
+        for engine in engines { Task { try? await LocalVoices.shared.prepare(engine) } }
         _ = await AVCaptureDevice.requestAccess(for: .audio)
         if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
         if store.tracks.contains(where: { $0.steps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
@@ -394,6 +406,14 @@ final class AppState {
             run?.phase = .speaking
             await speaker.speakSystem(input, voiceID: voiceID, rate: rate, label: track.name)
             speakingTrack = nil
+            return .none
+
+        case .localSpeech(let engine, let voice, let rate):
+            let input = try text(of: payload)
+            speakingTrack = track.id
+            run?.phase = .speaking
+            defer { speakingTrack = nil }
+            try await speaker.speakLocal(input, engine: engine, voice: voice, rate: rate, label: track.name)
             return .none
 
         case .openRouterSpeech(let model, let voice, let rate):

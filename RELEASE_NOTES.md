@@ -1,5 +1,13 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.5.0**
+- **Voices that run on this Mac.** The Speak step has two new engines next to macOS and OpenRouter:
+  - **Pocket TTS** streams speech as it's generated, so reading starts almost instantly (about 20 ms after the model is loaded). 26 voices. About 770 MB, downloaded once. It's Kyutai's research model, so check its license before any commercial use.
+  - **Supertonic-3** is very fast (about 80× faster than real time) and small (about 100 MB). 10 voices (Female 1–5, Male 1–5).
+- Each voice has a ▶ preview. Pause/resume (⌥R), speed and Clear work the same as other engines.
+- Tracks that use an on-device voice load it when the app starts, so the first read doesn't wait. Setup shows each engine's status and has **Load now**.
+- To try it: Open Voice Tools… → Read aloud → expand Speak → **Pocket TTS** or **Supertonic**.
+
 **0.4.1**
 - **A much smaller HUD**: a slim, translucent monospace tag at the bottom of the screen instead of the big card. `■ REC 00:04` while recording, `PROC 312ms` while processing, then a green `OK 186ms` that fades out in well under a second. Read aloud shows `READ 42%` / `PAUSED`. It ignores the mouse, so it never blocks a click.
 - The HUD no longer shows the transcript; it's in Activity (Open Voice Tools…) if you want it.
