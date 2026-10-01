@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum MainSection: Hashable {
@@ -19,6 +20,16 @@ struct MainWindowView: View {
             detail
         }
         .frame(minWidth: 900, minHeight: 640)
+        .background(WindowBehavior())
+        // A menu bar app has no Dock icon and isn't in ⌘Tab, so its window would be unreachable once you click
+        // away. While this window is open the app acts like a regular app; when it closes, menu-bar-only again.
+        .onAppear {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        .onDisappear {
+            NSApp.setActivationPolicy(.accessory)
+        }
         .onAppear {
             if app.mainSection == nil { app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .setup }
             app.refreshChecks()
@@ -231,53 +242,107 @@ private struct SetupView: View {
 }
 
 /// The shared word list used by Fix words steps (and given to LLM steps as a glossary).
+/// A plain table rather than a Form: Form shows a text field's title as a label beside it.
 private struct VocabularyView: View {
     @Bindable private var store = VocabularyStore.shared
-    @State private var sample = "i use cloud code and open router every day. para keet is fast."
+    @State private var sample = "i use cloud code and open router every day."
 
     var body: some View {
-        Form {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
                 Text("Words transcription keeps getting wrong. **Write** is the spelling you want; **Heard as** lists what comes out instead, separated by commas. Replacement is mechanical and instant: whole words only, any capitalization. Spellings with capitals are always written exactly; all-lowercase ones get a capital at the start of a sentence unless **Always exact** is on.")
                     .font(.callout).foregroundStyle(.secondary)
-            }
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Section("Words") {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    GridRow {
-                        Text("Write").font(.caption).foregroundStyle(.secondary)
-                        Text("Heard as").font(.caption).foregroundStyle(.secondary)
-                        Text("Always exact").font(.caption).foregroundStyle(.secondary)
-                        Color.clear.frame(width: 1, height: 1)
-                    }
-                    ForEach($store.entries) { $entry in
+                GroupBox {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                         GridRow {
-                            TextField("Claude Code", text: $entry.write)
-                                .textFieldStyle(.roundedBorder).frame(minWidth: 160)
-                            TextField("cloud code, clawed code", text: Binding {
-                                entry.heardAs.joined(separator: ", ")
-                            } set: { text in
-                                entry.heardAs = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                            })
-                            .textFieldStyle(.roundedBorder).frame(minWidth: 260)
-                            Toggle("", isOn: $entry.alwaysExact).labelsHidden()
-                            Button { store.entries.removeAll { $0.id == entry.id } } label: { Image(systemName: "minus.circle") }
-                                .buttonStyle(.borderless).help("Remove")
+                            Text("Write")
+                            Text("Heard as")
+                            Text("Always exact").gridColumnAlignment(.center)
+                            Text("")
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
+                        ForEach($store.entries) { $entry in
+                            GridRow {
+                                TextField("", text: $entry.write, prompt: Text("Spelling"))
+                                    .labelsHidden()
+                                    .multilineTextAlignment(.leading)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth: 180, maxWidth: 260)
+                                TextField("", text: heardAs($entry), prompt: Text("what comes out instead, comma-separated"))
+                                    .labelsHidden()
+                                    .multilineTextAlignment(.leading)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(minWidth: 260, maxWidth: .infinity)
+                                Toggle("", isOn: $entry.alwaysExact)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.small)
+                                    .gridColumnAlignment(.center)
+                                Button { store.entries.removeAll { $0.id == entry.id } } label: { Image(systemName: "minus.circle") }
+                                    .buttonStyle(.borderless)
+                                    .help("Remove")
+                            }
                         }
                     }
+                    .padding(8)
+                    HStack {
+                        Button { store.entries.append(VocabularyEntry(write: "", heardAs: [])) } label: {
+                            Label("Add word", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        Spacer()
+                    }
+                    .padding([.horizontal, .bottom], 8)
+                } label: {
+                    Text("Words").font(.headline)
                 }
-                Button { store.entries.append(VocabularyEntry(write: "", heardAs: [])) } label: { Label("Add word", systemImage: "plus") }
-                    .buttonStyle(.borderless)
-            }
 
-            Section("Try it") {
-                TextField("Type or paste a sentence", text: $sample, axis: .vertical)
-                LabeledContent("Result") {
-                    Text(FixWords.apply(sample, entries: store.entries)).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("", text: $sample, prompt: Text("Type or paste a sentence"), axis: .vertical)
+                            .labelsHidden()
+                            .multilineTextAlignment(.leading)
+                            .textFieldStyle(.roundedBorder)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("Result").font(.caption).foregroundStyle(.secondary)
+                            Text(FixWords.apply(sample, entries: store.entries))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(8)
+                } label: {
+                    Text("Try it").font(.headline)
                 }
             }
+            .padding(20)
+            .frame(maxWidth: 900, alignment: .leading)
         }
-        .formStyle(.grouped)
     }
+
+    /// Edits the comma-separated list without reformatting it while you type (a trailing comma or space stays).
+    private func heardAs(_ entry: Binding<VocabularyEntry>) -> Binding<String> {
+        Binding {
+            entry.wrappedValue.heardAsText ?? entry.wrappedValue.heardAs.joined(separator: ", ")
+        } set: { text in
+            entry.wrappedValue.heardAsText = text
+            entry.wrappedValue.heardAs = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+    }
+}
+
+/// Keeps the main window on screen when another app is in front (it must never hide on deactivate).
+private struct WindowBehavior: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            view.window?.hidesOnDeactivate = false
+            view.window?.isReleasedWhenClosed = false
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }

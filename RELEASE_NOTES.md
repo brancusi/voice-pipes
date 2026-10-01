@@ -1,5 +1,10 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.6.1**
+- **The Voice Tools window stays reachable.** While it's open, Voice Tools shows in the Dock and in ⌘Tab, so you can switch away and back. Close the window and it's back to menu-bar-only.
+- Fixed the Vocabulary page: each word showed "Claude Code" as a label beside it and listed its Heard-as words twice. It's now a plain table: Write, Heard as, Always exact.
+- Typing a comma in Heard as no longer gets tidied away while you type.
+
 **0.6.0**
 - **Vocabulary and Fix words.** A shared list of words transcription keeps getting wrong (Open Voice Tools… → **Vocabulary**): for each, the spelling you want and what comes out instead, e.g. **Claude Code** ← "cloud code, clawed code". The new **Fix words** block replaces them instantly (no model, nothing leaves your Mac): whole words only, any capitalization, punctuation kept.
 - Capitalization: spellings with capitals ("OpenRouter", "macOS") are always written exactly; all-lowercase ones get a capital at the start of a sentence, unless you tick **Always exact** (for things like `kubectl`).

@@ -10,6 +10,10 @@ struct VocabularyEntry: Codable, Identifiable, Hashable {
     var heardAs: [String]
     /// Write it exactly as typed even at the start of a sentence (for lowercase terms like "kubectl").
     var alwaysExact = false
+    /// The Heard-as field exactly as typed, so editing doesn't reformat it mid-keystroke. Not saved.
+    var heardAsText: String?
+
+    enum CodingKeys: String, CodingKey { case id, write, heardAs, alwaysExact }
 }
 
 /// The shared word list, saved next to the tracks so it can also be edited by hand.
