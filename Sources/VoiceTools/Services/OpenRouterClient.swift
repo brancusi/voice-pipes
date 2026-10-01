@@ -27,6 +27,18 @@ final class OpenRouterClient: Sendable {
         session.dataTask(with: request).resume()
     }
 
+    enum KeyStatus { case valid, rejected, unreachable }
+
+    /// Checks the stored key against OpenRouter's key endpoint.
+    func validateKey() async -> KeyStatus {
+        guard let key = try? apiKey else { return .rejected }
+        var request = URLRequest(url: base.appendingPathComponent("key"), timeoutInterval: 8)
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        guard let (_, response) = try? await session.data(for: request),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .unreachable }
+        return (200..<300).contains(status) ? .valid : status == 401 || status == 403 ? .rejected : .unreachable
+    }
+
     func transcribe(wav: Data, model: String) async throws -> String {
         let boundary = "vt-\(UUID().uuidString)"
         var body = Data()

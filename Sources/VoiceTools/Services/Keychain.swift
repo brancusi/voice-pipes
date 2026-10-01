@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum Keychain {
-    private static let service = "local.VoiceTools"
+    private static let service = "io.github.brancusi.voice-tools"
 
     static func get(_ account: String) -> String? {
         let query: [String: Any] = [

@@ -3,12 +3,14 @@ import SwiftUI
 @main
 struct VoiceToolsApp: App {
     @State private var app = AppState()
+    @StateObject private var updates = Updates()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuView(app: app)
+            MenuView(app: app).environmentObject(updates)
         } label: {
-            Image(systemName: menuBarSymbol)
+            // An update waiting shows as a download arrow until it's looked at.
+            Image(systemName: updates.available != nil && app.run == nil ? "arrow.down.circle" : menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
 
@@ -23,7 +25,7 @@ struct VoiceToolsApp: App {
         case .recording: "mic.fill"
         case .processing: "ellipsis.circle"
         case .speaking: "speaker.wave.2.fill"
-        default: "mic"
+        default: app.worstCheck == .problem ? "mic.badge.xmark" : "mic"
         }
     }
 }

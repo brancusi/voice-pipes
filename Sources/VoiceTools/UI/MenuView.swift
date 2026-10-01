@@ -2,39 +2,125 @@ import SwiftUI
 
 struct MenuView: View {
     @Bindable var app: AppState
+    @EnvironmentObject var updates: Updates
     @Environment(\.openWindow) private var openWindow
+    @State private var contentHeight: CGFloat = 400
+
+    /// A menu bar window taller than the screen gets misplaced by macOS; longer content scrolls instead.
+    private var maxHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 800) - 40 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            section("Tracks") { tracks }
-            if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
-            if !app.history.isEmpty { section("Recent runs") { recent } }
-            HStack {
-                Button("Edit tracks…") { openEditor() }
-                Spacer()
-                Button("Quit") { NSApp.terminate(nil) }
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                if let version = updates.available { updateCard(version) }
+                section("Tracks") { tracks }
+                if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
+                if !app.history.isEmpty { section("Recent runs") { recent } }
+                checksList
+                Divider()
+                footer
             }
-            .buttonStyle(.link)
-            .font(.system(size: 12))
+            .padding(14)
+            .frame(width: 400)
+            .background(GeometryReader { g in Color.clear.preference(key: HeightKey.self, value: g.size.height) })
         }
-        .padding(14)
-        .frame(width: 400)
+        .frame(width: 400, height: min(contentHeight, maxHeight))
+        .onPreferenceChange(HeightKey.self) { contentHeight = $0 }
+        .onAppear {
+            updates.poll()
+            app.refreshChecks()
+        }
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Voice Tools").font(.system(size: 15, weight: .semibold))
-                HStack(spacing: 6) {
-                    Circle().fill(statusColor).frame(width: 7, height: 7)
-                    Text(statusText).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("Voice Tools").font(.headline)
+                HStack(spacing: 5) {
+                    Circle().fill(headline.1).frame(width: 7, height: 7)
+                    Text(headline.0).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
-            Button { openEditor() } label: { Image(systemName: "slider.horizontal.3") }
-                .buttonStyle(.borderless)
-                .help("Edit tracks")
+            if app.checking || app.parakeetState == .loading { ProgressView().controlSize(.small) }
+        }
+    }
+
+    private var headline: (String, Color) {
+        switch app.worstCheck {
+        case .problem: ("Needs setup", .red)
+        case .warning: ("Needs attention", .orange)
+        default: (parakeetLine, .green)
+        }
+    }
+
+    private var parakeetLine: String {
+        switch app.parakeetState {
+        case .loading: "Loading Parakeet v3…"
+        case .ready: "Ready · Parakeet loaded"
+        default: "Ready"
+        }
+    }
+
+    private func updateCard(_ version: String) -> some View {
+        HStack {
+            Label("Version \(version) is available", systemImage: "arrow.down.circle.fill")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Button("Install…") { updates.check() }.buttonStyle(.borderedProminent).controlSize(.small)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.green.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+    }
+
+    private var checksList: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("CHECKS").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 4)
+            ForEach(app.checks) { check in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: check.symbol).foregroundStyle(Self.color(check.level)).frame(width: 16)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(check.title).font(.callout)
+                        Text(check.detail).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    if let fix = check.fix {
+                        Button(fix == .editTracks ? "Edit…" : "Open…") {
+                            fix == .editTracks ? openEditor() : Diagnostics.open(fix)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Button { openEditor() } label: { Label("Edit tracks…", systemImage: "slider.horizontal.3") }
+                .help("Edit tracks, triggers and connections")
+            Button { app.refreshChecks() } label: { Image(systemName: "arrow.clockwise") }.help("Check again")
+            Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
+                .help("Copy a report for troubleshooting")
+            Button { updates.check() } label: { Image(systemName: "arrow.down.circle") }
+                .help(updates.enabled ? "Check for updates (version \(updates.version))" : "Updates are off in this build")
+                .disabled(!updates.enabled)
+            Spacer()
+            Button("Quit") { NSApp.terminate(nil) }
+        }
+        .buttonStyle(.borderless)
+    }
+
+    static func color(_ level: Check.Level) -> Color {
+        switch level {
+        case .ok: .green
+        case .info: .blue
+        case .warning: .orange
+        case .problem: .red
         }
     }
 
@@ -99,27 +185,15 @@ struct MenuView: View {
         }
     }
 
-    private var statusText: String {
-        switch app.parakeetState {
-        case .notLoaded: "Ready · \(app.store.tracks.count) tracks"
-        case .loading: "Loading Parakeet v3…"
-        case .ready: "Ready · \(app.store.tracks.count) tracks · Parakeet loaded"
-        case .failed(let error): "Parakeet failed: \(error)"
-        }
-    }
-
-    private var statusColor: Color {
-        switch app.parakeetState {
-        case .loading: .orange
-        case .failed: .red
-        default: .green
-        }
-    }
-
     private func openEditor() {
         openWindow(id: "tracks")
         NSApp.activate(ignoringOtherApps: true)
     }
+}
+
+private struct HeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 400
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 private struct TrackRow: View {

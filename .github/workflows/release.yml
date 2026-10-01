@@ -1,0 +1,80 @@
+name: Voice Tools release
+
+# Push a tag like v0.2.0 to build the menu bar app for Apple silicon and publish it, with its signed update
+# feed (appcast.xml), to the public releases repo that installed copies check every few minutes.
+#
+# Needs two repository secrets:
+#   SPARKLE_ED_PRIVATE_KEY  the update signing key (Tools/make_update_key.swift); its public half is UPDATE_PUBLIC_KEY
+#   RELEASES_TOKEN          a fine-grained token with Contents: read & write on the releases repo only
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (no release is published for manual runs)"
+        required: true
+        default: "0.0.0-dev"
+
+permissions:
+  contents: read
+
+env:
+  RELEASES_REPO: brancusi/voice-tools-releases
+
+jobs:
+  build:
+    runs-on: macos-15          # Apple silicon runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF#refs/tags/v}"; else v="${{ inputs.version }}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          [[ "$(cat VERSION)" == "${{ steps.v.outputs.version }}" ]] \
+            || { echo "Tag v${{ steps.v.outputs.version }} doesn't match VERSION ($(cat VERSION))." >&2; exit 1; }
+
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+
+      - name: Build
+        run: |
+          [[ "$GITHUB_REF" == refs/tags/* ]] && export REQUIRE_UPDATES=1
+          VERSION="${{ steps.v.outputs.version }}" ./build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voice-Tools-${{ steps.v.outputs.version }}-arm64
+          path: dist/*
+
+      - name: Sign the update and write its feed
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          zip="dist/Voice-Tools-$v-arm64.zip"
+          # A key that doesn't match the app's built-in public key would publish updates nobody can install.
+          swiftc Tools/make_update_key.swift -o "$RUNNER_TEMP/make_update_key"
+          [[ "$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$RUNNER_TEMP/make_update_key" --public)" == "$(cat UPDATE_PUBLIC_KEY)" ]] \
+            || { echo "SPARKLE_ED_PRIVATE_KEY doesn't match UPDATE_PUBLIC_KEY" >&2; exit 1; }
+          signed=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | .cache/Sparkle-*/bin/sign_update --ed-key-file - "$zip")
+          url="https://github.com/$RELEASES_REPO/releases/download/v$v/$(basename "$zip")"
+          python3 Tools/appcast.py "$v" "$url" "$signed" RELEASE_NOTES.md > dist/appcast.xml
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          gh release create "v$v" dist/Voice-Tools-$v-arm64.zip dist/Voice-Tools-$v-arm64.zip.sha256 dist/appcast.xml \
+            --repo "$RELEASES_REPO" --title "Voice Tools $v" --notes-file RELEASE_NOTES.md

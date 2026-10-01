@@ -48,6 +48,9 @@ final class AppState {
     private(set) var history: [RunRecord] = []
     private(set) var parakeetState: ParakeetService.State = .notLoaded
     private(set) var unavailableCombos: [KeyCombo] = []
+    private(set) var checks: [Check] = []
+    private(set) var checking = false
+    @ObservationIgnored private var recheckPending = false
     var hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
     /// Set while the editor records a new key combo, so existing hotkeys don't fire.
     var hotkeysSuspended = false {
@@ -83,14 +86,41 @@ final class AppState {
         if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
         if store.tracks.contains(where: { $0.steps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
             parakeetState = .loading
+            refreshChecks()
             await parakeet.load()
             parakeetState = await parakeet.state
         }
+        refreshChecks()
     }
 
     func setOpenRouterKey(_ key: String) {
         Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.openRouter)
         hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
+        refreshChecks()
+    }
+
+    // MARK: - Checks
+
+    var worstCheck: Check.Level { checks.map(\.level).max() ?? .ok }
+
+    func refreshChecks() {
+        guard !checking else {
+            recheckPending = true
+            return
+        }
+        checking = true
+        Task {
+            checks = await Diagnostics.run(self)
+            checking = false
+            if recheckPending {
+                recheckPending = false
+                refreshChecks()
+            }
+        }
+    }
+
+    func copyReport() {
+        Clipboard.shared.copy(Diagnostics.report(checks, tracks: store.tracks))
     }
 
     // MARK: - Hotkeys
@@ -169,7 +199,7 @@ final class AppState {
         }
         if track.steps.contains(where: \.kind.usesOpenRouter) { OpenRouterClient.shared.prewarm() }
 
-        recorder.onSamples = chunked.map { transcriber in { transcriber.feed($0) } }
+        recorder.onSamples = chunked.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
         recorder.onLevel = { [weak self] level in
             Task { @MainActor in self?.run?.level = level }
         }

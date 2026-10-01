@@ -12,29 +12,51 @@ Default tracks:
 | Clean dictation | ⌥ ⇧ Space (toggle) | Mic → MAI-Transcribe-2 (OpenRouter) → Claude Haiku cleanup → Paste |
 | Read aloud | ⌥ R (toggle: start / pause / resume) | Selection → page → clipboard → Speak |
 
-## Build and run
+## Install
 
-Requires macOS 14+ and Swift 6 (Command Line Tools are enough; Xcode is not required).
+1. Download `Voice-Tools-<version>-arm64.zip` from the [releases](https://github.com/brancusi/voice-tools-releases/releases) and unzip it.
+2. Move **Voice Tools.app** to Applications.
+3. The app isn't notarized yet, so the first time: **right-click → Open → Open**. After that it opens normally.
+4. It lives in the menu bar (the mic icon). To start it at login: System Settings → General → Login Items → add Voice Tools.
+
+On first launch it asks for **Microphone** and **Accessibility** (needed to paste and to read selected text);
+the panel's **Checks** list shows what's missing, with a button to fix each. Parakeet v3 (~460 MB) downloads once
+and is cached. Add your OpenRouter key under **Edit tracks… → Connections**; it's stored in the Keychain.
+
+After that it keeps itself up to date.
+
+## Build
 
 ```sh
-Scripts/bundle.sh            # release build → build/Voice Tools.app
+./build.sh                 # → dist/Voice-Tools-<VERSION>-arm64.zip
+DEV=1 ./build.sh           # → build/Voice Tools.app, for local iteration
 open "build/Voice Tools.app"
 ```
 
-On first launch the app asks for **Microphone** and **Accessibility** (needed to paste and to read
-selected text). Parakeet v3 (~460 MB) downloads once from Hugging Face and is cached.
+Needs macOS 14+ and Swift 6 (Command Line Tools are enough). The icon is drawn in code (`Tools/make_icon.swift`).
+Sparkle (the updater) comes in through SwiftPM, pinned to the same version as `SPARKLE_VERSION` in `build.sh`,
+which also fetches that release's `sign_update` tool into `.cache/` (checked against its SHA-256).
 
-Add your OpenRouter key under **Edit tracks… → Connections**. It's stored in the Keychain.
+Ad hoc signed builds look like a new app to macOS on every rebuild, so Accessibility must be granted again. To
+avoid that locally, create a self-signed certificate in Keychain Access (Certificate Assistant → Create a
+Certificate → type *Code Signing*) and build with `SIGN_IDENTITY="<its name>" DEV=1 ./build.sh`.
 
-### Keeping permissions across rebuilds
+## Releases and updates
 
-Ad-hoc signed builds look like a new app to macOS on every rebuild, so Accessibility must be
-re-granted. Create a self-signed code-signing certificate in Keychain Access
-(Certificate Assistant → Create a Certificate → type *Code Signing*) and build with:
+Releases are built by GitHub Actions: update `RELEASE_NOTES.md`, bump `VERSION`, then push a tag `v<VERSION>`.
+The workflow builds the app, signs the zip with the update key, writes the update feed (`appcast.xml`, via
+`Tools/appcast.py`), and publishes all three to the public releases repo,
+[brancusi/voice-tools-releases](https://github.com/brancusi/voice-tools-releases/releases). This repo stays
+private; that one holds only the app.
 
-```sh
-SIGN_IDENTITY="Voice Tools Dev" Scripts/bundle.sh
-```
+Installed copies read `https://github.com/brancusi/voice-tools-releases/releases/latest/download/appcast.xml`
+every 5 minutes and when the panel opens, and install only an update signed by the key whose public half is in
+`UPDATE_PUBLIC_KEY` (built into the app). Versions must go up: Sparkle compares them.
+
+The key pair is made once with `Tools/make_update_key.swift`. The private half lives in the
+`SPARKLE_ED_PRIVATE_KEY` Actions secret and in a password manager, never in the repo. The workflow refuses to
+publish if it doesn't match `UPDATE_PUBLIC_KEY`. If it's ever lost, make a new pair, and everyone installs the
+next version by hand once. A build without `UPDATE_PUBLIC_KEY` has updates turned off.
 
 ## How it works
 
@@ -54,3 +76,4 @@ SIGN_IDENTITY="Voice Tools Dev" Scripts/bundle.sh
 | Services | `Services/OpenRouterClient.swift`, `HTTPStep.swift`, `Keychain.swift` |
 | System I/O | `IO/Clipboard.swift`, `TextCapture.swift`, `Speaker.swift` |
 | UI | `UI/MenuView.swift`, `TrackEditorView.swift`, `HUD.swift` |
+| Updates & checks | `Updates/Updates.swift` (Sparkle), `Updates/Diagnostics.swift` |
