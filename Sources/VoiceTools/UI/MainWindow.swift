@@ -86,7 +86,7 @@ struct MainWindowView: View {
         case .activity:
             ActivityView(app: app).navigationTitle("Activity")
         case .vocabulary:
-            VocabularyView().navigationTitle("Vocabulary")
+            VocabularyView(parakeet: app.parakeet).navigationTitle("Vocabulary")
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }
@@ -244,7 +244,9 @@ private struct SetupView: View {
 /// The shared word list used by Fix words steps (and given to LLM steps as a glossary).
 /// A plain table rather than a Form: Form shows a text field's title as a label beside it.
 private struct VocabularyView: View {
+    let parakeet: ParakeetService
     @Bindable private var store = VocabularyStore.shared
+    @State private var training: VocabularyEntry.ID?
     @State private var sample = "i use cloud code and open router every day."
 
     var body: some View {
@@ -260,6 +262,7 @@ private struct VocabularyView: View {
                             Text("Write")
                             Text("Heard as")
                             Text("Always exact").gridColumnAlignment(.center)
+                            Text("")
                             Text("")
                         }
                         .font(.caption).foregroundStyle(.secondary)
@@ -280,6 +283,10 @@ private struct VocabularyView: View {
                                     .toggleStyle(.switch)
                                     .controlSize(.small)
                                     .gridColumnAlignment(.center)
+                                Button("Train…") { training = entry.id }
+                                    .controlSize(.small)
+                                    .disabled(entry.write.trimmingCharacters(in: .whitespaces).isEmpty)
+                                    .help("Say it a few times and collect the ways transcription gets it wrong")
                                 Button { store.entries.removeAll { $0.id == entry.id } } label: { Image(systemName: "minus.circle") }
                                     .buttonStyle(.borderless)
                                     .help("Remove")
@@ -319,6 +326,11 @@ private struct VocabularyView: View {
             }
             .padding(20)
             .frame(maxWidth: 900, alignment: .leading)
+        }
+        .sheet(isPresented: Binding { training != nil } set: { if !$0 { training = nil } }) {
+            if let index = store.entries.firstIndex(where: { $0.id == training }) {
+                TrainWordSheet(parakeet: parakeet, entry: $store.entries[index])
+            }
         }
     }
 

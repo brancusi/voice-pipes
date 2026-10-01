@@ -1,5 +1,10 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.7.0**
+- **Train a word** (Vocabulary → **Train…** on any row). Record yourself saying it a few times; Voice Tools replays each take about 30 ways (faster, slower, quieter, with background noise) through Parakeet, and can also have the 36 on-device voices say it. You get every distinct way it came out, how often, and how often it was already right. Tick the ones to keep and **Add to Heard as**.
+- Results that came up at least twice are pre-ticked; one-offs are listed but left unticked. Anything made only of ordinary words (like "aaron's attacking") is flagged, since adding it would also change those words when you mean them.
+- Five takes take about 5 seconds; with the on-device voices, about 30 seconds the first time (loading the voices).
+
 **0.6.1**
 - **The Voice Tools window stays reachable.** While it's open, Voice Tools shows in the Dock and in ⌘Tab, so you can switch away and back. Close the window and it's back to menu-bar-only.
 - Fixed the Vocabulary page: each word showed "Claude Code" as a label beside it and listed its Heard-as words twice. It's now a plain table: Write, Heard as, Always exact.
