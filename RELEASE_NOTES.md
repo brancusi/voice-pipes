@@ -1,5 +1,10 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.4.1**
+- **A much smaller HUD**: a slim, translucent monospace tag at the bottom of the screen instead of the big card. `■ REC 00:04` while recording, `PROC 312ms` while processing, then a green `OK 186ms` that fades out in well under a second. Read aloud shows `READ 42%` / `PAUSED`. It ignores the mouse, so it never blocks a click.
+- The HUD no longer shows the transcript; it's in Activity (Open Voice Tools…) if you want it.
+- The time shown is the real work after you let go: restoring your clipboard after a paste now happens in the background instead of counting toward it.
+
 **0.4.0**
 - **Read aloud with OpenRouter voices.** The Speak step now has an engine switch: **macOS voice** or **OpenRouter**. With OpenRouter, pick a speech model (MAI-Voice, Gemini, MiniMax, Deepgram Aura, Kokoro and more) and one of its voices; every voice has a ▶ preview. Long text is read in passages: the first starts within a second or two and the next downloads while you listen. Pause, resume, speed and replay-this-passage all work.
 - **Model pickers** for every OpenRouter step: search the live list of transcription, language and speech models, with prices. Or type any model id.

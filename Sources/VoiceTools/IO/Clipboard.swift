@@ -54,9 +54,12 @@ final class Clipboard {
         await Keystroke.waitForModifiersReleased()
         Keystroke.send("v", flags: .maskCommand)
         guard let saved else { return }
-        // Give the target app time to read the pasteboard before restoring.
-        try? await Task.sleep(for: .milliseconds(400))
-        restoreSnapshot(saved)
+        // Give the target app time to read the pasteboard, then restore in the background so the
+        // track finishes (and reports its time) without waiting for it.
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            restoreSnapshot(saved)
+        }
     }
 
     /// Copies the current selection in the focused app via ⌘C, then restores the clipboard.

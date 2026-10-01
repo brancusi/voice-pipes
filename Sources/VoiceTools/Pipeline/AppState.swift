@@ -29,6 +29,10 @@ struct ActiveRun {
     var liveText = ""
     var level: Float = 0
     var recordingStarted = Date()
+    /// When processing began (on release, or at once for tracks without a microphone).
+    var processingStarted = Date()
+    /// Total processing time, set when the run finishes.
+    var totalMs: Int?
     var heldBy: String?
 }
 
@@ -273,6 +277,7 @@ final class AppState {
         endCaptureHotkeys()
         let samples = recorder.stop()
         run?.phase = .processing
+        run?.processingStarted = Date()
         run?.stepMs[0] = Int(Date().timeIntervalSince(capture.started) * 1000)
 
         // Ignore accidental taps.
@@ -329,8 +334,9 @@ final class AppState {
             history.insert(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total, steps: steps), at: 0)
             if history.count > 100 { history.removeLast() }
         }
+        run?.totalMs = total
         run?.phase = .done
-        try? await Task.sleep(for: .milliseconds(900))
+        try? await Task.sleep(for: .milliseconds(650))
         if run?.phase == .done, run?.trackID == track.id { run = nil }
     }
 
