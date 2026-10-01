@@ -44,7 +44,7 @@ enum Diagnostics {
                 checks.append(Check(level: .info, title: "Microphone", detail: "macOS will ask the first time you dictate."))
             default:
                 checks.append(Check(level: .problem, title: "Microphone blocked",
-                                    detail: "Allow Voice Tools in System Settings → Privacy & Security → Microphone.",
+                                    detail: "Click Fix to have macOS ask again.",
                                     fix: .microphoneSettings))
             }
         }
@@ -52,7 +52,7 @@ enum Diagnostics {
         checks.append(AXIsProcessTrusted()
             ? Check(level: .ok, title: "Accessibility", detail: "Allowed (paste and read selected text)")
             : Check(level: .problem, title: "Accessibility needed",
-                    detail: "Needed to paste and to read selected text. Turn on Voice Tools in Privacy & Security → Accessibility.",
+                    detail: "Needed to paste and to read selected text. Click Fix, then switch Voice Tools on in the list that opens.",
                     fix: .accessibilitySettings))
 
         if steps.contains(where: { if case .parakeet = $0 { true } else { false } }) {
@@ -114,12 +114,35 @@ enum Diagnostics {
         return lines.joined(separator: "\n")
     }
 
-    static func open(_ fix: Check.Fix) {
-        let pane = switch fix {
-        case .microphoneSettings: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
-        case .accessibilitySettings: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-        case .editTracks: ""
+    /// Fixes a missing permission in one click. An entry left by an older build (signed differently) shows as
+    /// switched on but doesn't apply to this one, and macOS won't ask again while it exists, so clear this app's
+    /// entry first; macOS then asks afresh and lists the app as it is now.
+    static func fix(_ fix: Check.Fix) async {
+        switch fix {
+        case .accessibilitySettings:
+            resetPermission("Accessibility")
+            TextCapture.promptForAccessibility()
+            openSettings("Privacy_Accessibility")
+        case .microphoneSettings:
+            resetPermission("Microphone")
+            if await !AVCaptureDevice.requestAccess(for: .audio) { openSettings("Privacy_Microphone") }
+        case .editTracks:
+            break
         }
-        if let url = URL(string: pane), !pane.isEmpty { NSWorkspace.shared.open(url) }
+    }
+
+    private static func resetPermission(_ service: String) {
+        guard let id = Bundle.main.bundleIdentifier else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", service, id]
+        try? process.run()
+        process.waitUntilExit()
+    }
+
+    private static func openSettings(_ anchor: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

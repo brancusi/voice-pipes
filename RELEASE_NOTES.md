@@ -1,5 +1,9 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.3.1**
+- **This update shouldn't ask for any permission.** From 0.3.0 on, macOS recognises new versions as the same app, so Microphone and Accessibility stay allowed.
+- **Fix…** buttons in Checks: if Accessibility or the Microphone is ever missing, one click clears the old entry macOS kept (the kind that shows as switched on but doesn't work), asks again, and opens the right Settings page. No more removing and re-adding the app by hand. The panel updates by itself once it's allowed.
+
 **0.3.0**
 - **Permissions now stay granted across updates.** Releases are signed with a fixed certificate, so macOS recognises each new version as the same app. Updating to 0.3.0 asks one last time: turn Voice Tools on again in Privacy & Security → Accessibility (remove it with − and add it back if the switch already looks on).
 - Fixed: **Paste at cursor** could do nothing when the trigger's ⌥/⇧ keys were still held (⌥ Space sent ⌥⌘V instead of ⌘V). It now waits for you to let go of the modifiers. The same fix applies to reading the selection for Read aloud.

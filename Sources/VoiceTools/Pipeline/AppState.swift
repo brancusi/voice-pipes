@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import ApplicationServices
 import Observation
 
 /// What flows between steps at runtime.
@@ -116,6 +117,24 @@ final class AppState {
                 recheckPending = false
                 refreshChecks()
             }
+        }
+    }
+
+    /// Runs a check's fix, then watches for the permission to arrive so the panel updates by itself.
+    func fix(_ fix: Check.Fix) {
+        Task {
+            await Diagnostics.fix(fix)
+            refreshChecks()
+            for _ in 0..<90 {
+                try? await Task.sleep(for: .seconds(1))
+                let granted = switch fix {
+                case .accessibilitySettings: AXIsProcessTrusted()
+                case .microphoneSettings: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                case .editTracks: true
+                }
+                if granted { break }
+            }
+            refreshChecks()
         }
     }
 

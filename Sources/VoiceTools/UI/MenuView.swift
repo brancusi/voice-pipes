@@ -89,8 +89,8 @@ struct MenuView: View {
                     }
                     Spacer()
                     if let fix = check.fix {
-                        Button(fix == .editTracks ? "Edit…" : "Open…") {
-                            fix == .editTracks ? openEditor() : Diagnostics.open(fix)
+                        Button(fix == .editTracks ? "Edit…" : "Fix…") {
+                            fix == .editTracks ? openEditor() : app.fix(fix)
                         }
                         .controlSize(.small)
                     }
