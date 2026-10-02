@@ -1,0 +1,1028 @@
+{
+ "version": 1,
+ "buckets": {
+  "speech": "Elo: ≥1240 = 5, ≥1150 = 4, ≥1110 = 3, ≥1070 = 2, else 1",
+  "transcription": "WER: ≤2.5% = 5, ≤3.5% = 4, ≤5.5% = 3, ≤8% = 2, else 1",
+  "text": "Intelligence Index: ≥45 = 5, ≥30 = 4, ≥18 = 3, ≥9 = 2, else 1"
+ },
+ "sources": {
+  "speech": {
+   "name": "Artificial Analysis TTS Arena",
+   "url": "https://artificialanalysis.ai/text-to-speech/leaderboard/provider-voice",
+   "date": "Oct 2026"
+  },
+  "transcription": {
+   "name": "Artificial Analysis word error rate",
+   "url": "https://artificialanalysis.ai/speech-to-text/non-streaming",
+   "date": "Oct 2026"
+  },
+  "text": {
+   "name": "Artificial Analysis Intelligence Index",
+   "url": "https://artificialanalysis.ai/leaderboards/models",
+   "date": "Oct 2026"
+  }
+ },
+ "models": {
+  "google/gemini-3.8-flash-tts": {
+   "score": 5,
+   "raw": 1272,
+   "tags": [
+    "narration and characters",
+    "multi-speaker dialogue"
+   ],
+   "sentence": "Google's creative-tier voice, built for narration, character work and multi-speaker dialogue where fidelity, acting nuance and regional dialects matter more than latency."
+  },
+  "qwen/qwen-audio-3.0-tts-plus": {
+   "score": 5,
+   "raw": 1259,
+   "sentence": "Alibaba's higher-quality voice; Artificial Analysis noted its increased naturalness and contextually appropriate intonation when it took the top spot on release."
+  },
+  "google/gemini-3.8-flash-lite-tts": {
+   "score": 5,
+   "raw": 1240,
+   "sentence": "The fast, high-throughput member of Google's 3.8 voice family."
+  },
+  "google/gemini-3.1-flash-tts-preview": {
+   "score": 4,
+   "raw": 1205,
+   "tags": [
+    "70+ languages",
+    "inline audio tags"
+   ],
+   "sentence": "Speaks 70+ languages and takes 200+ inline audio tags like [whispers] or [laughs] to steer emotion and pacing, with up to two speakers."
+  },
+  "minimax/speech-2.8-hd": {
+   "score": 4,
+   "raw": 1170,
+   "tags": [
+    "emotion control"
+   ],
+   "sentence": "MiniMax's high-definition voice, aimed at studio-grade audio with emotion control, multilingual support and voice cloning."
+  },
+  "minimax/speech-2.8-turbo": {
+   "score": 4,
+   "raw": 1152,
+   "tags": [
+    "40+ languages"
+   ],
+   "sentence": "The faster sibling of Speech 2.8 HD: natural, expressive speech with emotion control and 40+ languages."
+  },
+  "fish-audio/s2.1-pro": {
+   "score": 3,
+   "raw": 1137,
+   "tags": [
+    "expressive narration",
+    "multilingual"
+   ],
+   "sentence": "A production-oriented voice for multilingual apps, expressive narration and dialogue, steered with plain-language style instructions."
+  },
+  "fish-audio/s2.1-pro-free:free": {
+   "score": 3,
+   "raw": 1137,
+   "tags": [
+    "expressive narration"
+   ],
+   "sentence": "The no-cost variant of Fish Audio S2.1 Pro with the same synthesis, meant for testing and low-volume use (no production latency or availability guarantees)."
+  },
+  "x-ai/grok-voice-tts-1.0": {
+   "score": 3,
+   "raw": 1132,
+   "tags": [
+    "20+ languages",
+    "inline speech tags"
+   ],
+   "sentence": "Speaks 20+ languages with automatic language detection and five built-in voices; inline tags control pauses, emphasis, pitch, speed and style."
+  },
+  "fish-audio/s2-pro": {
+   "score": 3,
+   "raw": 1117,
+   "tags": [
+    "multi-speaker dialogue",
+    "emotion control"
+   ],
+   "sentence": "A multilingual voice for expressive narration and multi-speaker dialogue, with natural-language control of style and emotion."
+  },
+  "mistralai/voxtral-mini-tts-2603": {
+   "score": 2,
+   "raw": 1079,
+   "tags": [
+    "voice cloning",
+    "multilingual"
+   ],
+   "sentence": "Mistral's voice with zero-shot voice cloning and multilingual support."
+  },
+  "fish-audio/s1": {
+   "score": 2,
+   "raw": 1078,
+   "tags": [
+    "emotional range",
+    "multilingual"
+   ],
+   "sentence": "A multilingual voice for apps that need broad emotional expression, guided with parenthetical style cues."
+  },
+  "hexgrad/kokoro-82m": {
+   "score": 1,
+   "raw": 1063,
+   "tags": [
+    "open weights"
+   ],
+   "sentence": "A tiny open-weight voice (82M parameters) covering 8 languages; Artificial Analysis lists it as the cheapest model on the board."
+  },
+  "microsoft/mai-transcribe-2": {
+   "score": 5,
+   "raw": 2.04,
+   "tags": [
+    "60 languages",
+    "code switching"
+   ],
+   "sentence": "Microsoft AI's multilingual model, ranked #1 on the FLEURS benchmark, with 60 languages, automatic language ID and mixed-language speech."
+  },
+  "microsoft/mai-transcribe-1.5": {
+   "score": 5,
+   "raw": 2.38,
+   "tags": [
+    "43 languages",
+    "captions and calls"
+   ],
+   "sentence": "Multilingual transcription across 43 languages, aimed at captions, call transcription, subtitling and accessibility."
+  },
+  "google/gemini-3.5-transcribe": {
+   "score": 4,
+   "raw": 2.6,
+   "tags": [
+    "word timestamps",
+    "speaker diarization"
+   ],
+   "sentence": "Google's transcription model for synchronous jobs that need word-level timestamps or telling up to eight speakers apart."
+  },
+  "mistralai/voxtral-small-24b-2507-stt": {
+   "score": 4,
+   "raw": 2.77,
+   "tags": [
+    "open weights",
+    "transcription and translation"
+   ],
+   "sentence": "Mistral's larger Voxtral model for transcription, translation and audio understanding; Artificial Analysis lists it as the most accurate open-weights model."
+  },
+  "assemblyai/universal-3-5-pro": {
+   "score": 4,
+   "raw": 3.02,
+   "tags": [
+    "word timestamps",
+    "clips up to 120s"
+   ],
+   "sentence": "AssemblyAI's model via its Sync API, returning a full transcript with word-level timestamps in one response for clips up to 120 seconds."
+  },
+  "openai/gpt-transcribe": {
+   "score": 4,
+   "raw": 3.31,
+   "tags": [
+    "keyword hints"
+   ],
+   "sentence": "OpenAI's high-accuracy transcription model that accepts free-form context and keyword hints."
+  },
+  "mistralai/voxtral-mini-3b-2507": {
+   "score": 3,
+   "raw": 3.84,
+   "tags": [
+    "transcription and translation"
+   ],
+   "sentence": "A compact Mistral speech model for transcription, translation and light audio processing."
+  },
+  "openai/gpt-4o-transcribe": {
+   "score": 3,
+   "raw": 3.96,
+   "sentence": "OpenAI's high-quality transcription model built on GPT-4o audio."
+  },
+  "x-ai/grok-stt-1.0": {
+   "score": 3,
+   "raw": 4.03,
+   "tags": [
+    "speaker diarization",
+    "word timestamps"
+   ],
+   "sentence": "SpaceXAI's speech-to-text with word-level timestamps, optional speaker diarization and multichannel audio."
+  },
+  "openai/whisper-1": {
+   "score": 3,
+   "raw": 4.06,
+   "tags": [
+    "50+ languages",
+    "translation"
+   ],
+   "sentence": "OpenAI's Whisper via the API: transcription and translation across 50+ languages."
+  },
+  "openai/whisper-large-v3": {
+   "score": 3,
+   "raw": 4.07,
+   "tags": [
+    "99+ languages",
+    "open source"
+   ],
+   "sentence": "OpenAI's open-source Whisper Large v3, transcription and translation across 99+ languages."
+  },
+  "google/chirp-3": {
+   "score": 3,
+   "raw": 4.32,
+   "tags": [
+    "multilingual",
+    "auto language detection"
+   ],
+   "sentence": "Google's multilingual model with 24 GA and 77+ preview languages and automatic language detection."
+  },
+  "openai/gpt-4o-mini-transcribe": {
+   "score": 3,
+   "raw": 4.47,
+   "sentence": "OpenAI's smaller, cost-efficient transcription model for high-volume work."
+  },
+  "openai/whisper-large-v3-turbo": {
+   "score": 3,
+   "raw": 4.62,
+   "tags": [
+    "99+ languages"
+   ],
+   "sentence": "An optimised Whisper Large v3 built for speed and cost efficiency."
+  },
+  "deepgram/nova-3": {
+   "score": 3,
+   "raw": 5.18,
+   "tags": [
+    "multilingual"
+   ],
+   "sentence": "Deepgram's general-purpose model; Artificial Analysis measures it as the fastest speech-to-text model (569x real time)."
+  },
+  "anthropic/claude-opus-5.5": {
+   "score": 5,
+   "raw": 57.6,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average. It costs more than similar models. 1M-token context window."
+  },
+  "anthropic/claude-sonnet-5.5": {
+   "score": 5,
+   "raw": 56.0,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is notably fast and reasonably priced for its class. 1M-token context window."
+  },
+  "anthropic/claude-fable-5.1": {
+   "score": 5,
+   "raw": 53.4,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "openai/gpt-6-astra": {
+   "score": 5,
+   "raw": 52.7,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is fairly concise. It costs more than similar models. 1M-token context window."
+  },
+  "openai/gpt-6.1-sol": {
+   "score": 5,
+   "raw": 51.8,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is reasonably priced for its class and fairly concise. 1M-token context window."
+  },
+  "anthropic/claude-opus-5": {
+   "score": 5,
+   "raw": 50.8,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "anthropic/claude-fable-5": {
+   "score": 5,
+   "raw": 49.6,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "openai/gpt-6-sol": {
+   "score": 5,
+   "raw": 47.6,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average, reasonably priced for its class and fairly concise. 1M-token context window."
+  },
+  "openai/gpt-5.6-sol": {
+   "score": 5,
+   "raw": 47.0,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average. It costs more than similar models. 1M-token context window."
+  },
+  "x-ai/grok-4.7": {
+   "score": 5,
+   "raw": 46.4,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average and reasonably priced for its class. 500k-token context window."
+  },
+  "qwen/qwen3.8-max-0902": {
+   "score": 5,
+   "raw": 45.4,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is reasonably priced for its class. 984k-token context window."
+  },
+  "z-ai/glm-5.3": {
+   "score": 4,
+   "raw": 44.8,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "x-ai/grok-4.6": {
+   "score": 4,
+   "raw": 44.3,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average and reasonably priced for its class. 500k-token context window."
+  },
+  "moonshotai/kimi-k3": {
+   "score": 4,
+   "raw": 43.6,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "openai/gpt-5.6-terra": {
+   "score": 4,
+   "raw": 42.1,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is faster than average. It costs more than similar models. 1M-token context window."
+  },
+  "anthropic/claude-opus-4.8": {
+   "score": 4,
+   "raw": 41.8,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "z-ai/glm-5.3-flash": {
+   "score": 4,
+   "raw": 41.8,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is reasonably priced for its class. 1M-token context window."
+  },
+  "google/gemini-3.8-flash": {
+   "score": 4,
+   "raw": 40.9,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is notably fast and well priced for its class. 1M-token context window."
+  },
+  "anthropic/claude-opus-4.7": {
+   "score": 4,
+   "raw": 40.7,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 1M-token context window."
+  },
+  "qwen/qwen3.8-2.4t-a95b": {
+   "score": 4,
+   "raw": 39.9,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It costs more than similar models. 262k-token context window."
+  },
+  "deepseek/deepseek-v4.1-flash": {
+   "score": 4,
+   "raw": 39.5,
+   "sentence": "Artificial Analysis ranks it among the leading models in intelligence. It is notably fast and reasonably priced for its class. 1M-token context window."
+  },
+  "google/gemini-3.7-flash": {
+   "score": 4,
+   "raw": 39.1,
+   "sentence": "Artificial Analysis rates its intelligence above average. It is notably fast and well priced for its class. 1M-token context window."
+  },
+  "openai/gpt-5.4": {
+   "score": 4,
+   "raw": 39.0,
+   "sentence": "Artificial Analysis rates its intelligence above average. It costs more than similar models. 1M-token context window."
+  },
+  "x-ai/grok-4.5": {
+   "score": 4,
+   "raw": 38.8,
+   "sentence": "Artificial Analysis rates its intelligence above average. It is reasonably priced for its class and fairly concise. 500k-token context window."
+  },
+  "openai/gpt-5.5": {
+   "score": 4,
+   "raw": 38.4,
+   "sentence": "Artificial Analysis rates its intelligence above average. It is faster than average. It costs more than similar models. 922k-token context window."
+  },
+  "anthropic/claude-sonnet-5": {
+   "score": 4,
+   "raw": 38.2,
+   "sentence": "Artificial Analysis rates its intelligence above average. It is faster than average and reasonably priced for its class. 1M-token context window."
+  },
+  "openai/gpt-6-luna": {
+   "score": 4,
+   "raw": 38.1
+  },
+  "openai/gpt-5.6-luna": {
+   "score": 4,
+   "raw": 37.3
+  },
+  "deepseek/deepseek-v4-pro-0813": {
+   "score": 4,
+   "raw": 36.0
+  },
+  "deepseek/deepseek-v4-flash-0731": {
+   "score": 4,
+   "raw": 34.3
+  },
+  "google/gemini-3.6-flash": {
+   "score": 4,
+   "raw": 34.0
+  },
+  "qwen/qwen3.8-27b": {
+   "score": 4,
+   "raw": 33.7
+  },
+  "z-ai/glm-5.2": {
+   "score": 4,
+   "raw": 33.7
+  },
+  "google/gemini-3.5-flash": {
+   "score": 4,
+   "raw": 32.6
+  },
+  "openai/gpt-5.3-codex": {
+   "score": 4,
+   "raw": 32.5
+  },
+  "openai/gpt-5.2": {
+   "score": 4,
+   "raw": 30.4
+  },
+  "google/gemini-3.1-pro-preview": {
+   "score": 3,
+   "raw": 29.7
+  },
+  "qwen/qwen3.7-max": {
+   "score": 3,
+   "raw": 29.5
+  },
+  "minimax/minimax-m3": {
+   "score": 3,
+   "raw": 29.2
+  },
+  "openai/gpt-5.2-codex": {
+   "score": 3,
+   "raw": 28.5
+  },
+  "qwen/qwen3.6-max-preview": {
+   "score": 3,
+   "raw": 28.4
+  },
+  "z-ai/glm-5": {
+   "score": 3,
+   "raw": 27.9
+  },
+  "x-ai/grok-build-0.1": {
+   "score": 3,
+   "raw": 27.2
+  },
+  "moonshotai/kimi-k2.6": {
+   "score": 3,
+   "raw": 27.0
+  },
+  "qwen/qwen3.6-plus": {
+   "score": 3,
+   "raw": 27.0
+  },
+  "z-ai/glm-5-turbo": {
+   "score": 3,
+   "raw": 26.6
+  },
+  "anthropic/claude-opus-4.6": {
+   "score": 3,
+   "raw": 26.4
+  },
+  "z-ai/glm-5.1": {
+   "score": 3,
+   "raw": 26.1
+  },
+  "moonshotai/kimi-k2.7-code": {
+   "score": 3,
+   "raw": 25.8
+  },
+  "qwen/qwen3.7-plus": {
+   "score": 3,
+   "raw": 25.2
+  },
+  "x-ai/grok-4.3": {
+   "score": 3,
+   "raw": 24.9
+  },
+  "anthropic/claude-sonnet-4.6": {
+   "score": 3,
+   "raw": 24.7
+  },
+  "openai/gpt-5.1": {
+   "score": 3,
+   "raw": 24.7
+  },
+  "openai/gpt-5.4-mini": {
+   "score": 3,
+   "raw": 24.1
+  },
+  "anthropic/claude-opus-4.5": {
+   "score": 3,
+   "raw": 23.7
+  },
+  "openai/gpt-5.1-codex": {
+   "score": 3,
+   "raw": 23.7
+  },
+  "moonshotai/kimi-k2.5": {
+   "score": 3,
+   "raw": 23.5
+  },
+  "z-ai/glm-5v-turbo": {
+   "score": 3,
+   "raw": 23.5
+  },
+  "openai/gpt-5": {
+   "score": 3,
+   "raw": 23.0
+  },
+  "qwen/qwen3.5-27b": {
+   "score": 3,
+   "raw": 22.9
+  },
+  "minimax/minimax-m2.5": {
+   "score": 3,
+   "raw": 22.8
+  },
+  "minimax/minimax-m2.7": {
+   "score": 3,
+   "raw": 22.8
+  },
+  "google/gemini-3.5-flash-lite": {
+   "score": 3,
+   "raw": 22.2
+  },
+  "z-ai/glm-4.7": {
+   "score": 3,
+   "raw": 22.2
+  },
+  "moonshotai/kimi-k2-thinking": {
+   "score": 3,
+   "raw": 22.0
+  },
+  "openai/o3-pro": {
+   "score": 3,
+   "raw": 21.9
+  },
+  "qwen/qwen3.6-27b": {
+   "score": 3,
+   "raw": 21.4
+  },
+  "qwen/qwen3-max-thinking": {
+   "score": 3,
+   "raw": 21.3
+  },
+  "minimax/minimax-m2.1": {
+   "score": 3,
+   "raw": 20.9
+  },
+  "openai/gpt-5.4-nano": {
+   "score": 3,
+   "raw": 20.7
+  },
+  "openai/gpt-5.1-codex-mini": {
+   "score": 3,
+   "raw": 20.4
+  },
+  "openai/o3": {
+   "score": 3,
+   "raw": 20.2
+  },
+  "anthropic/claude-sonnet-4.5": {
+   "score": 3,
+   "raw": 19.3
+  },
+  "qwen/qwen3.5-35b-a3b": {
+   "score": 3,
+   "raw": 19.3
+  },
+  "anthropic/claude-opus-4.1": {
+   "score": 3,
+   "raw": 18.6
+  },
+  "minimax/minimax-m2": {
+   "score": 3,
+   "raw": 18.6
+  },
+  "qwen/qwen3.5-397b-a17b": {
+   "score": 3,
+   "raw": 18.4
+  },
+  "qwen/qwen3.6-35b-a3b": {
+   "score": 3,
+   "raw": 18.2
+  },
+  "google/gemini-3-flash-preview": {
+   "score": 2,
+   "raw": 17.9
+  },
+  "openai/gpt-5-mini": {
+   "score": 2,
+   "raw": 16.8
+  },
+  "google/gemma-4-26b-a4b-it": {
+   "score": 2,
+   "raw": 16.7
+  },
+  "openai/o4-mini-high": {
+   "score": 2,
+   "raw": 16.7
+  },
+  "anthropic/claude-sonnet-4": {
+   "score": 2,
+   "raw": 16.6
+  },
+  "google/gemini-2.5-pro": {
+   "score": 2,
+   "raw": 16.1
+  },
+  "deepseek/deepseek-v3.2": {
+   "score": 2,
+   "raw": 16.0
+  },
+  "qwen/qwen3-max": {
+   "score": 2,
+   "raw": 15.6
+  },
+  "qwen/qwen3.5-122b-a10b": {
+   "score": 2,
+   "raw": 15.6
+  },
+  "anthropic/claude-haiku-4.5": {
+   "score": 2,
+   "raw": 15.4
+  },
+  "moonshotai/kimi-k2-0905": {
+   "score": 2,
+   "raw": 15.3
+  },
+  "openai/o1": {
+   "score": 2,
+   "raw": 15.2
+  },
+  "z-ai/glm-4.6": {
+   "score": 2,
+   "raw": 14.9
+  },
+  "z-ai/glm-4.7-flash": {
+   "score": 2,
+   "raw": 14.9
+  },
+  "google/gemma-4-31b-it": {
+   "score": 2,
+   "raw": 14.7
+  },
+  "mistralai/mistral-medium-3-5": {
+   "score": 2,
+   "raw": 14.2
+  },
+  "deepseek/deepseek-v3.1-terminus": {
+   "score": 2,
+   "raw": 13.9
+  },
+  "deepseek/deepseek-v3.2-exp": {
+   "score": 2,
+   "raw": 13.9
+  },
+  "deepseek/deepseek-chat-v3.1": {
+   "score": 2,
+   "raw": 13.7
+  },
+  "qwen/qwen3-vl-235b-a22b-thinking": {
+   "score": 2,
+   "raw": 13.4
+  },
+  "cohere/command-a-plus": {
+   "score": 2,
+   "raw": 13.1
+  },
+  "deepseek/deepseek-r1-0528": {
+   "score": 2,
+   "raw": 13.1
+  },
+  "openai/gpt-5-nano": {
+   "score": 2,
+   "raw": 13.0
+  },
+  "z-ai/glm-4.5": {
+   "score": 2,
+   "raw": 12.8
+  },
+  "moonshotai/kimi-k2": {
+   "score": 2,
+   "raw": 12.7
+  },
+  "openai/gpt-4.1": {
+   "score": 2,
+   "raw": 12.7
+  },
+  "qwen/qwen3-235b-a22b-thinking-2507": {
+   "score": 2,
+   "raw": 12.7
+  },
+  "openai/o3-mini": {
+   "score": 2,
+   "raw": 12.5
+  },
+  "openai/o1-pro": {
+   "score": 2,
+   "raw": 12.4
+  },
+  "qwen/qwen3-235b-a22b-2507": {
+   "score": 2,
+   "raw": 12.0
+  },
+  "qwen/qwen3-coder": {
+   "score": 2,
+   "raw": 11.9
+  },
+  "perplexity/sonar-reasoning-pro": {
+   "score": 2,
+   "raw": 11.8
+  },
+  "openai/gpt-oss-120b": {
+   "score": 2,
+   "raw": 11.6
+  },
+  "deepseek/deepseek-r1": {
+   "score": 2,
+   "raw": 11.4
+  },
+  "qwen/qwen3-next-80b-a3b-thinking": {
+   "score": 2,
+   "raw": 11.2
+  },
+  "qwen/qwen3.5-9b": {
+   "score": 2,
+   "raw": 11.2
+  },
+  "z-ai/glm-4.5-air": {
+   "score": 2,
+   "raw": 11.1
+  },
+  "openai/o3-mini-high": {
+   "score": 2,
+   "raw": 11.0
+  },
+  "openai/gpt-4.1-mini": {
+   "score": 2,
+   "raw": 10.2
+  },
+  "meta-llama/llama-4-maverick": {
+   "score": 2,
+   "raw": 10.0
+  },
+  "google/gemini-2.5-flash": {
+   "score": 2,
+   "raw": 9.9
+  },
+  "qwen/qwen3-vl-235b-a22b-instruct": {
+   "score": 2,
+   "raw": 9.9
+  },
+  "qwen/qwen3-30b-a3b-thinking-2507": {
+   "score": 2,
+   "raw": 9.8
+  },
+  "deepseek/deepseek-chat-v3-0324": {
+   "score": 2,
+   "raw": 9.7
+  },
+  "qwen/qwen3-next-80b-a3b-instruct": {
+   "score": 2,
+   "raw": 9.6
+  },
+  "qwen/qwen3-vl-30b-a3b-thinking": {
+   "score": 2,
+   "raw": 9.5
+  },
+  "mistralai/mistral-large-2512": {
+   "score": 2,
+   "raw": 9.3
+  },
+  "mistralai/mistral-medium-3.1": {
+   "score": 2,
+   "raw": 9.2
+  },
+  "qwen/qwen3-coder-next": {
+   "score": 2,
+   "raw": 9.2
+  },
+  "amazon/nova-premier-v1": {
+   "score": 2,
+   "raw": 9.2
+  },
+  "mistralai/mistral-medium-3": {
+   "score": 2,
+   "raw": 9.0
+  },
+  "openai/gpt-oss-20b": {
+   "score": 2,
+   "raw": 9.0
+  },
+  "amazon/nova-2-lite-v1": {
+   "score": 1,
+   "raw": 8.7
+  },
+  "mistralai/devstral-2512": {
+   "score": 1,
+   "raw": 8.6
+  },
+  "openai/gpt-4o-2024-11-20": {
+   "score": 1,
+   "raw": 8.4
+  },
+  "qwen/qwen3-vl-32b-instruct": {
+   "score": 1,
+   "raw": 8.4
+  },
+  "z-ai/glm-4.6v": {
+   "score": 1,
+   "raw": 8.4
+  },
+  "qwen/qwen3-235b-a22b": {
+   "score": 1,
+   "raw": 8.3
+  },
+  "mistralai/mistral-small-3.2-24b-instruct": {
+   "score": 1,
+   "raw": 8.2
+  },
+  "qwen/qwen3-vl-8b-thinking": {
+   "score": 1,
+   "raw": 8.2
+  },
+  "meta-llama/llama-4-scout": {
+   "score": 1,
+   "raw": 8.1
+  },
+  "qwen/qwen3-vl-30b-a3b-instruct": {
+   "score": 1,
+   "raw": 7.9
+  },
+  "openai/gpt-4.1-nano": {
+   "score": 1,
+   "raw": 7.8
+  },
+  "meta-llama/llama-3.3-70b-instruct": {
+   "score": 1,
+   "raw": 7.7
+  },
+  "openai/gpt-4o-2024-08-06": {
+   "score": 1,
+   "raw": 7.7
+  },
+  "perplexity/sonar": {
+   "score": 1,
+   "raw": 7.7
+  },
+  "qwen/qwen-2.5-72b-instruct": {
+   "score": 1,
+   "raw": 7.7
+  },
+  "perplexity/sonar-pro": {
+   "score": 1,
+   "raw": 7.6
+  },
+  "qwen/qwen3-30b-a3b-instruct-2507": {
+   "score": 1,
+   "raw": 7.5
+  },
+  "openai/gpt-4o-2024-05-13": {
+   "score": 1,
+   "raw": 7.3
+  },
+  "qwen/qwen3-32b": {
+   "score": 1,
+   "raw": 7.3
+  },
+  "qwen/qwen3-vl-8b-instruct": {
+   "score": 1,
+   "raw": 7.3
+  },
+  "mistralai/mistral-small-3.1-24b-instruct": {
+   "score": 1,
+   "raw": 7.1
+  },
+  "cohere/command-a": {
+   "score": 1,
+   "raw": 7.0
+  },
+  "openai/gpt-4-turbo": {
+   "score": 1,
+   "raw": 7.0
+  },
+  "amazon/nova-pro-v1": {
+   "score": 1,
+   "raw": 7.0
+  },
+  "meta-llama/llama-3.1-8b-instruct": {
+   "score": 1,
+   "raw": 6.9
+  },
+  "mistralai/mistral-large-2407": {
+   "score": 1,
+   "raw": 6.8
+  },
+  "google/gemini-2.5-flash-lite": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "mistralai/mistral-small-24b-instruct-2501": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "openai/gpt-4": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "openai/gpt-4o-mini": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "openai/gpt-4o-mini-2024-07-18": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "qwen/qwen3-14b": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "qwen/qwen-2.5-coder-32b-instruct": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "z-ai/glm-4.5v": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "amazon/nova-lite-v1": {
+   "score": 1,
+   "raw": 6.7
+  },
+  "meta-llama/llama-3.1-70b-instruct": {
+   "score": 1,
+   "raw": 6.6
+  },
+  "qwen/qwen3-30b-a3b": {
+   "score": 1,
+   "raw": 6.6
+  },
+  "mistralai/mistral-saba": {
+   "score": 1,
+   "raw": 6.5
+  },
+  "mistralai/ministral-14b-2512": {
+   "score": 1,
+   "raw": 6.0
+  },
+  "qwen/qwen3-8b": {
+   "score": 1,
+   "raw": 6.0
+  },
+  "microsoft/phi-4": {
+   "score": 1,
+   "raw": 5.9
+  },
+  "amazon/nova-micro-v1": {
+   "score": 1,
+   "raw": 5.9
+  },
+  "meta-llama/llama-3.2-3b-instruct": {
+   "score": 1,
+   "raw": 5.7
+  },
+  "mistralai/mixtral-8x22b-instruct": {
+   "score": 1,
+   "raw": 5.7
+  },
+  "mistralai/ministral-8b-2512": {
+   "score": 1,
+   "raw": 5.5
+  },
+  "openai/gpt-3.5-turbo": {
+   "score": 1,
+   "raw": 5.5
+  },
+  "google/gemma-3-27b-it": {
+   "score": 1,
+   "raw": 4.9
+  },
+  "google/gemma-3-4b-it": {
+   "score": 1,
+   "raw": 4.8
+  },
+  "meta-llama/llama-3.2-1b-instruct": {
+   "score": 1,
+   "raw": 4.8
+  },
+  "mistralai/ministral-3b-2512": {
+   "score": 1,
+   "raw": 4.8
+  },
+  "google/gemma-3-12b-it": {
+   "score": 1,
+   "raw": 3.8
+  },
+  "local:pocket": {
+   "benchmarkMs": 22,
+   "tags": [
+    "streams",
+    "private"
+   ],
+   "sentence": "Not on a public leaderboard. First sound 22 ms on this Mac (our benchmark); 26 voices, nothing leaves your Mac."
+  },
+  "local:supertonic": {
+   "benchmarkMs": 152,
+   "tags": [
+    "31 languages"
+   ],
+   "sentence": "Not on a public leaderboard. A 12-second passage in 152 ms on this Mac (our benchmark; it doesn't stream); 10 voices."
+  },
+  "local:parakeet": {
+   "benchmarkMs": 100,
+   "tags": [
+    "private"
+   ],
+   "sentence": "Not on a public leaderboard. Text about 100 ms after you stop, on this Mac (our benchmark); nothing leaves your Mac."
+  }
+ },
+ "tags_rule": "Tags name capabilities or use cases (voice cloning, multi-speaker, open weights, word timestamps); never quality, speed or cost, which the columns show."
+}

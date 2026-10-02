@@ -159,6 +159,8 @@ final class AppState {
         self.store.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         VocabularyStore.shared.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         self.store.onExternalChanges = { [weak self] in self?.showExternalChanges($0) }
+        // The model pickers' measured speeds and costs come from the same runs.
+        ModelInsights.historyStore = historyStore
         hud.attach(self)
         observeTracks()
         // `vp` talks to the app through this socket.
@@ -541,6 +543,10 @@ final class AppState {
             if let index, depth == 0, case .route = step.kind, let title = run?.stepTitles[safe: index], run?.trackID == track.id { entry.title = title }
             entry.output = output.flatMap(Self.describe)
             entry.usage = meter.total ?? (Self.runsOnThisMac(step.kind) ? RunRecord.Usage(local: true) : nil)
+            entry.model = meter.total?.model ?? Self.pickerID(step.kind)
+            if case .speak = step.kind { entry.firstSoundMs = speaker.firstSoundMs }
+            if case .localSpeech = step.kind { entry.firstSoundMs = speaker.firstSoundMs }
+            if case .openRouterSpeech = step.kind { entry.firstSoundMs = speaker.firstSoundMs }
             entry.decision = lastDecision
             if run?.trackID == track.id { run?.log.append(entry) }
         }
@@ -574,6 +580,17 @@ final class AppState {
         case .openRouterSpeech(let model, _, _): "Speak · \(model.split(separator: "/").last ?? "")"
         case .speak: "Speak · macOS voice"
         default: kind.title
+        }
+    }
+
+    /// The id a model picker uses for the step's model (local models get "local:<name>").
+    static func pickerID(_ kind: StepKind) -> String? {
+        switch kind {
+        case .parakeet: "local:parakeet"
+        case .openRouterSTT(let model), .llm(let model, _, _), .openRouterSpeech(let model, _, _): model
+        case .localSpeech(let engine, _, _): "local:\(engine.rawValue)"
+        case .speak: "local:macos"
+        default: nil
         }
     }
 

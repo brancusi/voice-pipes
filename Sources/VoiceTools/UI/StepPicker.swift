@@ -344,33 +344,36 @@ private struct PickerHeight: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// The picker's window: borderless, with the window shadow, attached to the editor and placed under its
-/// "+ Add step" link (above it near the bottom of the screen). It takes the keyboard while open; clicking
-/// anywhere else, Esc or adding a block closes it.
+/// A picker's window: borderless, with the window shadow, attached to the editor and placed under the control
+/// that opened it (above it near the bottom of the screen). It takes the keyboard while open; clicking anywhere
+/// else, Esc or a pick closes it. Shared by the Add step picker and the model pickers.
 @MainActor
-final class StepPickerPanel {
-    static let shared = StepPickerPanel()
+final class AnchoredPanel {
+    static let shared = AnchoredPanel()
     private var panel: NSPanel?
     private var resignObserver: NSObjectProtocol?
     private var anchorRect: NSRect = .zero
     private var above = false
+    private var width: CGFloat = 400
+    private var maxHeight: CGFloat = 520
 
-    func show(from anchor: NSView, context: StepPickerContext, onAdd: @escaping (StepKind) -> Void) {
+    /// `content` gets `close` and `reportHeight` (call it with the content's height so the panel fits it).
+    func show<Content: View>(from anchor: NSView, width: CGFloat, maxHeight: CGFloat,
+                             @ViewBuilder content: (_ close: @escaping () -> Void, _ reportHeight: @escaping (CGFloat) -> Void) -> Content) {
         close()
         guard let window = anchor.window else { return }
+        self.width = width
+        self.maxHeight = maxHeight
         anchorRect = window.convertToScreen(anchor.convert(anchor.bounds, to: nil))
-        let panel = PickerPanel(contentRect: NSRect(x: 0, y: 0, width: StepPicker.width, height: 300),
+        let panel = PickerPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: 300),
                                 styleMask: [.borderless], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.appearance = window.effectiveAppearance
-        let picker = StepPicker(context: context, onAdd: { [weak self] kind in
-            onAdd(kind)
-            self?.close()
-        }, onClose: { [weak self] in self?.close() }, onHeight: { [weak self] height in self?.place(height: height) })
-        let host = NSHostingView(rootView: picker.vpWindow())
+        let view = content({ [weak self] in self?.close() }, { [weak self] height in self?.place(height: height) })
+        let host = NSHostingView(rootView: view.vpWindow())
         panel.contentView = host
         self.panel = panel
         place(height: host.fittingSize.height)
@@ -381,14 +384,14 @@ final class StepPickerPanel {
         }
     }
 
-    /// Below the link, top edge fixed as the list shrinks while filtering; above it if there's no room below.
+    /// Below the control, top edge fixed as the content shrinks; above it if there's no room below.
     private func place(height: CGFloat) {
         guard let panel, height > 0 else { return }
         let screen = NSScreen.screens.first { $0.frame.intersects(anchorRect) }?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
-        if panel.frame.height < 10 || !panel.isVisible { above = anchorRect.minY - 4 - StepPicker.maxHeight < screen.minY }
-        let x = min(max(anchorRect.minX - 4, screen.minX + 8), screen.maxX - StepPicker.width - 8)
+        if panel.frame.height < 10 || !panel.isVisible { above = anchorRect.minY - 4 - maxHeight < screen.minY }
+        let x = min(max(anchorRect.minX - 4, screen.minX + 8), screen.maxX - width - 8)
         let y = above ? anchorRect.maxY + 4 : anchorRect.minY - 4 - height
-        panel.setFrame(NSRect(x: x, y: y, width: StepPicker.width, height: height), display: true)
+        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         panel.invalidateShadow()
     }
 
@@ -399,6 +402,19 @@ final class StepPickerPanel {
         self.panel = nil
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
+    }
+}
+
+/// The Add step picker in its panel.
+@MainActor
+enum StepPickerPanel {
+    static func show(from anchor: NSView, context: StepPickerContext, onAdd: @escaping (StepKind) -> Void) {
+        AnchoredPanel.shared.show(from: anchor, width: StepPicker.width, maxHeight: StepPicker.maxHeight) { close, report in
+            StepPicker(context: context, onAdd: { kind in
+                onAdd(kind)
+                close()
+            }, onClose: close, onHeight: report)
+        }
     }
 }
 

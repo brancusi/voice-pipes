@@ -20,8 +20,10 @@ struct ModelPicker: View {
     var local: [LocalModelOption] = []
     let onPick: (Pick) -> Void
 
-    @State private var showing = false
+    @State private var anchor = AnchorBox()
     private var catalog: OpenRouterCatalog { .shared }
+
+    final class AnchorBox { weak var view: NSView? }
 
     init(capability: OpenRouterCatalog.Capability, selection: String, local: [LocalModelOption] = [],
          onPick: @escaping (Pick) -> Void) {
@@ -39,7 +41,7 @@ struct ModelPicker: View {
     }
 
     var body: some View {
-        Button { showing = true } label: {
+        Button(action: open) {
             HStack(spacing: 8) {
                 if let option = local.first(where: { $0.id == selection }) {
                     Text(option.name).foregroundStyle(Palette.fg).lineLimit(1)
@@ -58,107 +60,20 @@ struct ModelPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(AnchorView { anchor.view = $0 })
         .help(local.contains { $0.id == selection } ? "Runs on this Mac" : "OpenRouter · \(selection)")
-        .popover(isPresented: $showing, arrowEdge: .bottom) {
-            ModelList(capability: capability, selection: selection, local: local) { pick in
-                onPick(pick)
-                showing = false
-            }
-        }
         .onAppear { catalog.refreshIfStale() }
     }
-}
 
-private struct ModelList: View {
-    let capability: OpenRouterCatalog.Capability
-    let selection: String
-    let local: [LocalModelOption]
-    let pick: (ModelPicker.Pick) -> Void
-    @State private var query = ""
-    private var catalog: OpenRouterCatalog { .shared }
-
-    private var terms: [Substring] { query.lowercased().split(separator: " ") }
-
-    private func matches(_ text: String) -> Bool {
-        let haystack = text.lowercased()
-        return terms.allSatisfy { haystack.contains($0) }
-    }
-
-    private var localMatches: [LocalModelOption] { local.filter { matches("\($0.name) \($0.detail) local mac") } }
-    private var models: [OpenRouterCatalog.Model] {
-        catalog.models(for: capability).filter { matches("\($0.name) \($0.id)") }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(capability.title).font(VPFont.title)
-                Spacer()
-                if catalog.loading { ProgressView().controlSize(.small) }
-                Button { catalog.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.borderless).help("Reload the list from OpenRouter")
-            }
-            VPTextField("Search \(local.count + catalog.models(for: capability).count) models", text: $query)
-            if let error = catalog.error {
-                Text(error).font(VPFont.caption).foregroundStyle(Palette.orange)
-            }
-            List {
-                if !localMatches.isEmpty {
-                    Section("On this Mac") {
-                        ForEach(localMatches) { option in
-                            row(title: option.name, subtitle: option.detail, trailing: "free", selected: option.id == selection) {
-                                pick(.local(option))
-                            }
-                        }
-                    }
-                }
-                Section("OpenRouter") {
-                    ForEach(models) { model in
-                        row(title: model.shortName, subtitle: model.id, mono: true,
-                            trailing: model.priceLabel(for: capability),
-                            extra: capability == .speech && !model.voices.isEmpty ? "\(model.voices.count) voices" : nil,
-                            selected: model.id == selection) {
-                            pick(.openRouter(model))
-                        }
-                    }
-                }
-            }
-            .listStyle(.plain)
-            HStack {
-                Text("Or type an OpenRouter model id:").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                TextField("provider/model", text: $query, onCommit: {
-                    let id = query.trimmingCharacters(in: .whitespaces)
-                    if id.contains("/") { pick(.openRouter(catalog.model(id) ?? .init(id: id, name: id))) }
-                })
-                .font(.system(size: 11, design: .monospaced))
-                .textFieldStyle(.roundedBorder)
-            }
+    private func open() {
+        guard let view = anchor.view else { return }
+        let capability = capability, selection = selection, local = local, onPick = onPick
+        AnchoredPanel.shared.show(from: view, width: ModelBrowser.width, maxHeight: ModelBrowser.maxHeight) { close, report in
+            ModelBrowser(capability: capability, selection: selection, local: local, onPick: { pick in
+                onPick(pick)
+                close()
+            }, onClose: close, onHeight: report)
         }
-        .padding(12)
-        .frame(width: 460, height: 480)
-        .background(Palette.bg200)
-        .vpWindow()
-    }
-
-    private func row(title: String, subtitle: String, mono: Bool = false, trailing: String, extra: String? = nil,
-                     selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).fontWeight(selected ? .semibold : .regular)
-                    Text(subtitle).font(VPFont.micro)
-                        .foregroundStyle(Palette.fgMuted).lineLimit(2)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(trailing).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                    if let extra { Text(extra).font(VPFont.micro).foregroundStyle(Palette.comment) }
-                }
-                if selected { Text("✓").foregroundStyle(Palette.purple) }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 

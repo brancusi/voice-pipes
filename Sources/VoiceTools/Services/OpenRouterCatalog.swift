@@ -30,6 +30,8 @@ final class OpenRouterCatalog {
         struct Pricing: Codable, Hashable {
             var prompt: String?
             var completion: String?
+            /// A flat fee per request (e.g. :online web search), when there is one.
+            var request: String?
         }
 
         let id: String

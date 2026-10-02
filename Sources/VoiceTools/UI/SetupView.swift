@@ -13,7 +13,7 @@ struct SetupView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     checks.vpSetupSection("checks")
                     connections.vpSetupSection("connections")
-                    VPSection("Command line and agents") { Card { CommandLineCard() } }.vpSetupSection("cli")
+                    VPSection("Command line and agents") { Card { CommandLineCard(store: app.store) } }.vpSetupSection("cli")
                     onThisMac.vpSetupSection("models")
                     appearanceSection.vpSetupSection("appearance")
                     ReadingSettingsSection(app: app).vpSetupSection("reading")

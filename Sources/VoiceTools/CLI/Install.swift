@@ -560,8 +560,17 @@ enum CLISetup {
 
 /// The card shown in Setup and the setup window: where vp is, which agents have the skill, and the button.
 struct CommandLineCard: View {
+    /// Given in Setup, for the read-aloud row (the setup window leaves it out).
+    var store: TrackStore?
     @State private var state = CLISetup.state
     @State private var message: String?
+
+    private static let readAloudDetail: [AgentSettings.ReadAloud: String] = [
+        .off: "Agents speak only when you ask them to.",
+        .long: "Agents read long replies aloud: summaries, reports, explanations.",
+        .attention: "Agents speak when they're waiting on you, finish something or hit a problem, and read long replies.",
+        .all: "Agents read every reply aloud, in a short spoken version.",
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -587,6 +596,17 @@ struct CommandLineCard: View {
                          : "installed for " + state.skills.joined(separator: ", "))
                         .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 }
+            }
+            if let store {
+                // The same setting as `vp agents read-aloud` and [settings.agents] read_aloud.
+                let mode = Binding { store.agents.readAloud } set: { store.agents.readAloud = $0 }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Agents read to me unasked").font(VPFont.bodyStrong)
+                    VPSegmented(selection: mode, options: [(.off, "Off"), (.long, "Long replies"), (.attention, "When they need me"), (.all, "Everything")])
+                    Text(Self.readAloudDetail[mode.wrappedValue] ?? "").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.leading, 52).padding(.top, 2)
             }
             if let message { Text(message).font(VPFont.caption).foregroundStyle(Palette.green) }
             Text("Agents can then speak to you (vp say), ask you things out loud (vp ask), run your tracks and edit ~/.config/voice-pipes/config.toml.")

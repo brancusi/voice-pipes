@@ -47,6 +47,10 @@ struct RunRecord: Codable, Identifiable, Hashable {
         var message: String?
         /// A Speak step's voice, shown with its usage rather than in the title.
         var voice: String?
+        /// The model as the pickers name it ("local:pocket", "local:parakeet", or an OpenRouter id), for measured speeds.
+        var model: String?
+        /// Speak steps: how long until the first sound.
+        var firstSoundMs: Int?
     }
 
     struct Decision: Codable, Hashable {

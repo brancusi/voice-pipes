@@ -9,7 +9,9 @@ import Observation
 final class Speaker: NSObject {
     enum State { case idle, loading, speaking, paused }
 
-    private(set) var state: State = .idle
+    private(set) var state: State = .idle {
+        didSet { if state == .speaking, firstSoundMs == nil, engine != .none { firstSoundMs = Int(Date().timeIntervalSince(speakStarted) * 1000) } }
+    }
     private(set) var sourceLabel = ""
     private(set) var voiceLabel = ""
     /// 0...1 through the whole text.
@@ -27,6 +29,9 @@ final class Speaker: NSObject {
 
     private(set) var text = ""
     private(set) var sentences: [Sentence] = []
+    /// How long the last reading took to make its first sound (the run log and the model picker's "1st sound").
+    @ObservationIgnored private(set) var firstSoundMs: Int?
+    @ObservationIgnored private var speakStarted = Date()
     /// UTF-16 offset of the voice in `text`: exact for macOS voices (word by word), estimated from progress for
     /// the others.
     private(set) var position = 0
@@ -319,6 +324,8 @@ final class Speaker: NSObject {
     // MARK: - Read-along and speed
 
     private func begin(_ text: String, rate: Float, engine: Engine) {
+        speakStarted = Date()
+        firstSoundMs = nil
         self.text = text
         self.engine = engine
         self.rate = rate

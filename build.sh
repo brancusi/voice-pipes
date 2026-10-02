@@ -64,6 +64,8 @@ swiftc -O "${CACHE[@]}" Tools/make_icon.swift -o "$WORK/make_icon"
 "$WORK/make_icon" "$WORK/AppIcon.iconset" "$APP/Contents/Resources/AppIcon.icns" >/dev/null
 # Silkscreen, the pixel face for flavour headlines (empty states, training success), with its OFL licence.
 ditto Resources/Fonts "$APP/Contents/Resources/Fonts"
+# Model quality ratings for the pickers (curated per release; see Resources/model-ratings.json).
+cp Resources/model-ratings.json "$APP/Contents/Resources/model-ratings.json"
 
 echo "==> compile (arm64, macOS 14+)"
 swift build -c release --arch arm64

@@ -1,5 +1,11 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.8.0**
+- **Model pickers now show what a paragraph costs, how fast each model is on your Mac, and a quality rating from Artificial Analysis.** Sort by best value, quality, speed or cost; each picker remembers your choice. On-device models stay on top in every sort: they're free, private and work offline. Costs are only shown where the billing unit is known (otherwise "—"); speeds come from your own runs (on-device models show our benchmark until then); quality comes from Artificial Analysis's public leaderboards as of October 2026, and models they don't cover say "not rated". Click a model for what it's good at, then **Use** it; ↑↓, →, Return and Esc work too.
+- The sidebar is a little wider, so track names read in full (hover for the whole name), and ↑↓ move through it again.
+- **Agents read to me unasked** in Setup → Command line and agents: Off, Long replies, When they need me, or Everything, the same setting as `vp agents read-aloud`.
+- The read-along card fades its text at the edges instead of cutting a line in half.
+
 **1.7.4**
 - **Ask an agent to build or change a pipeline in plain words.** "Make me a track that cleans up my dictation and posts it to my notes", "read hard text with a cloud voice": the agent skill now walks Claude Code, Codex and others through it: they edit config.toml (which holds everything the app does, one to one), check it, open the track so you can watch it change, try it, and tell you what they built. The skill carries the full block and settings reference, generated from the same source as config.toml's, so it always matches.
 - **Agents read aloud what you want them to.** Tell an agent "read me anything that needs my attention" and it's saved for every agent and every session: `off` (only when asked), `long` (summaries, reports, explanations), `attention` (that, plus questions, finished tasks and problems) or `all`. Set it with `vp agents read-aloud attention`, or `read_aloud` in config.toml under [settings.agents].

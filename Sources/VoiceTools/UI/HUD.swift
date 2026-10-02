@@ -478,9 +478,18 @@ struct ReadAlongCard: View {
                                 .id(sentence.id)
                         }
                     }
-                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .padding(.horizontal, 12).padding(.vertical, 22)
                 }
                 .scrollIndicators(.never)
+                // Lines fade at the card's top and bottom edges instead of being cut mid-glyph.
+                .mask(
+                    // 24 pt from transparent at each edge to opaque, on the scrolling text itself.
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                        Rectangle().fill(.black)
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                    }
+                )
                 .onHover { hovering = $0 }
                 .onAppear { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
                 .onChange(of: current) { _, new in follow(proxy, to: new) }

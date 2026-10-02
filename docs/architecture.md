@@ -186,3 +186,12 @@ branches from text, recursively. Config: `[[track.step.branch]]` / `[[track.step
 `ModelDownloads` measures each model's folder on disk (FluidAudio streams into `<file>.partial` there) three times
 a second while it loads: a forward-only fraction against measured totals, MB/s, and "preparing" once bytes stop
 near the end. FluidAudio's own progress callbacks restart per internal operation, so they aren't used for the bar.
+
+## Model pickers
+
+`ModelBrowser` (in `AnchoredPanel`, shared with the step picker) ranks models with `ModelInsights`: paragraph cost
+from catalogue prices only in a known unit (per char for speech, per second or per hour for transcription with a
+1-cent threshold, tokens for LLMs; a curated `unit` overrides), exact transcription cost from run logs when present;
+speeds as the median of the last 20 log entries for the model (`LogEntry.model`, `firstSoundMs`); quality from
+`Resources/model-ratings.json` (Artificial Analysis, bucketed; refresh per release). `ModelInsights.value` is the one
+Best value formula; unknown cost and unrated sink. On this Mac is pinned on top in every sort.

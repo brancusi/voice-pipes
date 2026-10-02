@@ -69,9 +69,10 @@ enum RunLogFormat {
         }
         // The recording: its length is already in the time column.
         if entry.category == "Input", let out = entry.output, out.hasPrefix("audio") { return "" }
-        guard let usage = entry.usage else { return entry.voice ?? "" }
-        if usage.local == true { return [entry.voice, "on this Mac"].compactMap { $0 }.joined(separator: " · ") }
-        var parts: [String] = entry.voice.map { [$0] } ?? []
+        let firstSound = entry.firstSoundMs.map { "1st sound \(ms($0))" }
+        guard let usage = entry.usage else { return [entry.voice, firstSound].compactMap { $0 }.joined(separator: " · ") }
+        if usage.local == true { return [entry.voice, firstSound, "on this Mac"].compactMap { $0 }.joined(separator: " · ") }
+        var parts: [String] = [entry.voice, firstSound].compactMap { $0 }
         if let p = usage.promptTokens, let c = usage.completionTokens { parts.append("\(count(p)) → \(count(c)) tok") }
         if let seconds = usage.seconds { parts.append(String(format: "%.1f s audio", seconds)) }
         if let characters = usage.characters { parts.append("\(characters.formatted()) chars") }

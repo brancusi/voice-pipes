@@ -210,7 +210,7 @@ private struct AddStepMenu: View {
     var body: some View {
         Button {
             guard let view = anchor.view else { return }
-            StepPickerPanel.shared.show(from: view, context: StepPickerContext(
+            StepPickerPanel.show(from: view, context: StepPickerContext(
                 branch: branch, previous: previous,
                 hasOpenRouterKey: Keychain.get(SecretKey.openRouter) != nil, hasJevKey: JevClient.hasKey), onAdd: onAdd)
         } label: {

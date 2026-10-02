@@ -86,6 +86,13 @@ language, how long it is) and send each kind somewhere else.
 
 ### Choosing models
 
+
+The model pickers show, for each model: what a typical job ("a paragraph": 600 characters spoken, 150 tokens in and
+out, or 30 s of audio) costs in its billing unit ("—" when OpenRouter's unit is ambiguous), its speed measured on
+this Mac (median of your last 20 runs; on-device models show our benchmark until then), and a 1–5 quality rating
+from Artificial Analysis's leaderboards (`Resources/model-ratings.json`, with the bucket rules; "not rated" when they
+don't cover it). Sort by Best value, Quality, Speed or Cost; On this Mac stays on top. Tags name capabilities (voice
+cloning, multi-speaker, vision, rate-limited free tiers), never speed or price.
 Transcribe, LLM and Speak have one **Model** picker: **On this Mac** first, then OpenRouter's live list for that
 job (searchable, with prices; refreshed daily or from Setup). Switching a Speak model keeps your speed and keeps
 the voice if the new model has it. You can also type any OpenRouter model id.

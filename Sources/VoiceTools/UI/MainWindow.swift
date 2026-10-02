@@ -18,7 +18,7 @@ struct MainWindowView: View {
 
     var body: some View {
         NavigationSplitView {
-            sidebar.navigationSplitViewColumnWidth(min: 220, ideal: 240)
+            sidebar.navigationSplitViewColumnWidth(min: 250, ideal: 250)
         } detail: {
             detail.scrollsSidewaysBelow(Self.detailMinWidth)
         }
@@ -42,7 +42,7 @@ struct MainWindowView: View {
     /// Harness only: the sidebar and the page side by side (a split view doesn't render offscreen).
     var snapshotBody: some View {
         HStack(spacing: 0) {
-            sidebar.frame(width: 230)
+            sidebar.frame(width: 250)
             Rectangle().fill(Palette.line).frame(width: 1)
             detail.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -61,7 +61,7 @@ struct MainWindowView: View {
                     sidebarItem(.track(track.id)) {
                         HStack(spacing: 8) {
                             Rectangle().fill(Palette.track(track.colorHex)).frame(width: 7, height: 7)
-                            Text(track.name).lineLimit(1)
+                            Text(track.name).lineLimit(1).help(track.name)
                             Spacer(minLength: 4)
                             if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
                         }
@@ -95,6 +95,21 @@ struct MainWindowView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Palette.bg000)
+        // ↑↓ move through the sidebar (the system list did this; ours draws its own selection).
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.downArrow) { moveSection(1); return .handled }
+        .onKeyPress(.upArrow) { moveSection(-1); return .handled }
+    }
+
+    private var sidebarOrder: [MainSection] {
+        app.store.tracks.map { MainSection.track($0.id) } + [.activity, .vocabulary, .setup]
+    }
+
+    private func moveSection(_ delta: Int) {
+        let order = sidebarOrder
+        let current = app.mainSection.flatMap { order.firstIndex(of: $0) } ?? -1
+        app.mainSection = order[max(0, min(order.count - 1, current + delta))]
     }
 
     /// A sidebar row: selected, it sits on a bg300 pill with fg text.
