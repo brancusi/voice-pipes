@@ -44,10 +44,18 @@ struct ModelBrowser: View {
                 info: ModelInsights.info(option.id, capability), description: option.detail)
         }
         let cloud = catalog.models(for: capability).map { model in
-            Row(id: model.id, name: model.shortName, local: false, provider: model.provider, detail: detail(model),
+            Row(id: model.id, name: Self.displayName(model), local: false, provider: model.provider, detail: detail(model),
                 info: ModelInsights.info(model.id, capability), description: model.description)
         }
         return localRows + cloud
+    }
+
+    /// The free tier's "(free)" / "Free" suffix goes: the cost cell and the rate-limited tag already say it.
+    static func displayName(_ model: OpenRouterCatalog.Model) -> String {
+        var name = model.shortName
+        guard model.id.hasSuffix(":free") else { return name }
+        for suffix in [" (free)", " Free"] where name.hasSuffix(suffix) { name.removeLast(suffix.count) }
+        return name
     }
 
     private func detail(_ model: OpenRouterCatalog.Model) -> String? {
