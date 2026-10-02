@@ -11,6 +11,13 @@ certificate ([releasing](releasing.md)). Stale entries are cleared by **Fix…**
 `tccutil reset <service> io.github.brancusi.voice-tools`, which works without admin for the app's own bundle id
 (it fails with `-10814` for an unregistered bundle id).
 
+**Keychain asks for the login password after every update.** The item's ACL trusts the app by its certificate
+requirement, which survives updates, but each item also has a *partition list*, and for a non-Apple certificate the
+app's partition is its `cdhash:` — one build. Each update adds another cdhash only after you type the password
+(`security dump-keychain -a` showed 12 on the OpenRouter item by 0.9.1). Only a Developer ID certificate gets a
+stable `teamid:` partition. Decision (0.9.1): keep the keys in the Keychain and move to Developer ID, rather than a
+plain file.
+
 **Signing with a self-signed certificate.** `codesign` reports "no identity found" for a certificate that's only
 in a keychain passed with `--keychain`; the keychain must be in the user search list
 (`security list-keychains -d user -s <kc> …`). The certificate being untrusted (`CSSMERR_TP_NOT_TRUSTED`) doesn't

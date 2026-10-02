@@ -6,8 +6,14 @@ name: Voice Tools release
 # Needs these repository secrets:
 #   SPARKLE_ED_PRIVATE_KEY  the update signing key (Tools/make_update_key.swift); its public half is UPDATE_PUBLIC_KEY
 #   RELEASES_TOKEN          a fine-grained token with Contents: read & write on the releases repo only
-#   SIGNING_CERT_P12        base64 of the "Voice Tools Signing" code-signing certificate (.p12, self-signed), and
-#   SIGNING_CERT_PASSWORD   its password. Signing every release with it keeps macOS permissions across updates.
+#   DEVID_CERT_P12          base64 of the "Developer ID Application: Aram Zadikian (7F3RGY9LG8)" certificate + key
+#   DEVID_CERT_PASSWORD     (.p12) and its password. Signing every release with it keeps macOS permissions and
+#                           Keychain access across updates.
+#   NOTARY_KEY_P8           App Store Connect API key (the .p8 file's contents) with its NOTARY_KEY_ID and
+#   NOTARY_KEY_ID           NOTARY_ISSUER_ID, for notarization.
+#   NOTARY_ISSUER_ID
+# (SIGNING_CERT_P12 / SIGNING_CERT_PASSWORD hold the old self-signed "Voice Tools Signing" certificate, used up to
+# 0.9.1 and kept only as a backup.)
 on:
   push:
     tags: ["v*"]
@@ -49,8 +55,8 @@ jobs:
 
       - name: Signing certificate
         env:
-          P12: ${{ secrets.SIGNING_CERT_P12 }}
-          P12_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+          P12: ${{ secrets.DEVID_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVID_CERT_PASSWORD }}
         run: |
           [[ -n "$P12" ]] || { echo "No signing certificate: building ad hoc."; exit 0; }
           kc="$RUNNER_TEMP/signing.keychain-db"; kc_pass="$(uuidgen)"
@@ -62,11 +68,24 @@ jobs:
           rm "$RUNNER_TEMP/signing.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kc_pass" "$kc" > /dev/null
           security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
-          echo "SIGN_IDENTITY=Voice Tools Signing" >> "$GITHUB_ENV"
+          identity=$(security find-identity -v -p codesigning "$kc" | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"')
+          [[ -n "$identity" ]] || { echo "No Developer ID Application identity in DEVID_CERT_P12" >&2; exit 1; }
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Notarization key
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          [[ -n "$NOTARY_KEY_P8" ]] || { echo "No notarization key: the build won't be notarized."; exit 0; }
+          printf '%s' "$NOTARY_KEY_P8" > "$RUNNER_TEMP/notary.p8"
+          echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8" >> "$GITHUB_ENV"
 
       - name: Build
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
-          [[ "$GITHUB_REF" == refs/tags/* ]] && export REQUIRE_UPDATES=1 REQUIRE_SIGNING=1
+          [[ "$GITHUB_REF" == refs/tags/* ]] && export REQUIRE_UPDATES=1 REQUIRE_SIGNING=1 REQUIRE_NOTARIZATION=1
           VERSION="${{ steps.v.outputs.version }}" ./build.sh
 
       - uses: actions/upload-artifact@v4

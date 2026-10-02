@@ -11,11 +11,13 @@
 # checks FEED_URL (every 5 minutes itself; Sparkle hourly, its minimum). Without a key the app builds with updates
 # off; REQUIRE_UPDATES=1 makes that an error.
 #
-# Signing: releases are signed with the "Voice Tools Signing" certificate (self-signed, from the
-# SIGNING_CERT_P12 secret), so macOS keeps Microphone and Accessibility permissions across updates: it
-# remembers the app by its identifier and certificate instead of by one build's hash. Set SIGN_IDENTITY to
-# that certificate's name to sign local builds the same way. Without it the build is ad hoc, which macOS
-# treats as a new app every time; REQUIRE_SIGNING=1 makes that an error.
+# Signing: releases are signed with the "Developer ID Application: Aram Zadikian (7F3RGY9LG8)" certificate (from
+# the SIGNING_CERT_P12 secret), so macOS keeps Microphone and Accessibility permissions, and Keychain access, across
+# updates: it remembers the app by its identifier and team instead of by one build's hash. Developer ID builds get
+# the hardened runtime (with the microphone entitlement) and, when NOTARY_KEY_PATH, NOTARY_KEY_ID and
+# NOTARY_ISSUER_ID name an App Store Connect API key, are notarized and stapled; REQUIRE_NOTARIZATION=1 makes a
+# missing key an error. Set SIGN_IDENTITY to sign local builds the same way. Without it the build is ad hoc, which
+# macOS treats as a new app every time; REQUIRE_SIGNING=1 makes that an error.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -102,11 +104,45 @@ if [[ "$IDENTITY" == "-" && "${REQUIRE_SIGNING:-0}" == 1 ]]; then
   echo "REQUIRE_SIGNING=1 but no SIGN_IDENTITY; users would have to grant permissions again." >&2; exit 1
 fi
 echo "==> sign (${IDENTITY/#-/ad hoc})"
-codesign --force --deep --sign "$IDENTITY" "$APP"
-if [[ "$IDENTITY" != "-" ]]; then
-  # The designated requirement must name the certificate, or permissions won't carry over between versions.
-  codesign -d -r- "$APP" 2>&1 | grep -q 'certificate root' \
-    || { echo "Signed app's requirement doesn't name the certificate:" >&2; codesign -d -r- "$APP" >&2; exit 1; }
+if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
+  # Inside out, each piece with the hardened runtime and a secure timestamp, as notarization requires.
+  # (Self-signed and ad hoc builds can't use the runtime: library validation would refuse to load Sparkle.)
+  ENTITLEMENTS="$WORK/VoiceTools.entitlements"
+  cat > "$ENTITLEMENTS" <<'ENT'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>com.apple.security.device.audio-input</key><true/>
+</dict></plist>
+ENT
+  SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+  for item in "$SPK/Autoupdate" "$SPK/Updater.app" "$APP/Contents/Frameworks/Sparkle.framework"; do
+    codesign --force --options runtime --timestamp --sign "$IDENTITY" "$item"
+  done
+  codesign --force --options runtime --timestamp --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP"
+  codesign --verify --deep --strict "$APP"
+  # The designated requirement must name the team, or permissions won't carry over between versions.
+  codesign -d -r- "$APP" 2>&1 | grep -q 'subject.OU' \
+    || { echo "Signed app's requirement doesn't name the team:" >&2; codesign -d -r- "$APP" >&2; exit 1; }
+else
+  codesign --force --deep --sign "$IDENTITY" "$APP"
+  if [[ "$IDENTITY" != "-" ]]; then
+    # The designated requirement must name the certificate, or permissions won't carry over between versions.
+    codesign -d -r- "$APP" 2>&1 | grep -q 'certificate root' \
+      || { echo "Signed app's requirement doesn't name the certificate:" >&2; codesign -d -r- "$APP" >&2; exit 1; }
+  fi
+fi
+
+if [[ -n "${NOTARY_KEY_PATH:-}" && "$IDENTITY" == "Developer ID Application"* ]]; then
+  echo "==> notarize"
+  ditto -c -k --keepParent "$APP" "$WORK/notarize.zip"
+  xcrun notarytool submit "$WORK/notarize.zip" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" \
+    --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m | tee "$WORK/notary.log"
+  grep -q "status: Accepted" "$WORK/notary.log" || { echo "Notarization failed." >&2; exit 1; }
+  xcrun stapler staple "$APP"
+  spctl --assess --type execute --verbose "$APP"
+elif [[ "${REQUIRE_NOTARIZATION:-0}" == 1 ]]; then
+  echo "REQUIRE_NOTARIZATION=1 but no Developer ID identity or NOTARY_KEY_PATH." >&2; exit 1
 fi
 
 if [[ "${DEV:-0}" == 1 ]]; then
