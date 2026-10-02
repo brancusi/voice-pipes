@@ -138,8 +138,8 @@ struct HUDTag: View {
     var body: some View {
         HStack(spacing: 7) {
             Rectangle().fill(color).frame(width: 7, height: 7)
-            Text(label).foregroundStyle(.white.opacity(0.92))
-            if let detail { Text(detail).foregroundStyle(.white.opacity(0.6)).truncationMode(.tail) }
+            Text(label).foregroundStyle(Palette.hudFG)
+            if let detail { Text(detail).foregroundStyle(Palette.hudMuted).truncationMode(.tail) }
             if let level { Meter(level: level) }
             if let controls { controls.padding(.leading, 2) }
         }
@@ -150,7 +150,7 @@ struct HUDTag: View {
         .frame(height: 22)
         .background(
             RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                .fill(.black.opacity(0.45))
+                .fill(Palette.hudBG)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2.5, style: .continuous))
         )
         .overlay(RoundedRectangle(cornerRadius: 2.5, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
@@ -160,12 +160,12 @@ struct HUDTag: View {
 
     private var color: Color {
         switch state {
-        case .recording: Color(red: 1, green: 0.27, blue: 0.23)
-        case .processing: Color(red: 1, green: 0.75, blue: 0.2)
-        case .speaking: Color(red: 0.62, green: 0.55, blue: 1)
-        case .paused: .white.opacity(0.45)
-        case .done: Color(red: 0.2, green: 0.85, blue: 0.45)
-        case .failed: Color(red: 1, green: 0.55, blue: 0.2)
+        case .recording: Color(hex: 0xFF5555)
+        case .processing: Color(hex: 0xF1FA8C)
+        case .speaking: Color(hex: 0xBD93F9)
+        case .paused: Palette.hudMuted
+        case .done: Color(hex: 0x50FA7B)
+        case .failed: Color(hex: 0xFFB86C)
         }
     }
 
@@ -203,7 +203,7 @@ struct PlaybackControls: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.white.opacity(0.9))
+        .foregroundStyle(Palette.hudFG)
         .help(help)
     }
 }
@@ -215,12 +215,12 @@ private struct ModelLine: View {
     var body: some View {
         Text(text)
             .font(.system(size: 10, weight: .regular, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(Palette.hudMuted)
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.horizontal, 7)
             .frame(height: 17)
-            .background(RoundedRectangle(cornerRadius: 2.5, style: .continuous).fill(.black.opacity(0.4)))
+            .background(RoundedRectangle(cornerRadius: 2.5, style: .continuous).fill(Palette.hudBG))
             .environment(\.colorScheme, .dark)
             .frame(maxWidth: HUDController.size.width - 20)
     }

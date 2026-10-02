@@ -20,6 +20,7 @@ struct MainWindowView: View {
             detail
         }
         .frame(minWidth: 900, minHeight: 640)
+        .vpWindow()
         .background(WindowBehavior())
         // A menu bar app has no Dock icon and isn't in ⌘Tab, so its window would be unreachable once you click
         // away. While this window is open the app acts like a regular app; when it closes, menu-bar-only again.
@@ -41,11 +42,11 @@ struct MainWindowView: View {
         List(selection: $app.mainSection) {
             Section("Tracks") {
                 ForEach(app.store.tracks) { track in
-                    HStack {
-                        Circle().fill(Color(hex: track.colorHex)).frame(width: 8, height: 8)
+                    HStack(spacing: 8) {
+                        Rectangle().fill(Color(hex: track.colorHex)).frame(width: 7, height: 7)
                         Text(track.name)
                         Spacer()
-                        Text(track.triggers.first?.combo.display ?? "").font(.caption).foregroundStyle(.secondary)
+                        if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
                     }
                     .opacity(track.enabled ? 1 : 0.5)
                     .tag(MainSection.track(track.id))
@@ -68,6 +69,8 @@ struct MainWindowView: View {
                 .tag(MainSection.setup)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Palette.bg000)
     }
 
     @ViewBuilder private var detail: some View {
@@ -84,9 +87,9 @@ struct MainWindowView: View {
                 Text("Select a track").foregroundStyle(.secondary)
             }
         case .activity:
-            HistoryView(app: app).navigationTitle("History")
+            HistoryView(app: app).navigationTitle("History").background(Palette.bg100)
         case .vocabulary:
-            VocabularyView(parakeet: app.parakeet).navigationTitle("Vocabulary")
+            VocabularyView(parakeet: app.parakeet).navigationTitle("Vocabulary").background(Palette.bg100)
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }
@@ -125,31 +128,34 @@ private struct HistoryView: View {
             List(records) { record in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(record.trackName).font(.headline)
-                        Text(record.date.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
+                        Text(record.trackName).font(VPFont.bodyStrong)
+                        Text("· \(record.date.formatted(date: .abbreviated, time: .shortened)) · \(record.totalMs) ms")
+                            .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                         if let failure = record.failure {
-                            Label(failure, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1)
+                            Text("· " + failure).font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
                         }
                         Spacer()
-                        Text("\(record.totalMs) ms").monospacedDigit().foregroundStyle(.secondary)
-                        Button(copied == record.id ? "Copied" : "Copy") {
+                        Button(copied == record.id ? "Copied ✓" : "Copy") {
                             Clipboard.shared.copy(record.text)
                             copied = record.id
                         }
+                        .buttonStyle(copied == record.id ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
                     }
                     if let heard = record.heard {
-                        Text("› " + heard).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text("› " + heard).foregroundStyle(Palette.fgMuted).textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(record.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 10) {
                         ForEach(Array(record.steps.enumerated()), id: \.offset) { _, step in
-                            Text("\(step.title) \(step.ms) ms").font(.caption).foregroundStyle(.secondary)
+                            Text("\(step.title) \(step.ms) ms").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                         }
                     }
                 }
                 .padding(.vertical, 6)
+                .listRowBackground(Palette.bg200)
             }
+            .scrollContentBackground(.hidden)
             .searchable(text: $query, prompt: "Search everything you've said")
             .toolbar {
                 ToolbarItem {
@@ -175,10 +181,12 @@ private struct SetupView: View {
 
     var body: some View {
         Form {
+            Group {
             Section {
                 ForEach(app.checks) { check in
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: check.symbol).foregroundStyle(MenuView.color(check.level)).frame(width: 18)
+                        Text(Self.code(check.level)).font(VPFont.label).tracking(0.9)
+                        .foregroundStyle(MenuView.color(check.level)).frame(width: 40, alignment: .leading)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(check.title)
                             Text(check.detail).font(.caption).foregroundStyle(.secondary)
@@ -258,8 +266,22 @@ private struct SetupView: View {
                     Button("Check now") { updates.check() }.disabled(!updates.enabled)
                 }
             }
+            }
+            .listRowBackground(Palette.bg200)
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(Palette.bg100)
+    }
+
+    /// Check levels as log codes, so status never depends on colour alone.
+    static func code(_ level: Check.Level) -> String {
+        switch level {
+        case .ok: "OK"
+        case .info: "INFO"
+        case .warning: "WARN"
+        case .problem: "FAIL"
+        }
     }
 
     private var catalogLine: String {

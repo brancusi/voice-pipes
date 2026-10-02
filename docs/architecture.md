@@ -29,7 +29,8 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | System I/O | `IO/Clipboard.swift` | Clipboard history, paste (⌘V) and selection copy (⌘C) via synthetic keystrokes. |
 | | `IO/TextCapture.swift` | Selected text and page text via the Accessibility API. |
 | | `IO/Speaker.swift` | Read-aloud playback for all three engine families, with pause/resume/progress. |
-| UI | `UI/MenuView.swift` | The panel (launcher). |
+| UI | `UI/Theme.swift` | The design system in code: `Palette` (Dracula / Alucard, follows the system appearance; the HUD stays dark), `VPFont` (SF Mono scale), button styles, `Keycap`, `SectionLabel`, `vpCard()`, `vpWindow()`, pipeline category colours. Source of truth: the Voice Pipes design system artifact. |
+| | `UI/MenuView.swift` | The panel (launcher). |
 | | `UI/MainWindow.swift` | Main window: Tracks / History / Vocabulary / Setup; activation-policy switching. |
 | | `UI/TrackEditorView.swift` | Track editor, step rows, per-block configuration, key recorder. |
 | | `UI/ModelPicker.swift` | Unified model picker (on-device + OpenRouter) and OpenRouter voice picker. |

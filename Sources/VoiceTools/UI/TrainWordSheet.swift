@@ -27,7 +27,7 @@ struct TrainWordSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Train “\(spelling)”").font(.title3.weight(.semibold))
+            Text("Train “\(spelling)”").font(VPFont.title)
             Text("Click **Start takes** and say it; click **Next take** and say it again — about five times, varying it a little. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -67,6 +67,8 @@ struct TrainWordSheet: View {
         }
         .padding(20)
         .frame(width: 640)
+        .background(Palette.bg100)
+        .vpWindow()
         .frame(minHeight: 300)
         .onDisappear { if recording { _ = recorder.stop() } }
     }
@@ -76,7 +78,7 @@ struct TrainWordSheet: View {
     private var recordingControls: some View {
         HStack(spacing: 10) {
             if recording {
-                Circle().fill(.red).frame(width: 9, height: 9)
+                Rectangle().fill(Palette.red).frame(width: 9, height: 9)
                 Text("Take \(takes.count + 1)").font(.callout.monospacedDigit())
                 LevelBars(level: level)
                 TimelineView(.periodic(from: takeStarted, by: 0.1)) { context in

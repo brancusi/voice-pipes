@@ -11,10 +11,11 @@ struct TrackDetailView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Name", text: $track.name).font(.title2.weight(.semibold))
+                TextField("Name", text: $track.name).font(VPFont.display)
                 Toggle("Enabled", isOn: $track.enabled)
                 ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
             }
+            .listRowBackground(Palette.bg200)
 
             Section("Triggers") {
                 ForEach($track.triggers) { $trigger in
@@ -42,8 +43,9 @@ struct TrackDetailView: View {
                 Button("+ Add trigger") {
                     track.triggers.append(Trigger(combo: KeyCombo(key: .n, modifiers: [.control, .option]), mode: .toggle))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.vpGhost)
             }
+            .listRowBackground(Palette.bg200)
 
             Section {
                 ForEach($track.steps) { $step in
@@ -58,22 +60,33 @@ struct TrackDetailView: View {
                 }
                 addStepMenu
             } header: {
-                Text("Pipeline")
+                HStack(spacing: 10) {
+                    Text("Pipeline")
+                    Text("drag ⋮⋮ to reorder").font(VPFont.caption).foregroundStyle(Palette.comment)
+                }
             } footer: {
                 if let error = track.validationError {
-                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                    Text("WARN  " + error).font(VPFont.caption).foregroundStyle(Palette.orange)
+                } else {
+                    Text("✓ Steps connect: " + ([track.steps.first?.kind.input.rawValue ?? "none"]
+                         + track.steps.map(\.kind.output.rawValue)).map { $0 == "none" ? "—" : $0 }.joined(separator: " → "))
+                        .font(VPFont.caption).foregroundStyle(Palette.green)
                 }
             }
+            .listRowBackground(Palette.bg200)
 
             Section {
                 HStack {
-                    Button("Run now") { app.start(track) }
+                    Button("▶ Run now") { app.start(track) }.buttonStyle(.vpPrimary)
                     Spacer()
-                    Button("Delete track", role: .destructive, action: onDelete)
+                    Button("Delete track", role: .destructive, action: onDelete).buttonStyle(.vpDanger)
                 }
             }
+            .listRowBackground(Palette.bg200)
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(Palette.bg100)
     }
 
     private var addStepMenu: some View {
@@ -116,8 +129,9 @@ private struct StepRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                Image(systemName: "line.3.horizontal")
-                    .foregroundStyle(.secondary)
+                Text("⋮⋮")
+                    .font(VPFont.body).tracking(-2)
+                    .foregroundStyle(Palette.comment)
                     .frame(width: 16, height: 28)
                     .contentShape(Rectangle())
                     .onHover { inside in inside ? NSCursor.openHand.push() : NSCursor.pop() }
@@ -127,19 +141,21 @@ private struct StepRow: View {
                     }
                     .help("Drag to reorder")
                 Image(systemName: icon)
-                    .frame(width: 28, height: 28)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(step.kind.tint.opacity(0.15)))
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 26, height: 26)
+                    .background(RoundedRectangle(cornerRadius: 2).fill(step.kind.tint.opacity(0.15)))
                     .foregroundStyle(step.kind.tint)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(step.kind.category.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                    Text(step.kind.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    Text(step.kind.category.uppercased()).font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(0.8).foregroundStyle(step.kind.tint)
+                    Text(step.kind.title).font(VPFont.bodyStrong).lineLimit(1)
                 }
                 Spacer()
-                Text("\(step.kind.input.rawValue) → \(step.kind.output.rawValue)")
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                Text("\(step.kind.input.rawValue == "none" ? "—" : step.kind.input.rawValue) → \(step.kind.output.rawValue == "none" ? "—" : step.kind.output.rawValue)")
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 Button(action: onToggle) { Image(systemName: expanded ? "chevron.up" : "chevron.down") }
-                    .buttonStyle(.borderless)
-                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
+                    .buttonStyle(.vpIcon)
+                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon)
             }
             if expanded {
                 StepConfigView(kind: $step.kind, speaker: speaker).padding(.leading, 40)
@@ -432,10 +448,17 @@ private struct KeyRecorder: View {
     @State private var monitor: Any?
 
     var body: some View {
-        Button(recording ? "Press keys…" : combo.display) {
-            recording ? stop() : start()
+        // A keycap; pink (the keyboard colour) while it listens for the new shortcut.
+        Button { recording ? stop() : start() } label: {
+            Text(recording ? "Press keys…" : combo.display)
+                .font(VPFont.bodyStrong)
+                .foregroundStyle(recording ? Palette.pink : Palette.fg)
+                .padding(.horizontal, 10).frame(minWidth: 110, minHeight: 24)
+                .background(RoundedRectangle(cornerRadius: 2).fill(recording ? Color.clear : Palette.bg300))
+                .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(recording ? Palette.pink : Palette.line, lineWidth: 1))
+                .contentShape(Rectangle())
         }
-        .frame(minWidth: 130)
+        .buttonStyle(.plain)
         .onDisappear(perform: stop)
     }
 

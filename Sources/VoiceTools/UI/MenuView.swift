@@ -1,11 +1,12 @@
 import SwiftUI
 
+/// The menu bar panel: a quick launcher. One line per track, what's playing, the last three runs.
 struct MenuView: View {
     @Bindable var app: AppState
     @EnvironmentObject var updates: Updates
     @Environment(\.openWindow) private var openWindow
 
-    /// The panel is as tall as its content (no scrolling): one compact line per track, three recent runs.
+    /// The panel is as tall as its content (no scrolling).
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -14,12 +15,14 @@ struct MenuView: View {
             if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
             if !app.history.isEmpty { historySection }
             if app.worstCheck >= .warning { issuesCard }
-            Divider()
+            Rectangle().fill(Palette.line).frame(height: 1)
             footer
         }
         .padding(14)
         .frame(width: 360)
         .fixedSize(horizontal: false, vertical: true)
+        .background(Palette.bg000)
+        .vpWindow()
         .onAppear {
             updates.poll()
             app.refreshChecks()
@@ -30,10 +33,10 @@ struct MenuView: View {
         HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Voice Pipes").font(.headline)
-                HStack(spacing: 5) {
-                    Circle().fill(headline.1).frame(width: 7, height: 7)
-                    Text(headline.0).font(.caption).foregroundStyle(.secondary)
+                Text("Voice Pipes").font(VPFont.title)
+                HStack(spacing: 6) {
+                    Rectangle().fill(headline.1).frame(width: 7, height: 7)
+                    Text(headline.0).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 }
             }
             Spacer()
@@ -43,30 +46,30 @@ struct MenuView: View {
 
     private var headline: (String, Color) {
         switch app.worstCheck {
-        case .problem: ("Needs setup", .red)
-        case .warning: ("Needs attention", .orange)
-        default: (parakeetLine, .green)
+        case .problem: ("FAIL · Needs setup", Palette.red)
+        case .warning: ("WARN · Needs attention", Palette.orange)
+        default: (parakeetLine, Palette.green)
         }
     }
 
     private var parakeetLine: String {
         switch app.parakeetState {
-        case .loading: "Loading Parakeet v3…"
-        case .ready: "Ready · Parakeet loaded"
-        default: "Ready"
+        case .loading: "PROC · Loading Parakeet v3…"
+        case .ready: "OK · Parakeet loaded"
+        default: "OK · Ready"
         }
     }
 
     private func updateCard(_ version: String) -> some View {
-        HStack {
-            Label("Version \(version) is available", systemImage: "arrow.down.circle.fill")
-                .font(.subheadline.weight(.semibold))
+        HStack(spacing: 10) {
+            Text("NEW").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.green)
+            Text("Version \(version) is ready").font(VPFont.body)
             Spacer()
-            Button("Install…") { updates.check() }.buttonStyle(.borderedProminent).controlSize(.small)
+            Button("Install…") { updates.check() }.buttonStyle(.vpPrimary)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.green.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.bg200))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.green, lineWidth: 1))
     }
 
     /// Problems only, in one line; the details and fixes live in the main window's Setup.
@@ -75,129 +78,132 @@ struct MenuView: View {
         let worst = issues.map(\.level).max() ?? .warning
         return Button { openMain(.setup) } label: {
             HStack(spacing: 10) {
-                Image(systemName: worst == .problem ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                Text(worst == .problem ? "FAIL" : "WARN").font(VPFont.label).tracking(0.9)
                     .foregroundStyle(Self.color(worst))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(issues.count == 1 ? issues[0].title : "\(issues.count) things need attention").font(.callout)
+                    Text(issues.count == 1 ? issues[0].title : "\(issues.count) things need attention").font(VPFont.body)
                     Text(issues.count == 1 ? issues[0].detail : issues.map(\.title).joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(2)
                 }
                 Spacer()
-                Text("Fix…").font(.callout).foregroundStyle(.tint)
+                Text("Fix…").font(VPFont.bodyStrong).foregroundStyle(Palette.purple)
             }
             .padding(12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Self.color(worst).opacity(0.1)))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.08)))
+        .vpCard()
     }
 
     private var footer: some View {
-        HStack {
-            Button { openMain(nil) } label: { Label("Open Voice Pipes…", systemImage: "macwindow") }
+        HStack(spacing: 4) {
+            Button("Open Voice Pipes…") { openMain(nil) }
+                .buttonStyle(.vpGhost)
                 .help("Tracks, history and setup in a full window")
             Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
+                .buttonStyle(.vpIcon)
                 .help("Copy a report for troubleshooting")
             Button { updates.check() } label: { Image(systemName: "arrow.down.circle") }
+                .buttonStyle(.vpIcon)
                 .help(updates.enabled ? "Check for updates (version \(updates.version))" : "Updates are off in this build")
                 .disabled(!updates.enabled)
             Spacer()
-            Button("Quit") { NSApp.terminate(nil) }
+            Button { NSApp.terminate(nil) } label: { Text("Quit").foregroundStyle(Palette.fgMuted) }
+                .buttonStyle(.vpGhost)
         }
-        .buttonStyle(.borderless)
     }
 
     static func color(_ level: Check.Level) -> Color {
         switch level {
-        case .ok: .green
-        case .info: .blue
-        case .warning: .orange
-        case .problem: .red
+        case .ok: Palette.green
+        case .info: Palette.cyan
+        case .warning: Palette.orange
+        case .problem: Palette.red
         }
     }
 
     private var tracks: some View {
         VStack(spacing: 0) {
             ForEach(Array(app.store.tracks.enumerated()), id: \.element.id) { index, track in
-                if index > 0 { Divider() }
-                Button { app.start(track) } label: { TrackRow(track: track) }
-                    .buttonStyle(.plain)
-                    .opacity(track.enabled ? 1 : 0.45)
+                if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
+                Button { app.start(track) } label: {
+                    TrackRow(track: track, playing: app.run?.trackID == track.id)
+                }
+                .buttonStyle(.plain)
+                .opacity(track.enabled ? 1 : 0.4)
             }
         }
-        .card()
+        .vpCard()
     }
 
     private var nowPlaying: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(app.speaker.state == .paused ? "Paused" : app.speaker.state == .loading ? "Loading" : "Speaking")
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(Capsule().fill(Color.orange.opacity(0.18)))
-                Text(app.speaker.sourceLabel).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-            }
-            ProgressView(value: app.speaker.progress)
-            HStack {
-                if app.speaker.state == .loading {
-                    ProgressView().controlSize(.small)
-                    Text("Preparing voice…").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Button(app.speaker.state == .paused ? "Resume" : "Pause") { app.speaker.togglePause() }
-                        .buttonStyle(.borderedProminent)
-                }
-                if app.speaker.canGoBack {
-                    Button { app.speaker.back() } label: { Image(systemName: "backward.fill") }.help("Replay this passage")
-                }
-                Button("Clear") { app.speaker.clear() }
+        let speaker = app.speaker
+        let (code, color): (String, Color) = switch speaker.state {
+        case .paused: ("PAUSED", Palette.fgMuted)
+        case .loading: ("VOICE", Palette.purple)
+        default: ("READ", Palette.purple)
+        }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Rectangle().fill(color).frame(width: 7, height: 7)
+                Text(code).font(VPFont.label).tracking(0.9)
+                Text(speaker.state == .loading ? "···" : "\(Int(speaker.progress * 100))%")
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 Spacer()
-                Text(app.speaker.voiceLabel).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(speaker.voiceLabel).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2).fill(Palette.bg300)
+                    RoundedRectangle(cornerRadius: 2).fill(Palette.purple).frame(width: geo.size.width * speaker.progress)
+                }
+            }
+            .frame(height: 4)
+            if let info = app.run?.modelInfo {
+                Text(info).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1).truncationMode(.middle)
+            }
+            HStack(spacing: 6) {
+                if speaker.state == .loading {
+                    ProgressView().controlSize(.small)
+                    Text("Preparing voice…").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                } else {
+                    Button(speaker.state == .paused ? "Resume" : "Pause") { speaker.togglePause() }
+                        .buttonStyle(.vpPrimary)
+                }
+                if speaker.canGoBack {
+                    Button { speaker.back() } label: { Image(systemName: "backward.end.fill") }
+                        .buttonStyle(.vpIcon).help("Replay this passage")
+                }
+                Button("Stop") { speaker.clear() }.buttonStyle(.vpSecondary)
             }
         }
         .padding(12)
-        .card()
+        .vpCard()
     }
 
     /// The last three runs, each one click from the clipboard; the rest are in the window's History.
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("HISTORY").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                SectionLabel("History")
                 Spacer()
                 Button("All \(app.history.count) →") { openMain(.activity) }
-                    .buttonStyle(.borderless).font(.system(size: 11))
+                    .buttonStyle(.plain).font(VPFont.caption).foregroundStyle(Palette.purple)
             }
             .padding(.horizontal, 4)
-            recent
-        }
-    }
-
-    private var recent: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(app.history.prefix(3).enumerated()), id: \.element.id) { index, record in
-                if index > 0 { Divider() }
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(record.trackName) · \(record.date.formatted(.relative(presentation: .named))) · \(record.totalMs) ms")
-                            .font(.system(size: 11)).foregroundStyle(.secondary)
-                        Text(record.text).font(.system(size: 13)).lineLimit(1)
-                    }
-                    Spacer()
-                    Button { Clipboard.shared.copy(record.text) } label: { Image(systemName: "doc.on.doc") }
-                        .buttonStyle(.borderless)
-                        .help("Copy")
+            VStack(spacing: 0) {
+                ForEach(Array(app.history.prefix(3).enumerated()), id: \.element.id) { index, record in
+                    if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
+                    HistoryRow(record: record)
                 }
-                .padding(.horizontal, 10).padding(.vertical, 7)
             }
+            .vpCard()
         }
-        .card()
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased()).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
+            SectionLabel(title).padding(.horizontal, 4)
             content()
         }
     }
@@ -212,41 +218,52 @@ struct MenuView: View {
 
 private struct TrackRow: View {
     let track: Track
+    let playing: Bool
+    @State private var hovering = false
 
-    /// One line: color, name, hotkeys. The pipeline is in the tooltip and the main window.
+    /// One line: colour, name, hotkeys. The pipeline is in the tooltip and the main window.
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(Color(hex: track.colorHex)).frame(width: 7, height: 7)
-            Text(track.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+            Rectangle().fill(Color(hex: track.colorHex)).frame(width: 7, height: 7)
+            Text(track.name).font(VPFont.body).lineLimit(1)
             Spacer(minLength: 8)
-            ForEach(track.triggers) { trigger in
-                Text(trigger.combo.display)
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.07)))
-            }
+            if playing { Text("▶").font(VPFont.caption).foregroundStyle(Palette.purple) }
+            ForEach(track.triggers) { trigger in Keycap(text: trigger.combo.display) }
         }
-        .padding(.horizontal, 10).frame(height: 30)
+        .padding(.horizontal, 12).frame(height: 30)
+        .background(hovering || playing ? Palette.bg300 : .clear)
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .help(track.steps.map(\.kind.chip).joined(separator: " › ")
               + track.triggers.map { "\n\($0.combo.display): \($0.mode == .hold ? "hold" : "press to start and stop")" }.joined())
     }
 }
 
-extension StepKind {
-    var tint: Color {
-        switch category {
-        case "Input": .secondary
-        case "Output": .green
-        default: .blue
-        }
-    }
-}
+private struct HistoryRow: View {
+    let record: RunRecord
+    @State private var copied = false
 
-extension View {
-    func card() -> some View {
-        background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08)))
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 0) {
+                    Text("\(record.trackName) · \(record.date.formatted(.relative(presentation: .named))) · \(record.totalMs) ms")
+                        .foregroundStyle(Palette.fgMuted)
+                    if record.failure != nil { Text(" · failed").foregroundStyle(Palette.orange) }
+                }
+                .font(VPFont.caption).lineLimit(1)
+                Text(record.text).font(VPFont.body).lineLimit(1)
+            }
+            Spacer()
+            Button {
+                Clipboard.shared.copy(record.text)
+                copied = true
+            } label: {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc").foregroundStyle(copied ? Palette.green : Palette.fgMuted)
+            }
+            .buttonStyle(.vpIcon)
+            .help(copied ? "Copied" : "Copy")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
     }
 }

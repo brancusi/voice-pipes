@@ -1,5 +1,11 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.1.0**
+- **A new look.** Voice Pipes now wears its own skin: the Dracula colour scheme (or its light twin, Alucard, when your Mac is in light mode) and one monospace typeface everywhere, like the HUD always had. It still works like a normal Mac app.
+- **Colour means something.** Each kind of step has its colour: transcription cyan, transforms (LLM, Route · Jev, Fix words) purple, outputs green. Statuses read like a log: OK, INFO, WARN, FAIL, always with the word, never colour alone.
+- The menu bar panel shows which track is playing, a NEW card when an update is ready, and the Jev route under Now playing. History rows confirm with a ✓ when copied.
+- In the editor, step rows carry their category colour, the drag handle is ⋮⋮, the hotkey recorder turns pink while it listens, and the footer confirms the steps connect.
+
 **1.0.0**
 - **Voice Tools is now Voice Pipes.** Pipelines, and pipes you play from the keyboard, like an organ. The menu bar panel, the window, notifications and the app itself carry the new name.
 - After this update the app renames itself in your Applications folder from "Voice Tools" to "Voice Pipes" and reopens once. Your tracks, history, vocabulary, keys and permissions all carry over; nothing to set up again.
