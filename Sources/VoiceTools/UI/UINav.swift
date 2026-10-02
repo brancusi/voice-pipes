@@ -91,21 +91,24 @@ final class UINav {
 
 extension View {
     /// Outlines this element in rose for a moment when `vp open` (or an outside edit to config.toml) points at it.
-    func vpFlash(_ key: String, cornerRadius: CGFloat = 4) -> some View {
-        modifier(FlashModifier(key: key, cornerRadius: cornerRadius))
+    /// `outset` draws it outside the element (for a section whose label sits at its top edge).
+    func vpFlash(_ key: String, cornerRadius: CGFloat = 4, outset: CGFloat = 0) -> some View {
+        modifier(FlashModifier(key: key, cornerRadius: cornerRadius, outset: outset))
     }
 }
 
 private struct FlashModifier: ViewModifier {
     let key: String
     let cornerRadius: CGFloat
+    var outset: CGFloat = 0
     @State private var shown = false
 
     func body(content: Content) -> some View {
         content
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
+                RoundedRectangle(cornerRadius: cornerRadius + outset)
                     .strokeBorder(Palette.pink, lineWidth: 2)
+                    .padding(-outset)
                     .opacity(shown ? 1 : 0)
                     .allowsHitTesting(false)
             )

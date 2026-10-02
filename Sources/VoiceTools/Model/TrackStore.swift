@@ -12,6 +12,11 @@ final class TrackStore {
         didSet { if !applyingFile { save() } }
     }
 
+    /// What agents read aloud unasked ([settings.agents]); `vp agents read-aloud` sets it.
+    var agents = AgentSettings() {
+        didSet { if !applyingFile, agents != oldValue { save() } }
+    }
+
     /// Keyboard control while reading ([settings.reading]); Setup edits it, the file can too.
     var reading = ReadingSettings() {
         didSet { if !applyingFile, reading != oldValue { save() } }
@@ -46,6 +51,7 @@ final class TrackStore {
         var found: [ConfigIssue] = []
         var fresh = false
         var loadedReading = ReadingSettings()
+        var loadedAgents = AgentSettings()
         let disk = DiskText.read(configURL)
         switch disk {
         case .text(let content):
@@ -55,6 +61,7 @@ final class TrackStore {
                 loaded = config.tracks
                 AppearanceChoice.store(config.appearance)
                 loadedReading = config.reading
+                loadedAgents = config.agents
             } else {
                 // A broken file at launch: run the last good tracks and leave the file for its author to fix.
                 loaded = cached ?? Track.defaults
@@ -96,6 +103,7 @@ final class TrackStore {
         let changed = migrated || loaded != before
         tracks = loaded
         reading = loadedReading
+        agents = loadedAgents
         issues = found
         diskText = text
         createdFresh = fresh
@@ -142,6 +150,7 @@ final class TrackStore {
             AppearanceChoice.store(config.appearance)
             applyingFile = true
             reading = config.reading
+            agents = config.agents
             applyingFile = false
             writeCache()
             if !changes.isEmpty { onExternalChanges(changes) }
@@ -262,7 +271,7 @@ final class TrackStore {
             tracks = slugged
             applyingFile = false
         }
-        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, reading: reading, tracks: tracks))
+        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, reading: reading, agents: agents, tracks: tracks))
         guard text != diskText else { return }
         do {
             try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)

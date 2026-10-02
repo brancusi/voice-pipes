@@ -369,7 +369,7 @@ private struct ThemeSwatch: View {
 
 private extension View {
     func vpSetupSection(_ name: String) -> some View {
-        id("setup-\(name)").vpFlash("setup-\(name)")
+        id("setup-\(name)").vpFlash("setup-\(name)", cornerRadius: 6, outset: 8)
     }
 }
 
@@ -377,6 +377,8 @@ private extension View {
 /// keys for each action, and shortcuts that work anywhere while reading. Saved in config.toml [settings.reading].
 private struct ReadingSettingsSection: View {
     let app: AppState
+    /// An action picked from "+ Add shortcut", waiting for its keys.
+    @State private var addingGlobal: ReadingSettings.Action?
 
     private var reading: Binding<ReadingSettings> {
         Binding { app.store.reading } set: { app.store.reading = $0 }
@@ -408,9 +410,13 @@ private struct ReadingSettingsSection: View {
                     HStack {
                         Text("Keys while the HUD has the keyboard").font(VPFont.bodyStrong)
                         Spacer()
+                        let atDefaults = reading.wrappedValue.keys == ReadingSettings.defaultKeys
                         Button("Reset to defaults") { reading.wrappedValue.keys = ReadingSettings.defaultKeys }
-                            .buttonStyle(.vpGhost)
-                            .disabled(reading.wrappedValue.keys == ReadingSettings.defaultKeys)
+                            .buttonStyle(.plain)
+                            .font(VPFont.bodyStrong)
+                            .foregroundStyle(atDefaults ? Palette.comment : Palette.purple)
+                            .disabled(atDefaults)
+                            .help(atDefaults ? "Already the defaults" : "Back to Esc, Space, j/k, h/l, g/G")
                     }
                     ForEach(ReadingSettings.Action.allCases) { action in
                         actionRow(action.label) {
@@ -429,18 +435,30 @@ private struct ReadingSettingsSection: View {
                         Text("Shortcuts that work in any app, but only while something is being read. Include ⌃, ⌥ or ⌘ so they don't take a key from your typing.")
                             .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
                     }
-                    ForEach(ReadingSettings.Action.allCases) { action in
+                    // Only the shortcuts that are set, then one button for the rest.
+                    ForEach(ReadingSettings.Action.allCases.filter { reading.wrappedValue.global[$0] != nil }) { action in
                         actionRow(action.label) {
-                            if let combo = reading.wrappedValue.global[action] {
-                                RemovableKeycap(combo: combo) { reading.wrappedValue.global[action] = nil }
-                            } else {
-                                KeyCaptureButton(title: "Set…", app: app) { combo in
-                                    guard !combo.modifiers.isEmpty else { return "needs ⌃, ⌥ or ⌘" }
-                                    reading.wrappedValue.global[action] = combo
-                                    return nil
-                                }
+                            RemovableKeycap(combo: reading.wrappedValue.global[action]!) { reading.wrappedValue.global[action] = nil }
+                        }
+                    }
+                    if let action = addingGlobal {
+                        actionRow(action.label) {
+                            KeyCaptureButton(title: "Press keys…", app: app, autoStart: true, onCancel: { addingGlobal = nil }) { combo in
+                                guard !combo.modifiers.isEmpty else { return "Add ⌃, ⌥ or ⌘" }
+                                reading.wrappedValue.global[action] = combo
+                                addingGlobal = nil
+                                return nil
                             }
                         }
+                    }
+                    let unset = ReadingSettings.Action.allCases.filter { reading.wrappedValue.global[$0] == nil && $0 != addingGlobal }
+                    if !unset.isEmpty {
+                        Menu {
+                            ForEach(unset) { action in Button(action.label) { addingGlobal = action } }
+                        } label: {
+                            Text("+ Add shortcut").font(VPFont.bodyStrong).foregroundStyle(Palette.purple)
+                        }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     }
                 }
                 .padding(16)
@@ -456,18 +474,28 @@ private struct ReadingSettingsSection: View {
     }
 }
 
-/// A key in a list, with × to remove it.
+/// A key in a list as one chip, [J ×]: the × (rose on hover) removes it.
 private struct RemovableKeycap: View {
     let combo: KeyCombo
     let onRemove: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 2) {
-            Keycap(text: combo.display)
-            Button(action: onRemove) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
-                .buttonStyle(.plain).foregroundStyle(Palette.fgMuted).frame(width: 16, height: 22)
-                .help("Remove \(combo.display)")
+        HStack(spacing: 6) {
+            Text(combo.display).font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(0.7).foregroundStyle(Palette.fg)
+            Button(action: onRemove) {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(hovering ? Palette.pink : Palette.fgMuted)
+                    .frame(width: 16, height: 16).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .help("Remove \(combo.display)")
+            .accessibilityLabel("Remove \(combo.display)")
         }
+        .padding(.leading, 8).padding(.trailing, 4).frame(height: 22)
+        .background(RoundedRectangle(cornerRadius: 2).fill(Palette.bg300))
+        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.line, lineWidth: 1))
     }
 }
 
@@ -476,6 +504,8 @@ private struct RemovableKeycap: View {
 private struct KeyCaptureButton: View {
     let title: String
     let app: AppState
+    var autoStart = false
+    var onCancel: () -> Void = {}
     let onCapture: (KeyCombo) -> String?
     @State private var recording = false
     @State private var monitor: Any?
@@ -483,7 +513,10 @@ private struct KeyCaptureButton: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Button { recording ? stop() : start() } label: {
+            Button {
+                refusal = nil
+                recording ? stop() : start()
+            } label: {
                 Text(recording ? "Press a key…" : title)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(recording ? Palette.pink : Palette.purple)
@@ -495,18 +528,21 @@ private struct KeyCaptureButton: View {
             if let refusal { Text(refusal).font(VPFont.caption).foregroundStyle(Palette.orange) }
         }
         .onDisappear(perform: stop)
+        .onAppear { if autoStart { start() } }
     }
 
     private func start() {
         recording = true
-        refusal = nil
         app.hotkeysSuspended = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
                 stop()  // plain Esc cancels
+                onCancel()
             } else {
                 refusal = onCapture(KeyCombo(key: .init(code: UInt32(event.keyCode)), modifiers: .init(event.modifierFlags)))
                 stop()
+                // Refused: listen again, so the fix is one more key press.
+                if refusal != nil, autoStart { DispatchQueue.main.async { start() } }
             }
             return nil
         }

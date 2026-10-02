@@ -220,7 +220,17 @@ struct HUDView: View {
         app.readAlong && app.run?.phase == .speaking && !app.speaker.sentences.isEmpty
     }
 
-    /// "⎋ stop · Space pause · J/K sentence · H/L speed", from the keys you've set (first key of each).
+    /// "Esc stop · Space pause · J/K sentence · H/L speed" with the keys in fg and the words muted.
+    static func keysHintText(_ reading: ReadingSettings) -> Text {
+        keysHint(reading).components(separatedBy: " · ").enumerated().reduce(Text("")) { text, item in
+            let parts = item.element.split(separator: " ", maxSplits: 1).map(String.init)
+            let piece = Text(parts.first ?? "").foregroundColor(Palette.hudFG)
+                + Text(parts.count > 1 ? " " + parts[1] : "").foregroundColor(Palette.hudMuted)
+            return item.offset == 0 ? piece : text + Text(" · ").foregroundColor(Palette.hudMuted) + piece
+        }
+    }
+
+    /// "Esc stop · Space pause · J/K sentence · H/L speed", from the keys you've set (first key of each).
     static func keysHint(_ reading: ReadingSettings) -> String {
         func key(_ action: ReadingSettings.Action) -> String? { reading.keys[action]?.first?.display }
         func pair(_ a: ReadingSettings.Action, _ b: ReadingSettings.Action) -> String? {
@@ -237,7 +247,7 @@ struct HUDView: View {
         VStack(spacing: 6) {
             Spacer(minLength: 0)
             if expanded {
-                ReadAlongCard(speaker: app.speaker, keysHint: Self.keysHint(app.store.reading))
+                ReadAlongCard(speaker: app.speaker, keysHint: Self.keysHintText(app.store.reading))
                     .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
                     .transition(.opacity)
             }
@@ -311,8 +321,8 @@ struct HUDTag: View {
             if let controls { controls.padding(.leading, 2) }
             if controls != nil, HUDKeys.shared.active {
                 Text("KEYS").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Color(hex: 0xC3A3D4))
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color(hex: 0xC3A3D4).opacity(0.7), lineWidth: 1))
+                    .padding(.horizontal, 5).frame(height: 16)
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color(hex: 0xC3A3D4), lineWidth: 1))
                     .help("The HUD has the keyboard; Esc stops, move away or click elsewhere to give it back")
             }
         }
@@ -451,7 +461,7 @@ extension Color {
 /// leaves); the speed changes live.
 struct ReadAlongCard: View {
     let speaker: Speaker
-    var keysHint = ""
+    var keysHint = Text("")
     @State private var hovering = false
     private static let lavender = Color(hex: 0xC3A3D4)
 
@@ -479,9 +489,10 @@ struct ReadAlongCard: View {
             Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
             HStack(spacing: 8) {
                 if HUDKeys.shared.active {
-                    // The HUD has the keyboard: say so, and which keys do what.
-                    (Text("KEYS ON").foregroundColor(Self.lavender).bold() + Text("  " + keysHint).foregroundColor(Palette.hudMuted))
-                        .lineLimit(1).truncationMode(.tail)
+                    // The HUD has the keyboard: say so (never truncated), and which keys do what (truncates).
+                    Text("KEYS ON").font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(Self.lavender)
+                        .fixedSize()
+                    keysHint.lineLimit(1).truncationMode(.tail)
                 } else {
                     Text(hovering ? "click a sentence to read from there" : speaker.voiceLabel)
                         .foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)

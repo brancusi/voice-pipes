@@ -71,3 +71,31 @@ struct ReadingSettings: Equatable {
         return Action.allCases.first { (keys[$0] ?? []).contains(pressed) }
     }
 }
+
+/// What agents using Voice Pipes read aloud to you without being asked ([settings.agents] in config.toml). Agents
+/// don't remember between sessions, so this is where the preference lives: the skill and `vp agents context` read it.
+struct AgentSettings: Equatable {
+    enum ReadAloud: String, CaseIterable {
+        /// Only when you ask.
+        case off
+        /// Long, rich text: summaries, reports, explanations; not short replies.
+        case long
+        /// Long text, plus anything that needs you: a question, a decision, a finished task, a problem.
+        case attention
+        /// Every reply.
+        case all
+
+        var meaning: String {
+            switch self {
+            case .off: "only when you ask"
+            case .long: "long, rich text (summaries, reports, explanations), not short replies"
+            case .attention: "long text, plus anything that needs you: a question, a decision, a finished task, a problem"
+            case .all: "every reply"
+            }
+        }
+    }
+
+    var readAloud: ReadAloud = .off
+    /// Text longer than this (characters) counts as long.
+    var longText = 600
+}

@@ -5,6 +5,7 @@ import TOMLDecoder
 struct AppConfig: Equatable {
     var appearance: AppearanceChoice = .auto
     var reading = ReadingSettings()
+    var agents = AgentSettings()
     var tracks: [Track]
 }
 
@@ -288,6 +289,7 @@ enum ConfigFile {
         }
         var appearance = AppearanceChoice.auto
         var reading = ReadingSettings()
+        var agents = AgentSettings()
         if case .table(let settingsTable)? = top.raw("settings") {
             var settings = TableReader(settingsTable, path: "settings")
             if let a = settings.choice("appearance", AppearanceChoice.allCases.map(\.rawValue)) { appearance = AppearanceChoice(rawValue: a) ?? .auto }
@@ -296,7 +298,18 @@ enum ConfigFile {
                 reading = readReading(&r)
                 settings.issues += r.issues
             }
-            settings.finish(known: ["appearance", "reading"])
+            if case .table(let agentsTable)? = settings.raw("agents") {
+                var a = TableReader(agentsTable, path: "settings.agents")
+                if let mode = a.choice("read_aloud", AgentSettings.ReadAloud.allCases.map(\.rawValue)) {
+                    agents.readAloud = AgentSettings.ReadAloud(rawValue: mode) ?? .off
+                }
+                if let chars = a.int("long_text") {
+                    if chars < 50 { a.error("long_text", "should be at least 50 characters") } else { agents.longText = chars }
+                }
+                a.finish(known: ["read_aloud", "long_text"])
+                settings.issues += a.issues
+            }
+            settings.finish(known: ["appearance", "reading", "agents"])
             top.issues += settings.issues
         } else if root["settings"] != nil {
             top.error("settings", "should be a table: [settings]")
@@ -321,7 +334,7 @@ enum ConfigFile {
 
         let errors = top.issues.filter { $0.severity == .error }
         let warnings = top.issues.filter { $0.severity == .warning }
-        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, reading: reading, tracks: tracks) : nil, errors: errors, warnings: warnings)
+        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, reading: reading, agents: agents, tracks: tracks) : nil, errors: errors, warnings: warnings)
     }
 
     /// [settings.reading]: when the HUD takes the keyboard, click-away, its keys, and [settings.reading.global].
@@ -560,6 +573,9 @@ enum ConfigFile {
         out += "version = \(version)\n\n"
         out += "[settings]\n"
         out += "appearance = \(quote(config.appearance.rawValue))  # auto (follow macOS) | daylight | sundown\n"
+        out += "\n[settings.agents]  # what agents (Claude Code, Codex, …) read aloud to you without being asked\n"
+        out += "read_aloud = \(quote(config.agents.readAloud.rawValue))  # off | long (summaries, reports) | attention (long text + anything that needs you) | all\n"
+        out += "long_text = \(config.agents.longText)  # characters; longer than this counts as long\n"
         out += writeReading(config.reading)
         for track in tracks { out += "\n" + write(track) }
         out += "\n" + reference
@@ -813,6 +829,16 @@ enum ConfigFile {
         #    speak        model = pocket | supertonic | macos | an OpenRouter speech model
         #                 voice = see `vp voices --model <model>` · speed = 0.6–2.0           text → —
         #    show-hud     shows the text at the bottom of the screen           text → text
+        #
+        #  Settings (top of the file)
+        #    [settings]          appearance = auto | daylight | sundown
+        #    [settings.agents]   read_aloud = off | long | attention | all · long_text = characters (default 600)
+        #                        what agents read aloud without being asked (`vp agents read-aloud <mode>` sets it)
+        #    [settings.reading]  take_keys = always | hover | click | never · click_away = keep-reading | stop
+        #                        stop, pause, next, previous, slower, faster, start, end = lists of keys, e.g.
+        #                        faster = ["l", "equal"]  (only while the HUD has the keyboard)
+        #    [settings.reading.global]  the same actions as single shortcuts that work in any app while
+        #                        something is read, e.g. faster = "control+option+right" (needs a modifier)
         #
         #  Running a track from the CLI: `vp run <id>` starts it like its hotkey; `vp run <id> --text "…"` or
         #  piping text in (`echo … | vp run <id>`) starts at the first block that takes text; the final text

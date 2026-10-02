@@ -36,11 +36,30 @@ extension VPCommands {
             // For the session hook: compact, never starts the app.
             let (config, issues) = loadConfig()
             let running = (try? AppClient.request("ping", launch: false)) != nil
+            let agents = config?.agents ?? AgentSettings()
             print("Voice Pipes (`vp`, \(binPath)): \(running ? "app running" : "app not running, starts on demand") · config \(issueSummary(issues)) · tracks: "
                   + (config?.tracks.map { $0.slug ?? $0.name }.joined(separator: ", ") ?? "none")
-                  + ". Speak with `vp say \"…\"`, ask the user aloud with `vp ask \"…\"`, run a track with `vp run <id> --text \"…\"`; `vp help` for more.")
+                  + ". Read aloud without being asked: \(agents.readAloud.rawValue) (\(agents.readAloud.meaning); long = over \(agents.longText) characters)."
+                  + " Speak with `vp say \"…\"` (long text: `vp open reading` first), ask aloud with `vp ask \"…\"`, run a track with `vp run <id> --text \"…\"`; the voice-pipes skill has the rest.")
+        case "read-aloud":
+            // What agents read aloud unasked: [settings.agents] in config.toml (the app picks it up within a second).
+            let (loaded, issues) = loadConfig()
+            guard var config = loaded else {
+                throw AppClient.Failure(code: "config_invalid", message: "config.toml doesn't check out: \(issues.first?.description ?? "")", hint: "vp config check")
+            }
+            if let mode = parsed.positionals.dropFirst().first {
+                guard let value = AgentSettings.ReadAloud(rawValue: mode) else {
+                    throw UsageError("bad_value", "read-aloud is off, long, attention or all.\(TableReader.suggestion(mode, AgentSettings.ReadAloud.allCases.map(\.rawValue)))")
+                }
+                config.agents.readAloud = value
+            }
+            if let chars = try parsed.int("long-text") { config.agents.longText = max(50, chars) }
+            if config.agents != (loaded?.agents ?? config.agents) || parsed.positionals.count > 1 || parsed["long-text"] != nil { try writeConfig(config) }
+            out.emit(.object([("read_aloud", .string(config.agents.readAloud.rawValue)), ("means", .string(config.agents.readAloud.meaning)),
+                              ("long_text", .int(config.agents.longText))]),
+                     help: ["vp agents read-aloud off|long|attention|all [--long-text <chars>]"])
         default:
-            throw UsageError("unknown_subcommand", "vp agents takes status, install, uninstall or context.", hint: "vp agents --help")
+            throw UsageError("unknown_subcommand", "vp agents takes status, install, uninstall, context or read-aloud.", hint: "vp agents --help")
         }
     }
 }
@@ -228,10 +247,23 @@ enum AgentsInstaller {
 
     // MARK: The skill
 
-    static let skill = """
+    /// The skill: the guide, then the block and settings reference generated from config.toml's own, so the two
+    /// never disagree.
+    static var skill: String { skillGuide + "\n## Reference: every block and setting (the same as config.toml's)\n\n```\n" + referenceText + "```\n" }
+
+    /// config.toml's reference without its comment marks and rules.
+    private static var referenceText: String {
+        ConfigFile.reference.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line -> String? in
+            let text = line.hasPrefix("# ") ? String(line.dropFirst(2)) : line == "#" ? "" : String(line)
+            if text.contains("════") || text.trimmingCharacters(in: .whitespaces) == "Reference" { return nil }
+            return text.hasPrefix(" ") ? String(text.dropFirst()) : text
+        }.joined(separator: "\n").trimmingCharacters(in: .newlines) + "\n"
+    }
+
+    private static let skillGuide = """
         ---
         name: voice-pipes
-        description: Use the user's Voice Pipes app through the `vp` CLI. Speak to the user aloud (`vp say`), ask them a question by voice and get their spoken answer (`vp ask`), record and transcribe them (`vp listen`) or an audio file (`vp transcribe`), run their voice pipelines ("tracks") with text in (`vp run <id> --text`), and read or change their tracks, hotkeys, vocabulary and keys (config.toml, `vp config`, `vp vocab`, `vp auth`). Also reads long text to the user (a summary, a report, an answer) in a HUD they can follow and steer: jump to any sentence, change speed, pause. Use when the user mentions Voice Pipes, tracks, dictation, reading aloud, voice notes, says "read this to me" or "read me the summary", or wants to be told or asked something out loud.
+        description: Use the user's Voice Pipes app through the `vp` CLI and its config file. Build a new voice pipeline ("track") or change one from a plain-language request (blocks such as transcribe, LLM, Jev branch/route, HTTP, speak, paste, edited in ~/.config/voice-pipes/config.toml and checked with `vp config check`); run tracks with text (`vp run <id> --text`); speak to the user (`vp say`), ask them aloud and get the spoken answer (`vp ask`), transcribe (`vp listen`, `vp transcribe`); and read long text aloud in a HUD they can follow and steer. Follow the user's read-aloud preference (`vp agents read-aloud`): it may ask you to read summaries or anything needing their attention out loud. Use when the user mentions Voice Pipes, tracks, pipelines, hotkeys, dictation, vocabulary, reading aloud, voice notes, says "read this to me", or wants to hear or be asked something.
         ---
 
         # Voice Pipes (`vp`)
@@ -244,6 +276,10 @@ enum AgentsInstaller {
         exit 0 = ok, 1 = error, 2 = bad usage. Follow the `help[]` lines at the end of each output. Nothing prompts.
         Commands that need the app start it in the background.
 
+        At the start of a session: run `vp` (state and tracks) and `vp agents read-aloud` (the user's standing
+        preference for what you read aloud, below). Follow that preference for the whole session. The session
+        context line, if the hook is installed, already states it.
+
         ## Talk to the user
 
         - `vp say "Tests passed; 3 files changed."` speaks and waits until done. `--voice <id>` (`vp voices`),
@@ -253,6 +289,26 @@ enum AgentsInstaller {
           `--max 30` caps the recording; `--silence 1.2` is how long a pause ends it.
         - `vp listen` records and transcribes without speaking first. `vp stop` stops speech or recording.
         - `vp speed 1.4` changes the speed of what's playing.
+
+        ## Read aloud: the user's standing preference
+
+        `vp agents read-aloud` prints it (`read_aloud` in config.toml `[settings.agents]`). It applies to your own
+        replies, in every session, without the user asking again:
+
+        | mode | read aloud |
+        |---|---|
+        | `off` | only when the user asks ("read this to me") |
+        | `long` | long, rich text: a summary, report, plan, explanation or review longer than `long_text` characters (default 600). Not short answers, not code, diffs or logs |
+        | `attention` | everything `long` reads, plus anything that needs the user: a question or decision you're waiting on, a finished task, a failure or blocker (a sentence or two: what happened and what you need) |
+        | `all` | every reply, as a short spoken version |
+
+        - The user says "read me anything that needs my attention" or "stop reading things to me": set it with
+          `vp agents read-aloud attention` (or `off`, `long`, `all`), so every agent and later session follows it.
+        - Read a spoken version, not the raw reply: what matters, in plain sentences. Leave code, file paths, diffs,
+          tables and URLs on screen and say they're there ("the diff is in the chat").
+        - Long readings: `vp open reading` first, then `printf '%s' "$TEXT" | vp say`. Short heads-ups: just `vp say`.
+        - One reading at a time; wait for `vp say` to return before starting another or asking anything aloud.
+        - Still write the full reply as text too; reading is in addition, never instead.
 
         ## Read long text to the user
 
@@ -282,20 +338,50 @@ enum AgentsInstaller {
         - `vp history --limit 5` shows recent runs (what was said, what came out, timings); `vp history show <n>`.
         - `vp watch` streams run events as they happen.
 
-        ## Change the configuration
+        ## Build or change a pipeline for the user
 
-        Everything lives in `~/.config/voice-pipes/config.toml` (tracks, hotkeys, settings) and `vocabulary.toml`
-        beside it. Both have JSON Schemas beside them and a full reference at the end of config.toml
-        (`vp help config` prints it).
+        The user describes what they want in plain language; you turn it into blocks in
+        `~/.config/voice-pipes/config.toml`. The file IS the app's configuration, one-to-one: every track, block,
+        branch, hotkey and setting the app's editor shows is in it, and the app reloads it within a second. Never ask
+        the user to click through the app to build something. `vocabulary.toml` beside it holds the word fixes.
 
-        1. Read the file; keep its layout. Each track is `[[track]]` with `id`, `name`, `color`, `enabled`,
-           `hotkeys = [{ keys = "option+space", mode = "hold" }]`, then `[[track.step]]` blocks with `type = …`.
-        2. Edit it, then run `vp config check`. It reports errors with line and path and "did you mean" hints.
-        3. The app reloads within a second. A file that doesn't check out is not applied (the last good version
-           keeps running), so always check. `vp config backups` / `vp config restore <n>` undo.
-        - Never put API keys or tokens in the file. Use `vp secret set <name>` (pipe the value in) and reference
-          `${secret:<name>}` in an http block's url, headers or body.
-        - Ask the user before changing or removing their hotkeys or tracks; adding a new track is fine.
+        1. Understand the job: what goes in (their voice, selected text, the clipboard), what should happen to it,
+           where it goes (pasted, copied, spoken, posted to a service), and the hotkey (hold or toggle).
+        2. Look at what exists: `vp tracks`, `vp tracks show <id>` (blocks numbered; branches as 2.easy, 2.hard.1),
+           and the file itself. Changing a track: read its `[[track]]` table and edit only what was asked.
+        3. Write the blocks (the reference below lists every block and setting). Keep the file's layout and comments;
+           give a new track a unique `id` (lowercase, dashes) and a hotkey nothing else uses (`vp tracks` shows the
+           used ones; option+letter or control+option+letter are usually free).
+        4. `vp config check`. Errors come with line, path and "did you mean"; fix and check again. A file that
+           doesn't check out is not applied (the last good version keeps running).
+        5. Show it: `vp open track <id>` (each save flashes what changed in the open editor), optionally
+           `--step <n>` to open a block.
+        6. Try it: `vp run <id> --text "sample"` prints the result; `vp history show 1` shows how it ran, step by
+           step, with Jev's pick and the tokens and cost. Careful: a track ending in `paste` pastes at the user's
+           cursor and one with `speak` talks; for a quiet test, say so or test a copy without those blocks.
+        7. Tell the user what you built in a sentence or two (and its hotkey), or read it aloud per their preference.
+
+        Choosing blocks:
+        - Voice in: `microphone` then `transcribe` (`model = "parakeet"` on this Mac, fast and private; or an
+          OpenRouter id for cloud accuracy), usually `fix-words` next (their vocabulary).
+        - Text in: `text` with `sources` (selection, page, clipboard; first with text wins).
+        - Change the text: `llm` (any OpenRouter model, `vp models --capability text --search <name>`; `{{input}}` in
+          the prompt places the text; `on_failure = "pass-through"` keeps a track working offline), `template`, `http`.
+        - Out: `paste`, `copy`, `speak` (`vp voices --model pocket`), `show-hud`, or `http` to post somewhere.
+          Outputs pass their text on, so a track can paste and then post.
+        - Different handling for different input: `branch`. Jev answers your `question` about the text and picks a
+          branch by its `when`; that branch's own steps run, then the track continues. Use it for how hard or long the
+          text is, what it's about, its language, or whether it's a question or a note. A branch with no steps
+          passes the text through. Give every branch a distinct, concrete `when` (Jev chooses by it).
+        - Just choosing which model answers: `route` (each route = name, when, model, prompt); simpler than a branch
+          when every path is one LLM call.
+        - Rules the check enforces: inputs (`microphone`, `text`) only start a track; branches start from text;
+          each block takes what the previous one gives; if branches end differently (one speaks, one gives text),
+          nothing can follow the branch, so put the remaining steps inside each branch.
+        - Secrets for http blocks: `vp secret set <name>` (pipe the value), then `${secret:<name>}`. Never put keys in
+          the file. Provider keys: `vp auth`.
+        - Ask before changing or removing the user's existing hotkeys or tracks; adding a new track is fine.
+          `vp config backups` / `vp config restore <n>` undo.
         - Vocabulary: `vp vocab add "Kubernetes" --heard "cuban eighties, cube or netties"`; `vp vocab test "…"`.
 
         ## Show the user (no screen access needed)
@@ -330,13 +416,7 @@ enum AgentsInstaller {
           `--code <code>` on a machine without a browser. `echo "$KEY" | vp auth set typesafe` for Jev.
         - Never print, echo or log key values.
 
-        ## Branches: let Jev pick the path
-
-        A `branch` block asks Jev a question about the text and runs one branch's own steps, then the track carries
-        on. Use it whenever different inputs need different handling (how hard the text is, what it's about, its
-        language). Each branch: `name`, `when` (what Jev chooses it by), and `[[track.step.branch.step]]` blocks (any
-        type; none passes the text through). If branches end differently (one speaks, one gives text), nothing can
-        follow the branch: put the rest inside each branch. `vp tracks show <id>` lists branches as 2.easy, 2.hard.1.
+        ## Example: a branch
 
         ```toml
           [[track.step]]

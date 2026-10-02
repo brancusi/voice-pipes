@@ -61,8 +61,8 @@ enum VPCommands {
                     handler: { _, out in try uiReply("ui", [:], out) }),
         CommandSpec(name: "update", usage: "vp update", summary: "Check for a new version", handler: { _, out in try simple("update.check", out) }),
         CommandSpec(name: "install", usage: "vp install [--dir <path>]", summary: "Link vp and voicepipes onto your PATH", values: ["dir"], handler: install),
-        CommandSpec(name: "agents", usage: "vp agents [install [--hook] | uninstall | context]",
-                    summary: "The agent skill (and an opt-in Claude Code session hook)", switches: ["hook"], handler: agents),
+        CommandSpec(name: "agents", usage: "vp agents [install [--hook] | uninstall | context | read-aloud [off|long|attention|all] [--long-text <chars>]]",
+                    summary: "The agent skill, the Claude Code session hook, and what agents read aloud to you", values: ["long-text"], switches: ["hook"], handler: agents),
     ]
 
     // MARK: Home

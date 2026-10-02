@@ -300,6 +300,11 @@ launch the app rewrites installed skills that are out of date, installs the skil
 installed for any agent), points the session hook at the current `vp`, and repoints `vp` links if you moved the app
 (a root-owned link it can't change shows up in Setup → Checks with **Fix…**).
 
+**What agents read aloud.** `vp agents read-aloud off|long|attention|all` (or `[settings.agents] read_aloud` in
+config.toml) tells every agent what to read to you unasked: nothing, long text (summaries, reports), long text plus
+anything that needs you (questions, finished tasks, problems), or every reply. `long_text` sets what counts as long
+(characters, default 600). Agents read a spoken version and keep code and links on screen.
+
 Agents can show you what they're doing without screen access: `vp open track <id> --step 3 --field prompt` opens the
 editor at that block with the cursor in its instructions. When an agent edits `config.toml`, the open editor flashes
 what changed and opens a single new or changed block, so you can watch a track being built.
