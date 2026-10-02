@@ -39,27 +39,15 @@ struct ActiveRun {
     var heldBy: String?
 }
 
-struct RunRecord: Identifiable {
-    struct StepTiming {
-        let title: String
-        let ms: Int
-    }
-
-    let id = UUID()
-    let trackName: String
-    let date: Date
-    let text: String
-    let totalMs: Int
-    var steps: [StepTiming] = []
-}
-
 @MainActor
 @Observable
 final class AppState {
     let store: TrackStore
     let speaker = Speaker()
     private(set) var run: ActiveRun?
-    private(set) var history: [RunRecord] = []
+    let historyStore = HistoryStore()
+    /// Every run's text, newest first, kept on disk.
+    var history: [RunRecord] { historyStore.records }
     private(set) var parakeetState: ParakeetService.State = .notLoaded
     private(set) var localVoiceStates: [LocalVoiceEngine: LocalVoices.State] = [:]
     private(set) var unavailableCombos: [KeyCombo] = []
@@ -327,6 +315,7 @@ final class AppState {
     private func runSteps(_ track: Track, from start: Int, payload initial: Payload, startedAt: Date = Date()) async {
         var payload = initial
         var index = start
+        var heard: String?
         while index < track.steps.count {
             let step = track.steps[index]
             run?.currentStep = index
@@ -337,29 +326,40 @@ final class AppState {
                 if case .llm(_, _, .passThrough) = step.kind {
                     NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
                 } else {
+                    // Keep what the run had so far, so a dictation whose paste failed can still be copied.
+                    record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
                     show(failure: error.localizedDescription, for: track)
                     return
                 }
             }
             run?.stepMs[index] = Int(Date().timeIntervalSince(t0) * 1000)
-            if let text = payload.text { run?.liveText = text }
+            if let text = payload.text {
+                run?.liveText = text
+                if step.kind.category == "Transcribe" { heard = text }
+            }
             index += 1
         }
 
-        let total = Int(Date().timeIntervalSince(startedAt) * 1000)
-        if let text = run?.liveText, !text.isEmpty {
-            let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().compactMap { index, pair -> RunRecord.StepTiming? in
-                // The microphone's time is how long you spoke, not processing.
-                guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return nil }
-                return RunRecord.StepTiming(title: pair.0, ms: ms)
-            }
-            history.insert(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total, steps: steps), at: 0)
-            if history.count > 100 { history.removeLast() }
-        }
+        let total = record(track, startedAt: startedAt, heard: heard, failure: nil)
         run?.totalMs = total
         run?.phase = .done
         try? await Task.sleep(for: .milliseconds(650))
         if run?.phase == .done, run?.trackID == track.id { run = nil }
+    }
+
+    /// Adds the run's text (if any) to History; returns the total time.
+    @discardableResult
+    private func record(_ track: Track, startedAt: Date, heard: String?, failure: String?) -> Int {
+        let total = Int(Date().timeIntervalSince(startedAt) * 1000)
+        guard let text = run?.liveText, !text.isEmpty, run?.trackID == track.id else { return total }
+        let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().compactMap { index, pair -> RunRecord.StepTiming? in
+            // The microphone's time is how long you spoke, not processing.
+            guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return nil }
+            return RunRecord.StepTiming(title: pair.0, ms: ms)
+        }
+        historyStore.add(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total, steps: steps,
+                                   heard: heard == text ? nil : heard, failure: failure))
+        return total
     }
 
     private func execute(_ kind: StepKind, payload: Payload, track: Track) async throws -> Payload {

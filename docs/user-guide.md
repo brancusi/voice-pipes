@@ -116,7 +116,16 @@ its read-aloud buttons.
 Under the tag, a second line names the model answering, once an LLM or Route step has run: for Route · Jev, the
 route, its model, and Jev's time and confidence, e.g. `quick → claude-haiku-4.5 · Jev 262 ms 100%`.
 
-The full text and per-step timings of every run are in **Activity**.
+The full text and per-step timings of every run are in **History**.
+
+## History
+
+Everything a track produces is kept, so a dictation that went nowhere (you clicked away, the paste had no text
+field) is never lost. The menu bar panel shows the last three runs with a copy button each; **All N →** opens
+**History** in the Voice Tools window, where you can search everything, copy any run back to the clipboard, and see
+each step's time. A run that failed partway keeps the text it had, marked with what went wrong. When later steps
+changed what you said (a question and its answer, dictation and its cleanup), what transcription heard is shown
+above the result. The last 1,000 runs are kept; **Clear history…** removes them all.
 
 ## Setup
 
@@ -136,6 +145,7 @@ All under `~/Library/Application Support/VoiceTools/` and safe to edit while the
 |---|---|
 | `tracks.json` | Tracks, triggers and steps. If it can't be read it's moved aside as `tracks.unreadable-<time>.json`, never overwritten. |
 | `vocabulary.json` | The Vocabulary list. |
+| `history.json` | History: the last 1,000 runs' text, what was heard, timings. Plain text on your disk; **Clear history…** empties it. |
 | `models-cache.json` | OpenRouter's model list (refreshed daily). |
 | `supertonic-voices/` | Downloaded Supertonic voice styles. |
 

@@ -33,8 +33,8 @@ offers **Install…**. Permissions carry over between versions.
 
 - **Menu bar panel** — a launcher: your tracks (click to run), what's playing, the last few runs, and one line
   when something needs fixing.
-- **Voice Tools window** (panel → *Open Voice Tools…*) — **Tracks** (build and edit pipelines), **Activity**
-  (every run's text and step timings), **Vocabulary** (words transcription gets wrong, with training), **Setup**
+- **Voice Tools window** (panel → *Open Voice Tools…*) — **Tracks** (build and edit pipelines), **History**
+  (every run's text, kept on disk, searchable and copyable), **Vocabulary** (words transcription gets wrong, with training), **Setup**
   (checks, keys, on-device models, updates). While it's open the app is in the Dock and ⌘Tab.
 - **HUD** — a small translucent tag at the bottom of the screen: `■ REC 00:04`, `PROC 312ms`, `OK 186ms`,
   `READ 42%`. It ignores the mouse.

@@ -11,9 +11,10 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | App | `App/VoiceToolsApp.swift` | Scenes: `MenuBarExtra` (panel) and the `Window("Voice Tools")`. Menu bar icon reflects the run state / an update. |
 | Model | `Model/Track.swift` | `Track`, `Trigger`, `Step`, `StepKind` (every block, with input/output `DataKind`, titles, catalog, defaults), `ParakeetMode`, `LocalVoiceEngine`. |
 | | `Model/TrackStore.swift` | Loads/saves `tracks.json`; one-time migrations; trigger conflict detection. |
+| | `Model/HistoryStore.swift` | `RunRecord` and `history.json`: the last 1,000 runs (text, heard, failure, timings), written off the main thread. |
 | | `Model/Vocabulary.swift` | `VocabularyEntry`, `VocabularyStore` (`vocabulary.json`), `FixWords` (the replacement algorithm). |
 | | `Model/KeyCombo.swift` | Hotkeys as Carbon key codes + modifiers; layout-aware key names; key code for a character. |
-| Engine | `Pipeline/AppState.swift` | The runtime: hotkey registration, trigger semantics, mic capture, step execution, run history, checks. |
+| Engine | `Pipeline/AppState.swift` | The runtime: hotkey registration, trigger semantics, mic capture, step execution, checks. |
 | Hotkeys | `Hotkeys/HotkeyManager.swift` | Carbon `RegisterEventHotKey` (press *and* release events, no Accessibility needed). |
 | Audio | `Audio/AudioRecorder.swift` | `AVAudioEngine` input tap → 16 kHz mono Float32; `cut()` for back-to-back takes; WAV encoder. |
 | | `Audio/ParakeetService.swift` | Parakeet v3 load/transcribe; `LiveTranscriber` protocol with `ChunkedTranscriber` and `StreamingTranscriber`. |
@@ -29,7 +30,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `IO/TextCapture.swift` | Selected text and page text via the Accessibility API. |
 | | `IO/Speaker.swift` | Read-aloud playback for all three engine families, with pause/resume/progress. |
 | UI | `UI/MenuView.swift` | The panel (launcher). |
-| | `UI/MainWindow.swift` | Main window: Tracks / Activity / Vocabulary / Setup; activation-policy switching. |
+| | `UI/MainWindow.swift` | Main window: Tracks / History / Vocabulary / Setup; activation-policy switching. |
 | | `UI/TrackEditorView.swift` | Track editor, step rows, per-block configuration, key recorder. |
 | | `UI/ModelPicker.swift` | Unified model picker (on-device + OpenRouter) and OpenRouter voice picker. |
 | | `UI/TrainWordSheet.swift` | Vocabulary training flow. |
@@ -54,7 +55,8 @@ beginCapture: AudioRecorder.start(); Esc registered as cancel; OpenRouter pre-wa
 finishCapture: stop mic; ignore < 0.25 s; live transcriber → finish (falls back to whole-clip if it fails/empty)
         ▼
 runSteps: for each step, execute(kind, payload) → payload   (Payload = .none | .audio([Float]) | .text(String))
-          per-step timings → HUD + Activity; a failing step stops the run (LLM can pass its input through)
+          per-step timings → HUD + History; a failing step stops the run (LLM can pass its input through) and its
+          text so far still goes to History
 ```
 
 Steps are typed by `StepKind.input` / `.output` (`DataKind`), and `Track.validationError` rejects a mismatched
@@ -102,7 +104,7 @@ Speed is applied at playback for every engine, because only some providers honou
 A `route(routes:)` step sends the text to Jev as one `choice` question: each route's name is an option and its
 *Use when…* text that option's criteria. The chosen route's model and prompt then run through the same call as an
 LLM step (glossary included). The step's title in the live run is replaced with the pick and Jev's time, so the HUD
-and Activity show it. If Jev fails (no key, network), the first route runs.
+and History show it. If Jev fails (no key, network), the first route runs.
 
 ## Persistence and migrations
 

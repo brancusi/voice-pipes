@@ -12,7 +12,7 @@ struct MenuView: View {
             if let version = updates.available { updateCard(version) }
             section("Tracks") { tracks }
             if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
-            if !app.history.isEmpty { section("Recent runs") { recent } }
+            if !app.history.isEmpty { historySection }
             if app.worstCheck >= .warning { issuesCard }
             Divider()
             footer
@@ -96,7 +96,7 @@ struct MenuView: View {
     private var footer: some View {
         HStack {
             Button { openMain(nil) } label: { Label("Open Voice Tools…", systemImage: "macwindow") }
-                .help("Tracks, activity and setup in a full window")
+                .help("Tracks, history and setup in a full window")
             Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
                 .help("Copy a report for troubleshooting")
             Button { updates.check() } label: { Image(systemName: "arrow.down.circle") }
@@ -157,6 +157,20 @@ struct MenuView: View {
         }
         .padding(12)
         .card()
+    }
+
+    /// The last three runs, each one click from the clipboard; the rest are in the window's History.
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("HISTORY").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button("All \(app.history.count) →") { openMain(.activity) }
+                    .buttonStyle(.borderless).font(.system(size: 11))
+            }
+            .padding(.horizontal, 4)
+            recent
+        }
     }
 
     private var recent: some View {

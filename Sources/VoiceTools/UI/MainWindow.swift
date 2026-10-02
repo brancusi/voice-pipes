@@ -55,7 +55,7 @@ struct MainWindowView: View {
                     .buttonStyle(.borderless)
             }
             Section("Voice Tools") {
-                Label("Activity", systemImage: "clock.arrow.circlepath").tag(MainSection.activity)
+                Label("History", systemImage: "clock.arrow.circlepath").tag(MainSection.activity)
                 Label("Vocabulary", systemImage: "character.book.closed").tag(MainSection.vocabulary)
                 HStack {
                     Label("Setup", systemImage: "checklist")
@@ -84,7 +84,7 @@ struct MainWindowView: View {
                 Text("Select a track").foregroundStyle(.secondary)
             }
         case .activity:
-            ActivityView(app: app).navigationTitle("Activity")
+            HistoryView(app: app).navigationTitle("History")
         case .vocabulary:
             VocabularyView(parakeet: app.parakeet).navigationTitle("Vocabulary")
         case .setup, nil:
@@ -101,24 +101,45 @@ struct MainWindowView: View {
     }
 }
 
-/// Every run this session, with what came out and how long each step took.
-private struct ActivityView: View {
+/// Every run's text, kept on disk: search it, copy any of it back, see how long each step took.
+private struct HistoryView: View {
     let app: AppState
+    @State private var query = ""
+    @State private var copied: RunRecord.ID?
+    @State private var confirmingClear = false
+
+    private var records: [RunRecord] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return app.history }
+        return app.history.filter {
+            $0.text.localizedCaseInsensitiveContains(q) || ($0.heard?.localizedCaseInsensitiveContains(q) ?? false)
+                || $0.trackName.localizedCaseInsensitiveContains(q)
+        }
+    }
 
     var body: some View {
         if app.history.isEmpty {
             ContentUnavailableView("No runs yet", systemImage: "waveform",
-                                   description: Text("Trigger a track with its hotkey or from the menu bar."))
+                                   description: Text("Everything your tracks produce is kept here, so you can copy it again."))
         } else {
-            List(app.history) { record in
+            List(records) { record in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(record.trackName).font(.headline)
-                        Text(record.date.formatted(date: .omitted, time: .shortened)).foregroundStyle(.secondary)
+                        Text(record.date.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
+                        if let failure = record.failure {
+                            Label(failure, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).lineLimit(1)
+                        }
                         Spacer()
                         Text("\(record.totalMs) ms").monospacedDigit().foregroundStyle(.secondary)
-                        Button { Clipboard.shared.copy(record.text) } label: { Image(systemName: "doc.on.doc") }
-                            .buttonStyle(.borderless).help("Copy")
+                        Button(copied == record.id ? "Copied" : "Copy") {
+                            Clipboard.shared.copy(record.text)
+                            copied = record.id
+                        }
+                    }
+                    if let heard = record.heard {
+                        Text("› " + heard).foregroundStyle(.secondary).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(record.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 10) {
@@ -128,6 +149,17 @@ private struct ActivityView: View {
                     }
                 }
                 .padding(.vertical, 6)
+            }
+            .searchable(text: $query, prompt: "Search everything you've said")
+            .toolbar {
+                ToolbarItem {
+                    Button("Clear history…") { confirmingClear = true }
+                }
+            }
+            .confirmationDialog("Clear all \(app.history.count) runs from History?", isPresented: $confirmingClear) {
+                Button("Clear history", role: .destructive) { app.historyStore.clear() }
+            } message: {
+                Text("This can't be undone.")
             }
         }
     }

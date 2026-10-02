@@ -1,5 +1,11 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.9.5**
+- **History: never lose a dictation.** Everything your tracks produce is now kept, even after you quit, so if you clicked away and the paste went nowhere, it's still there. The menu bar panel shows the last three with a copy button each; **All →** opens **History** (it was called Activity) in the main window, where you can search everything you've said and copy any of it back.
+- A run that fails partway (say, the paste had nowhere to go) still saves its text, marked with what went wrong.
+- For Quick answer and Clean dictation, History shows what you said above the answer or the cleaned-up text.
+- The last 1,000 runs are kept on your Mac. **Clear history…** in the History toolbar removes them.
+
 **0.9.4**
 - **A tidier menu bar panel.** Each track is now one line: its color, name and hotkey. Hover a track to see its steps; the full pipeline is in the Voice Tools window.
 - **No more scrolling.** The panel grows to fit everything (tracks, what's playing, recent runs) instead of cutting off at a fixed height.
