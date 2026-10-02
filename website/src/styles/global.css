@@ -403,6 +403,7 @@ a:hover {
 .site-footer .wordmark { font-size: 14px; }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 .site-footer__note { font-size: 12px; color: var(--fg-muted); }
+.site-footer__credit { margin: 0 auto; padding-block: 0 28px; font-size: 12px; color: var(--fg-muted); }
 
 /* Text colours, named after the design-system tokens; last, so they win over component colours */
 .c-fg { color: var(--fg); }
