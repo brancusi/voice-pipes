@@ -132,8 +132,11 @@ above the result. The last 1,000 runs are kept; **Clear history…** removes the
 - **Checks** — Microphone, Accessibility, Parakeet, on-device voices, OpenRouter key (validated live), shortcut
   clashes, track errors. **Fix…** on a permission clears any stale entry macOS kept from an older build, asks
   again and opens the right Settings page. **Copy report** puts a plain-text summary on the clipboard.
-- **OpenRouter** — API key (Keychain) and the model list (Reload).
-- **TypeSafe (Jev)** — API key (Keychain), used by Route steps and vocabulary training.
+- **Connections** — OpenRouter and TypeSafe (Jev), each with what it's used for and a status (OpenRouter's key is
+  checked live). A saved key shows masked, e.g. `sk-or-v1-••••••••••••3f9a`. To replace it, click the field and
+  paste: the new key is saved to the Keychain at once, with no Save button (or type it and press Return; Esc
+  leaves it as it was). **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
+  is used by Route steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
 - **Updates** — version and **Check now**.
 

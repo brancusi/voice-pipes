@@ -110,16 +110,53 @@ final class AppState {
     }
 
     var hasJevKey = JevClient.hasKey
+    /// The saved keys as Setup shows them (`sk-or-v1-••••3f9a`): read once, never the whole key.
+    private(set) var openRouterKeyHint = AppState.mask(Keychain.get(SecretKey.openRouter))
+    private(set) var jevKeyHint = AppState.mask(Keychain.get(SecretKey.typesafe))
 
+    enum KeyState { case checking, valid, rejected, unreachable }
+    /// The OpenRouter key's live check, or nil when there's no key or it hasn't been checked yet.
+    private(set) var openRouterKeyState: KeyState?
+
+    /// Saves (or, with an empty string, removes) the Jev key.
     func setJevKey(_ key: String) {
         Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.typesafe)
         hasJevKey = JevClient.hasKey
+        jevKeyHint = Self.mask(Keychain.get(SecretKey.typesafe))
+        refreshChecks()
     }
 
+    /// Saves (or, with an empty string, removes) the OpenRouter key, then checks it.
     func setOpenRouterKey(_ key: String) {
         Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.openRouter)
         hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
+        openRouterKeyHint = Self.mask(Keychain.get(SecretKey.openRouter))
+        openRouterKeyState = nil
+        checkOpenRouterKey()
         refreshChecks()
+    }
+
+    func checkOpenRouterKey() {
+        guard hasOpenRouterKey, openRouterKeyState != .checking else { return }
+        openRouterKeyState = .checking
+        Task {
+            openRouterKeyState = switch await OpenRouterClient.shared.validateKey() {
+            case .valid: .valid
+            case .rejected: .rejected
+            case .unreachable: .unreachable
+            }
+        }
+    }
+
+    /// The key's prefix (up to its last `-` or `_` in the first 12 characters, e.g. `sk-or-v1-`), dots, and the
+    /// last four characters. Short keys show only dots.
+    nonisolated static func mask(_ key: String?) -> String? {
+        guard let key = key?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return nil }
+        let dots = String(repeating: "•", count: 12)
+        guard key.count >= 16 else { return dots }
+        let head = key.prefix(12)
+        let prefix = head.lastIndex(where: { $0 == "-" || $0 == "_" }).map { String(head[...$0]) } ?? ""
+        return prefix + dots + key.suffix(4)
     }
 
     // MARK: - Checks
