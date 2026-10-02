@@ -156,7 +156,7 @@ final class AppState {
         guard key.count >= 16 else { return dots }
         let head = key.prefix(12)
         let prefix = head.lastIndex(where: { $0 == "-" || $0 == "_" }).map { String(head[...$0]) } ?? ""
-        return prefix + dots + key.suffix(4)
+        return prefix + dots + String(key.suffix(4))
     }
 
     // MARK: - Checks
