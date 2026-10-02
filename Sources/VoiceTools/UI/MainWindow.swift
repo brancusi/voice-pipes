@@ -12,12 +12,15 @@ enum MainSection: Hashable {
 /// The menu bar panel stays a quick launcher.
 struct MainWindowView: View {
     @Bindable var app: AppState
+    /// Narrowest the detail pages lay out properly; a tiled or split-screen window can be narrower than the
+    /// window's own minimum, and below this the page scrolls sideways instead of being clipped on both edges.
+    static let detailMinWidth: CGFloat = 520
 
     var body: some View {
         NavigationSplitView {
             sidebar.navigationSplitViewColumnWidth(min: 220, ideal: 240)
         } detail: {
-            detail
+            detail.scrollsSidewaysBelow(Self.detailMinWidth)
         }
         .frame(minWidth: 900, minHeight: 640)
         .vpWindow()
@@ -342,12 +345,12 @@ private struct VocabularyView: View {
                                     .labelsHidden()
                                     .multilineTextAlignment(.leading)
                                     .textFieldStyle(.roundedBorder)
-                                    .frame(minWidth: 180, maxWidth: 260)
+                                    .frame(minWidth: 120, maxWidth: 260)
                                 TextField("", text: heardAs($entry), prompt: Text("what comes out instead, comma-separated"))
                                     .labelsHidden()
                                     .multilineTextAlignment(.leading)
                                     .textFieldStyle(.roundedBorder)
-                                    .frame(minWidth: 260, maxWidth: .infinity)
+                                    .frame(minWidth: 160, maxWidth: .infinity)
                                 Toggle("", isOn: $entry.alwaysExact)
                                     .labelsHidden()
                                     .toggleStyle(.switch)
@@ -411,6 +414,20 @@ private struct VocabularyView: View {
         } set: { text in
             entry.wrappedValue.heardAsText = text
             entry.wrappedValue.heardAs = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+    }
+}
+
+extension View {
+    /// Lays the view out at least `minWidth` wide; when the space is narrower it scrolls left and right
+    /// (still full height, so the page's own vertical scrolling keeps working) rather than being centred and clipped.
+    func scrollsSidewaysBelow(_ minWidth: CGFloat) -> some View {
+        // One view tree at every width (no if/else), so resizing past the threshold doesn't reset the page's state.
+        GeometryReader { geo in
+            ScrollView(.horizontal) {
+                self.frame(width: max(geo.size.width, minWidth), height: geo.size.height)
+            }
+            .scrollDisabled(geo.size.width >= minWidth)
         }
     }
 }

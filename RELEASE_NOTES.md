@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.1.1**
+- **The window works when it's narrow.** In split screen or a small tiled window, pages like Vocabulary were cut off on both sides. They now shrink to fit, and when there really isn't room they scroll left and right instead of hiding their edges.
+
 **1.1.0**
 - **A new look.** Voice Pipes now wears its own skin: the Dracula colour scheme (or its light twin, Alucard, when your Mac is in light mode) and one monospace typeface everywhere, like the HUD always had. It still works like a normal Mac app.
 - **Colour means something.** Each kind of step has its colour: transcription cyan, transforms (LLM, Route · Jev, Fix words) purple, outputs green. Statuses read like a log: OK, INFO, WARN, FAIL, always with the word, never colour alone.
