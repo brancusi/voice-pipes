@@ -55,8 +55,9 @@ Setup → Checks. Modifier-only keys (like Right ⌘ alone) aren't supported.
 ### Building blocks
 
 Every block declares what it takes and gives (`audio`, `text`, or nothing); the editor flags a block whose input
-doesn't match the previous block's output. **+ Add step** lists them by category; drag a step by its ☰ handle
-to reorder the pipeline.
+doesn't match the previous block's output. **+ Add step** opens a picker: the blocks that fit after the previous
+step first, by category, each with a one-line description; the rest under "Doesn't fit", with the reason. Type to
+filter (names and descriptions), ↑↓ and Return to add, Esc to close. Drag a step by its ☰ handle to reorder.
 
 | Block | Takes → gives | What it does |
 |---|---|---|

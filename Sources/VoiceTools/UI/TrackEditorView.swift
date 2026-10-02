@@ -190,7 +190,7 @@ struct TrackDetailView: View {
     }
 
     private var addStepMenu: some View {
-        AddStepMenu(allowInputs: true) { kind in
+        AddStepMenu(previous: track.steps.last?.kind) { kind in
             let step = Step(kind: kind)
             track.steps.append(step)
             expandedStep = step.id
@@ -198,32 +198,34 @@ struct TrackDetailView: View {
     }
 }
 
-/// "+ Add step": every block by category (a branch's steps start from text, so no inputs there).
+/// "+ Add step": opens the step picker under it, told where the step goes (the track or a branch, after what).
 private struct AddStepMenu: View {
-    let allowInputs: Bool
+    var branch: String?
+    let previous: StepKind?
     let onAdd: (StepKind) -> Void
+    @State private var anchor = AnchorBox()
+
+    final class AnchorBox { weak var view: NSView? }
 
     var body: some View {
-        Menu {
-            ForEach(allowInputs ? ["Input", "Transcribe", "Transform", "Output"] : ["Transform", "Output"], id: \.self) { category in
-                Section(category) {
-                    ForEach(StepKind.catalog.filter { $0.category == category }, id: \.self) { kind in
-                        Button("\(kind.blockTitle)   \(kind.input.rawValue) → \(kind.output.rawValue)") { onAdd(kind) }
-                    }
-                }
-            }
+        Button {
+            guard let view = anchor.view else { return }
+            StepPickerPanel.shared.show(from: view, context: StepPickerContext(
+                branch: branch, previous: previous,
+                hasOpenRouterKey: Keychain.get(SecretKey.openRouter) != nil, hasJevKey: JevClient.hasKey), onAdd: onAdd)
         } label: {
             Text("+ Add step").font(VPFont.bodyStrong).foregroundStyle(Palette.purple)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .background(AnchorView { anchor.view = $0 })
+        .help("Add a block")
     }
 }
 
 /// A branch's own steps: the same rows as the track's pipeline, reorderable, with their own Add step.
 private struct BranchSteps: View {
     @Binding var steps: [Step]
+    let branchName: String
     let speaker: Speaker
     @State private var expandedStep: Step.ID?
     @State private var draggingStep: Step.ID?
@@ -243,7 +245,7 @@ private struct BranchSteps: View {
                 .vpFlash("step-\(step.id)")
             }
             HStack(spacing: 10) {
-                AddStepMenu(allowInputs: false) { kind in
+                AddStepMenu(branch: branchName, previous: steps.last?.kind) { kind in
                     let step = Step(kind: kind)
                     steps.append(step)
                     expandedStep = step.id
@@ -295,7 +297,7 @@ private struct BranchEditor: View {
                     .lineLimit(2)
                     .onTapGesture { editing = true }
             }
-            BranchSteps(steps: $branch.steps, speaker: speaker)
+            BranchSteps(steps: $branch.steps, branchName: branch.name.isEmpty ? "unnamed" : branch.name, speaker: speaker)
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg100))
@@ -394,7 +396,7 @@ private struct StepRow: View {
                         return NSItemProvider(object: step.id.uuidString as NSString)
                     }
                     .help("Drag to reorder")
-                Image(systemName: icon)
+                Image(systemName: step.kind.symbol)
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 26, height: 26)
                     .background(RoundedRectangle(cornerRadius: 2).fill(step.kind.tint.opacity(0.15)))
@@ -425,25 +427,6 @@ private struct StepRow: View {
         .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(expanded ? Palette.purple : Palette.line, lineWidth: 1))
     }
 
-    private var icon: String {
-        switch step.kind {
-        case .microphone: "mic"
-        case .text: "text.cursor"
-        case .parakeet: "bolt"
-        case .openRouterSTT: "waveform"
-        case .llm: "sparkles"
-        case .route: "arrow.triangle.turn.up.right.diamond"
-        case .branch: "arrow.triangle.branch"
-        case .http: "network"
-        case .template: "curlybraces"
-        case .fixWords: "character.cursor.ibeam"
-        case .paste: "doc.on.clipboard"
-        case .copy: "doc.on.doc"
-        case .speak, .openRouterSpeech: "speaker.wave.2"
-        case .localSpeech: "speaker.wave.2.bubble"
-        case .showHUD: "rectangle.bottomthird.inset.filled"
-        }
-    }
 }
 
 /// Reorders steps live as a dragged step passes over the others; the drop itself just ends the drag.

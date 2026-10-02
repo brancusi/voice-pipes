@@ -218,6 +218,27 @@ extension View {
 
 extension StepKind {
     /// Pipeline colours: Input muted, Transcribe cyan, Transform purple, Output green.
+    /// The block's SF Symbol, in the editor's step rows and the Add step picker.
+    var symbol: String {
+        switch self {
+        case .microphone: "mic"
+        case .text: "text.cursor"
+        case .parakeet: "bolt"
+        case .openRouterSTT: "waveform"
+        case .llm: "sparkles"
+        case .route: "arrow.triangle.turn.up.right.diamond"
+        case .branch: "arrow.triangle.branch"
+        case .http: "network"
+        case .template: "curlybraces"
+        case .fixWords: "character.cursor.ibeam"
+        case .paste: "doc.on.clipboard"
+        case .copy: "doc.on.doc"
+        case .speak, .openRouterSpeech: "speaker.wave.2"
+        case .localSpeech: "speaker.wave.2.bubble"
+        case .showHUD: "rectangle.bottomthird.inset.filled"
+        }
+    }
+
     var tint: Color {
         switch category {
         case "Input": Palette.fgMuted

@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.7.1**
+- **A new Add step picker.** "+ Add step" now opens a proper picker in the Voice Pipes look instead of a plain menu: every block with its icon and a one-line description, what fits after the previous step first, and the rest in a dimmed "Doesn't fit" section that says why ("needs audio", "starts a pipeline"). It shows which blocks need a Jev or OpenRouter key you haven't added yet. Type to filter (it searches descriptions too: "clipboard" finds Copy), ↑↓ to move, Return to add, Esc to close. Inside a branch it says which branch you're adding to.
+
 **1.7.0**
 - **Branches: one track, several paths.** The new **Branch · Jev** block asks Jev a question about the text, like "how hard is this to read aloud?" or "what is this about?", and runs the matching branch's own steps (any blocks, even another branch) before the track carries on. You decide what each branch does, right in the editor; Jev picks in about a third of a second.
 - **Read aloud handles tricky text.** It now starts with a branch: plain prose is read as it is; text with numbers, prices or dates is first spelled out by a fast model (about 0.6 s), so "$4.2M" is read as "four point two million dollars"; code, file paths, URLs and tables are rewritten into sentences you can follow by ear. Want a different voice for the hard stuff? Add a Speak block to that branch. (New installs get this; to switch your existing Read aloud, add a Branch block, or ask your agent to.)
