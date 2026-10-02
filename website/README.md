@@ -40,10 +40,10 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 | `src/content/blog/` | Blog posts, one Markdown file each; `src/pages/blog/` has the index, the post page and `rss.xml`; `FlowFigures.astro` steps a post's animated figures |
 | `src/content.config.ts` | The two collections and their front matter |
 | `src/layouts/Base.astro` | The document shell: title, description, canonical URL, `noindex`, fonts, skip link |
-| `src/styles/global.css` | All styles: the design system's colour tokens, the design's classes and its two breakpoints (900 and 520 px) |
+| `src/styles/global.css` | All styles: the design system's colour tokens, the design's classes and its two breakpoints (900 and 520 px), plus the header's own (720 and 360 px) |
 | `src/lib/releases.ts` | Reads the newest releases from the app's `RELEASE_NOTES.md` for the Changelog section |
-| `src/assets/brand/` | The design system's logo and mascot SVGs, unchanged; `src/lib/svg.ts` draws them at whole-pixel sizes |
-| `src/pages/favicon.svg.ts` | Serves the supplied 16 px mark as `/favicon.svg` |
+| `src/assets/brand/` | The site's one-colour mark, its 16 px favicon drawing and the Wrangler (its README says where each comes from); `src/lib/svg.ts` draws them at whole-pixel sizes |
+| `src/pages/favicon.svg.ts` | Serves the mark's 16 px drawing as `/favicon.svg` |
 | `src/site.ts` | The download and release-notes links (the public `voice-tools-releases` repository) |
 | `public/` | Copied to `dist/` as is: `_headers` for Cloudflare's response headers |
 | `scripts/payload.mjs` | The payload report behind `npm run payload` |
@@ -80,13 +80,18 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 
 ## Where it differs from the design
 
-- **Header below 1100 px:** the section links are hidden (the design's stylesheet says 900 px; Docs and Blog, which
-  stay on every screen, need the room). In the design an inline style overrides that rule, so on a phone the links
-  wrap and push Download off-screen (the page scrolls sideways). Below 520 px Docs and Blog take a second row.
+- **Header (owner's request, 2026-10-02):** the design's six section links made the bar crowded, and below 1100 px
+  they were hidden, Setup with them. Now one nav, the same on every page and screen: **Product** (a disclosure listing
+  the home page's Tracks, Building blocks, Routing, On your Mac and Changelog), **Setup**, **Docs** and **Blog**, then
+  **Download**. Product is a `<details>`, so it works without JavaScript; a small script closes it on Escape, a click
+  elsewhere or a picked link. The current page (or the docs or blog page you're under) is bone, underlined in rose.
+  Below 720 px the nav takes its own row under the lockup and Download; every target is 44 px tall.
 - **Changelog rows** come from the release notes (above), so the text differs from the design's 1.1.0-era sample.
-- **Logo:** the header uses the design system's primary Sundown mark at 32 px (the design drew the 16 px three-pipe
-  drawing there, which the system keeps for sizes under 32 px), in the system's horizontal lockup: a gap of a fifth of
-  the icon and the wordmark tracked at -0.02em. The favicon is the supplied 16 px drawing.
+- **Logo (owner's request, 2026-10-02):** the full-colour Sundown mark was hard to read at header size, so the site
+  uses the one-colour version: the `›` prompt, three pipes with their slits and the base pipe, from the logo canvas's
+  one-colour glyph, in bone on the violet band at 36 px (2 × its 18 px grid). The wordmark is 20 px (18 below 720 px,
+  16 below 360), tracked at -0.02em, the `|` in rose. The favicon is the same drawing redrawn for 16 px, on a violet
+  tile so it reads on light and dark tabs. The Sundown mark stays the app icon.
 - **Fonts** are served from this site instead of Google Fonts; **a skip link** and **pink focus rings** on every link
   (the design system's focus style) are added for keyboard use.
 - **Animated hero (owner's request, 2026-10-02):** a saguaro, the Wrangler in boots and spurs playing his harmonica,
@@ -106,8 +111,8 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 
 ## Keeping it fast
 
-- **Almost no client JavaScript:** the hero demo's sequencer (about 2 kB), the docs' Copy buttons and the blog
-  figures' stepper, all inline. `npm run payload` holds each page to 3 kB. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
+- **Almost no client JavaScript:** the hero demo's sequencer (about 2 kB), the docs' Copy buttons, the blog
+  figures' stepper and the header's Product menu (closing it; it opens without JavaScript), all inline. `npm run payload` holds each page to 3 kB. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
   under reduced motion, and the demo shows a finished take without JavaScript.
 - **CSS inlined** in each page (`build.inlineStylesheets: 'always'`) and the illustrations are inline SVG, so a page
   is its HTML plus the two fonts.

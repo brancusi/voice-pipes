@@ -2,35 +2,80 @@
 import Logo from './Logo.astro';
 import { DOWNLOAD_URL } from '../site';
 
-// Absolute, so they work from /setup too (on the home page they stay same-page jumps).
+// The home page's sections, under Product. Absolute, so they work from every page (on the home page they stay
+// same-page jumps).
 const sections = [
   ['/#tracks', 'Tracks'],
   ['/#blocks', 'Building blocks'],
   ['/#routing', 'Routing'],
   ['/#local', 'On your Mac'],
   ['/#changelog', 'Changelog'],
-  ['/setup', 'Setup'],
 ];
-// Marks Docs or Blog as the current section on its pages (built as docs/cli.html and the like).
+const pages = [
+  ['/setup', 'Setup'],
+  ['/docs', 'Docs'],
+  ['/blog', 'Blog'],
+];
+// Marks the current page, or its section on the pages under it (built as docs/cli.html and the like).
 const path = Astro.url.pathname.replace(/\.html$/, '');
-const here = (section: string) => (path === section ? 'page' : path.startsWith(`${section}/`) ? 'true' : undefined);
+const here = (page: string) => (path === page ? 'page' : path.startsWith(`${page}/`) ? 'true' : undefined);
 ---
 
 <header class="band">
   <div class="wrap site-header__bar">
     <a class="brand" href="/#top" aria-label="Voice Pipes home">
-      <Logo size={32} />
+      <Logo size={36} />
       <span class="wordmark">voice <span class="c-pink">|</span> pipes</span>
     </a>
-    <nav class="navlinks" aria-label="Sections">
-      {sections.map(([href, label]) => <a class="nav-a" href={href}>{label}</a>)}
+    <nav class="site-nav" aria-label="Main">
+      <ul class="site-nav__list" role="list">
+        <li>
+          {/* A disclosure, not a menu widget: it opens and closes without JavaScript; the script below adds Escape. */}
+          <details class="site-nav__menu" data-site-menu>
+            <summary class="site-nav__link">
+              Product
+              <svg class="site-nav__caret" width="10" height="6" viewBox="0 0 5 3" shape-rendering="crispEdges" aria-hidden="true">
+                <path fill="currentColor" d="M0 0h1v1H0zM4 0h1v1H4zM1 1h1v1H1zM3 1h1v1H3zM2 2h1v1H2z"></path>
+              </svg>
+            </summary>
+            <ul class="site-nav__panel" role="list">
+              {sections.map(([href, label]) => (
+                <li>
+                  <a class="site-nav__item" href={href}>{label}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </li>
+        {pages.map(([href, label]) => (
+          <li>
+            <a class="site-nav__link" href={href} aria-current={here(href)}>{label}</a>
+          </li>
+        ))}
+      </ul>
     </nav>
-    <span class="spacer"></span>
-    {/* Kept on every screen size, unlike the section links. */}
-    <nav class="devlinks" aria-label="Developers">
-      <a class="nav-a" href="/docs" aria-current={here('/docs')}>Docs</a>
-      <a class="nav-a" href="/blog" aria-current={here('/blog')}>Blog</a>
-    </nav>
-    <a class="btn btn-p btn-sm" href={DOWNLOAD_URL}>Download</a>
+    <a class="btn btn-p site-header__cta" href={DOWNLOAD_URL}>Download</a>
   </div>
 </header>
+
+<script>
+  // Product closes on Escape (focus goes back to it), on a click outside it or on one of its links, and when focus
+  // leaves it.
+  const menu = document.querySelector<HTMLDetailsElement>('[data-site-menu]');
+  if (menu) {
+    const close = () => (menu.open = false);
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.open) {
+        close();
+        menu.querySelector('summary')!.focus();
+      }
+    });
+    menu.addEventListener('focusout', (event) => {
+      if (!menu.contains(event.relatedTarget as Node | null)) close();
+    });
+    document.addEventListener('click', (event) => {
+      const target = event.target as Element;
+      if (!menu.contains(target) || target.closest('a')) close();
+    });
+  }
+</script>
