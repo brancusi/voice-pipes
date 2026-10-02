@@ -87,6 +87,35 @@ final class JevClient: Sendable {
         return (index, answer.probabilities[answer.choice] ?? 0)
     }
 
+    /// Picks one of `options` (name, what it's for) for `input`, answering `question` (a Branch block): the index
+    /// and its probability.
+    func choose(input: String, question: String?, options: [(name: String, when: String)]) async throws -> (index: Int, probability: Double) {
+        guard let key = Keychain.get(SecretKey.typesafe), !key.isEmpty else { throw JevError.missingKey }
+        var names: [String] = []
+        for (i, option) in options.enumerated() {
+            let name = option.name.trimmingCharacters(in: .whitespaces)
+            names.append(name.isEmpty || names.contains(name) ? "branch \(i + 1)" : name)
+        }
+        var criteria: [String: Any] = [:]
+        for (name, option) in zip(names, options) { criteria[name] = option.when.isEmpty ? NSNull() : option.when as Any }
+        let asked = question?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let body: [String: Any] = [
+            "model": "jev-latest",
+            "state": ["input": input],
+            "questions": ["branch": [
+                "type": "choice",
+                "instructions": "`input` is text at this point in a voice pipeline."
+                    + (asked.isEmpty ? "" : " Question: \(asked)") + " Pick the branch that should handle it.",
+                "criteria": criteria,
+            ]],
+        ]
+        struct Answer: Decodable { let choice: String; let probabilities: [String: Double] }
+        struct Response: Decodable { let answers: [String: Answer] }
+        guard let answer = try JSONDecoder().decode(Response.self, from: try await post(body, key: key)).answers["branch"],
+              let index = names.firstIndex(of: answer.choice) else { throw JevError.http(200, "No branch in Jev's answer") }
+        return (index, answer.probabilities[answer.choice] ?? 0)
+    }
+
     private func post(_ body: [String: Any], key: String) async throws -> Data {
         var request = URLRequest(url: endpoint, timeoutInterval: 20)
         request.httpMethod = "POST"

@@ -224,7 +224,7 @@ enum ConfigFile {
         ("apricot", "#F0A35E"), ("dusk-blue", "#8FB8D6"), ("lavender", "#C3A3D4"), ("sage", "#A9BF8A"),
         ("marigold", "#E8C26A"), ("rose", "#EC8F7C"), ("red-rock", "#E0694A"),
     ]
-    static let stepTypes = ["microphone", "text", "transcribe", "llm", "route", "http", "template", "fix-words",
+    static let stepTypes = ["microphone", "text", "transcribe", "llm", "route", "branch", "http", "template", "fix-words",
                             "paste", "copy", "speak", "show-hud"]
     static let textSources: [(String, TextSource)] = [
         ("selection", .selection), ("page", .page), ("clipboard", .clipboard), ("previous-clipboard", .previousClipboard),
@@ -431,6 +431,27 @@ enum ConfigFile {
                 routes.append(route)
             }
             kind = .route(routes: routes)
+        case "branch":
+            known += ["question", "branch"]
+            var branches: [Branch] = []
+            let tables = s.tables("branch") ?? []
+            if tables.isEmpty { s.warning("branch", "has no [[…branch]] yet, so it passes the text through") }
+            for (i, table) in tables.enumerated() {
+                let label = table["name"].flatMap { if case .string(let n) = $0 { n } else { nil } } ?? "\(i + 1)"
+                var b = TableReader(table, path: "\(s.path).branch[\(label)]")
+                let name = b.string("name", required: true) ?? ""
+                let when = b.string("when") ?? ""
+                var steps: [Step] = []
+                for (j, stepTable) in (b.tables("step") ?? []).enumerated() {
+                    var r = TableReader(stepTable, path: "\(b.path).step[\(j + 1)]")
+                    if let kind = readStep(&r) { steps.append(Step(kind: kind)) }
+                    b.issues += r.issues
+                }
+                b.finish(known: ["name", "when", "step"])
+                s.issues += b.issues
+                branches.append(Branch(name: name, when: when, steps: steps))
+            }
+            kind = .branch(question: s.string("question"), branches: branches)
         case "http":
             known += ["url", "method", "headers", "body", "response_field"]
             kind = .http(url: s.string("url", required: true) ?? "",
@@ -515,15 +536,17 @@ enum ConfigFile {
             }
             out += "]\n"
         }
-        for step in track.steps { out += "\n" + write(step.kind) }
+        for step in track.steps { out += "\n" + write(step.kind, table: "track.step", indent: "  ") }
         return out
     }
 
-    private static func write(_ kind: StepKind) -> String {
-        var lines = ["  [[track.step]]"]
+    /// One step's table; a Branch's steps nest under it (`[[track.step.branch.step]]`), indented two more.
+    private static func write(_ kind: StepKind, table: String, indent: String) -> String {
+        var lines = ["\(indent)[[\(table)]]"]
         func add(_ key: String, _ value: String, _ comment: String? = nil) {
-            lines.append("  \(key) = \(value)" + (comment.map { "  # \($0)" } ?? ""))
+            lines.append("\(indent)\(key) = \(value)" + (comment.map { "  # \($0)" } ?? ""))
         }
+        let inner = indent + "  "
         switch kind {
         case .microphone:
             add("type", quote("microphone"))
@@ -549,11 +572,26 @@ enum ConfigFile {
             add("type", quote("route"))
             for route in routes {
                 lines.append("")
-                lines.append("    [[track.step.route]]")
-                lines.append("    name = \(quote(route.name))")
-                lines.append("    when = \(multiline(route.when, indent: "    "))")
-                lines.append("    model = \(quote(route.model))")
-                lines.append("    prompt = \(multiline(route.prompt, indent: "    "))")
+                lines.append("\(inner)[[\(table).route]]")
+                lines.append("\(inner)name = \(quote(route.name))")
+                lines.append("\(inner)when = \(multiline(route.when))")
+                lines.append("\(inner)model = \(quote(route.model))")
+                lines.append("\(inner)prompt = \(multiline(route.prompt))")
+            }
+        case .branch(let question, let branches):
+            add("type", quote("branch"), "Jev picks one branch; its steps run, then the track carries on")
+            if let question, !question.isEmpty { add("question", multiline(question), "what Jev decides") }
+            for branch in branches {
+                lines.append("")
+                lines.append("\(inner)[[\(table).branch]]")
+                lines.append("\(inner)name = \(quote(branch.name))")
+                lines.append("\(inner)when = \(multiline(branch.when))  # what Jev chooses this branch by")
+                if branch.steps.isEmpty { lines.append("\(inner)# no steps: the text passes through as it is") }
+                for step in branch.steps {
+                    lines.append("")
+                    lines.append(write(step.kind, table: "\(table).branch.step", indent: inner + "  ")
+                        .trimmingCharacters(in: .newlines))
+                }
             }
         case .http(let url, let method, let headers, let body, let field):
             add("type", quote("http"))
@@ -692,6 +730,12 @@ enum ConfigFile {
         #    route        Jev picks one [[track.step.route]] by its `when`; that route's model answers with its
         #                 prompt. Each route: name, when, model, prompt. Without a Jev key the first route answers.
         #                                                                         text → text
+        #    branch       Jev answers `question` about the text and picks one [[track.step.branch]] by its
+        #                 `when`; that branch's own [[track.step.branch.step]] blocks run (any blocks, even
+        #                 another branch), then the track carries on with what they give. A branch with no
+        #                 steps passes the text through. If branches end differently (one speaks, one gives
+        #                 text), nothing can follow the branch. Without a Jev key the first branch runs.
+        #                                                                         text → what the branches give
         #    http         url, method (GET | POST | PUT | PATCH), headers = { … }, body, response_field
         #                 {{input}} (URL-encoded in the url) / {{input_json}}; ${secret:name} / ${env:NAME}
         #                                                                         text → text (the reply)

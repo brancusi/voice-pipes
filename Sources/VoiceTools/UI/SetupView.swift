@@ -124,13 +124,15 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             SectionLabel("On this Mac")
             Card {
-                ModelRow(name: "Parakeet v3", detail: "transcription · ~460 MB", state: parakeetState, load: nil)
+                ModelRow(name: "Parakeet v3", detail: "transcription · 480 MB", state: parakeetState, load: nil,
+                         download: app.parakeetState == .loading ? ModelDownloads.shared.status[.parakeet] ?? .init(total: ModelDownloads.Model.parakeet.totalBytes) : nil)
                 ForEach(LocalVoiceEngine.allCases) { engine in
                     Hairline()
                     let state = app.localVoiceStates[engine] ?? .notLoaded
-                    ModelRow(name: engine.label, detail: "speech · \(engine.voices.count) voices",
+                    ModelRow(name: engine.label, detail: "speech · \(engine.voices.count) voices · \(engine == .pocket ? 530 : 170) MB",
                              state: Self.modelState(state),
-                             load: canLoad(state) ? { Task { try? await LocalVoices.shared.prepare(engine) } } : nil)
+                             load: canLoad(state) ? { Task { try? await LocalVoices.shared.prepare(engine) } } : nil,
+                             download: state == .loading ? ModelDownloads.shared.status[.init(engine)] ?? .init(total: ModelDownloads.Model(engine).totalBytes) : nil)
                 }
             }
         }
@@ -262,6 +264,7 @@ private struct ModelRow: View {
     let detail: String
     let state: (Check.Level, String)
     let load: (() -> Void)?
+    var download: ModelDownloads.Status?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -269,6 +272,7 @@ private struct ModelRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                 Text(detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                if let download { ModelLoadBar(status: download).padding(.top, 5).frame(maxWidth: 360) }
             }
             Spacer(minLength: 8)
             Text(state.1).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)

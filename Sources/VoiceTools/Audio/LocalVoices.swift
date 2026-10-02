@@ -38,6 +38,8 @@ actor LocalVoices {
 
     private func performLoad(_ engine: LocalVoiceEngine) async throws {
         set(engine, .loading)
+        await MainActor.run { ModelDownloads.shared.track(.init(engine)) }
+        defer { Task { @MainActor in ModelDownloads.shared.finish(.init(engine)) } }
         do {
             switch engine {
             case .pocket:

@@ -190,15 +190,25 @@ struct TrackDetailView: View {
     }
 
     private var addStepMenu: some View {
+        AddStepMenu(allowInputs: true) { kind in
+            let step = Step(kind: kind)
+            track.steps.append(step)
+            expandedStep = step.id
+        }
+    }
+}
+
+/// "+ Add step": every block by category (a branch's steps start from text, so no inputs there).
+private struct AddStepMenu: View {
+    let allowInputs: Bool
+    let onAdd: (StepKind) -> Void
+
+    var body: some View {
         Menu {
-            ForEach(["Input", "Transcribe", "Transform", "Output"], id: \.self) { category in
+            ForEach(allowInputs ? ["Input", "Transcribe", "Transform", "Output"] : ["Transform", "Output"], id: \.self) { category in
                 Section(category) {
                     ForEach(StepKind.catalog.filter { $0.category == category }, id: \.self) { kind in
-                        Button("\(kind.blockTitle)   \(kind.input.rawValue) → \(kind.output.rawValue)") {
-                            let step = Step(kind: kind)
-                            track.steps.append(step)
-                            expandedStep = step.id
-                        }
+                        Button("\(kind.blockTitle)   \(kind.input.rawValue) → \(kind.output.rawValue)") { onAdd(kind) }
                     }
                 }
             }
@@ -208,6 +218,90 @@ struct TrackDetailView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+    }
+}
+
+/// A branch's own steps: the same rows as the track's pipeline, reorderable, with their own Add step.
+private struct BranchSteps: View {
+    @Binding var steps: [Step]
+    let speaker: Speaker
+    @State private var expandedStep: Step.ID?
+    @State private var draggingStep: Step.ID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach($steps) { $step in
+                StepRow(step: $step, speaker: speaker, expanded: expandedStep == step.id) {
+                    expandedStep = expandedStep == step.id ? nil : step.id
+                } onDelete: {
+                    steps.removeAll { $0.id == step.id }
+                } onDragStart: {
+                    draggingStep = step.id
+                }
+                .onDrop(of: [.text], delegate: StepDropDelegate(target: step.id, steps: $steps, dragging: $draggingStep))
+                .id("step-\(step.id)")
+                .vpFlash("step-\(step.id)")
+            }
+            HStack(spacing: 10) {
+                AddStepMenu(allowInputs: false) { kind in
+                    let step = Step(kind: kind)
+                    steps.append(step)
+                    expandedStep = step.id
+                }
+                if steps.isEmpty {
+                    Text("no steps: the text passes through as it is").font(VPFont.caption).foregroundStyle(Palette.comment)
+                }
+            }
+            .padding(.leading, 4)
+        }
+    }
+}
+
+/// One branch of a Branch block, as a card: its name and what Jev chooses it by (click ✎ to edit), then its steps.
+private struct BranchEditor: View {
+    let index: Int
+    @Binding var branch: Branch
+    let speaker: Speaker
+    let onDelete: (() -> Void)?
+    @State private var editing = false
+
+    private static let colors = [Palette.green, Palette.cyan, Palette.purple, Palette.yellow, Palette.orange]
+    private var color: Color { editing ? Palette.pink : Self.colors[index % Self.colors.count] }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                if editing {
+                    VPTextField("Name", text: $branch.name, font: VPFont.bodyStrong, color: Palette.pink)
+                        .focusKey("branch\(index + 1).name").frame(width: 160)
+                } else {
+                    Text(branch.name.isEmpty ? "unnamed" : branch.name).font(VPFont.bodyStrong).foregroundStyle(color)
+                }
+                Spacer(minLength: 8)
+                Button { editing.toggle() } label: { Image(systemName: editing ? "checkmark" : "pencil") }
+                    .buttonStyle(.vpIcon).help(editing ? "Done" : "Edit the name and what Jev chooses it by")
+                if let onDelete {
+                    Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon).help("Remove this branch")
+                }
+            }
+            if editing {
+                FieldLabel("Use when", help: "Jev reads this to choose the branch.") {
+                    VPTextField("Use when…", text: $branch.when, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 38)
+                        .focusKey("branch\(index + 1).when")
+                }
+            } else {
+                (Text("use when › ").foregroundColor(Palette.comment) + Text(branch.when.isEmpty ? "(no description: Jev can't pick it)" : branch.when))
+                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+                    .lineLimit(2)
+                    .onTapGesture { editing = true }
+            }
+            BranchSteps(steps: $branch.steps, speaker: speaker)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg100))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(editing ? Palette.pink : Palette.line, lineWidth: 1))
+        .id("branch-\(branch.id)")
+        .vpFlash("branch-\(branch.id)")
     }
 }
 
@@ -338,7 +432,8 @@ private struct StepRow: View {
         case .parakeet: "bolt"
         case .openRouterSTT: "waveform"
         case .llm: "sparkles"
-        case .route: "arrow.triangle.branch"
+        case .route: "arrow.triangle.turn.up.right.diamond"
+        case .branch: "arrow.triangle.branch"
         case .http: "network"
         case .template: "curlybraces"
         case .fixWords: "character.cursor.ibeam"
@@ -455,6 +550,30 @@ private struct StepConfigView: View {
             Button("+ Add route") {
                 kind = .route(routes: routes + [Route(name: "route \(routes.count + 1)", when: "",
                                                       model: "anthropic/claude-haiku-4.5", prompt: "")])
+            }
+            .buttonStyle(.vpGhost).padding(.leading, -8)
+
+        case .branch(let question, let branches):
+            Text("Jev answers the question about the text (about 0.3 s) and picks the branch whose description fits; that branch's steps run, then the track carries on. Without a Jev key, the first branch runs.")
+                .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            FieldLabel("Question", help: "What Jev decides, e.g. how hard the text is to read aloud, or what it's about.") {
+                VPTextField("What should Jev decide about the text?", text: Binding { question ?? "" } set: {
+                    kind = .branch(question: $0.isEmpty ? nil : $0, branches: branches)
+                }, axis: .vertical).focusKey("question")
+            }
+            ForEach(Array(branches.enumerated()), id: \.element.id) { index, branch in
+                BranchEditor(index: index, branch: Binding {
+                    branches[index]
+                } set: { updated in
+                    var all = branches
+                    all[index] = updated
+                    kind = .branch(question: question, branches: all)
+                }, speaker: speaker, onDelete: branches.count > 1 ? {
+                    kind = .branch(question: question, branches: branches.filter { $0.id != branch.id })
+                } : nil)
+            }
+            Button("+ Add branch") {
+                kind = .branch(question: question, branches: branches + [Branch(name: "branch \(branches.count + 1)", when: "", steps: [])])
             }
             .buttonStyle(.vpGhost).padding(.leading, -8)
 

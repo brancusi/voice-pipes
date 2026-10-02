@@ -168,7 +168,7 @@ extension AppState {
     private func statusData() -> [String: Any] {
         let parakeet: String = switch parakeetState {
         case .ready: "loaded"
-        case .loading: parakeetProgress.map { "downloading \(Int($0 * 100))%" } ?? "loading"
+        case .loading: ModelDownloads.shared.status[.parakeet].map { $0.preparing ? "preparing" : "downloading \(Int($0.fraction * 100))%" } ?? "loading"
         case .notLoaded: "not loaded"
         case .failed(let e): "failed: \(e)"
         }

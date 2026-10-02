@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.7.0**
+- **Branches: one track, several paths.** The new **Branch · Jev** block asks Jev a question about the text, like "how hard is this to read aloud?" or "what is this about?", and runs the matching branch's own steps (any blocks, even another branch) before the track carries on. You decide what each branch does, right in the editor; Jev picks in about a third of a second.
+- **Read aloud handles tricky text.** It now starts with a branch: plain prose is read as it is; text with numbers, prices or dates is first spelled out by a fast model (about 0.6 s), so "$4.2M" is read as "four point two million dollars"; code, file paths, URLs and tables are rewritten into sentences you can follow by ear. Want a different voice for the hard stuff? Add a Speak block to that branch. (New installs get this; to switch your existing Read aloud, add a Branch block, or ask your agent to.)
+- **Download progress you can trust.** The model downloads in setup and in Setup → On this Mac now show a steady bar with "212 / 483 MB · 11 MB/s", then "preparing for this Mac…" while the model compiles. No more flickering, and the sizes shown are the real ones.
+
 **1.6.5**
 - **Click a sentence to jump there.** In the HUD's follow-along card, click any sentence and reading carries on from it, with any voice. Handy when an agent reads you a long summary: skip ahead to the part you care about, or go back over something you missed.
 - **A running word cursor.** A thin underline moves along under the word being spoken, and the part of the sentence already read is a touch brighter. It's exact with macOS voices and closely estimated with the others.

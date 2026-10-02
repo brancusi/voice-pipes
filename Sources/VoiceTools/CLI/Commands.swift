@@ -160,11 +160,25 @@ enum VPCommands {
             ("name", .string(track.name)),
             ("enabled", .bool(track.enabled)),
             ("hotkeys", .list(track.triggers.map { .string("\(KeyNames.format($0.combo)) \($0.mode == .hold ? "hold" : "toggle")") })),
-            ("steps", .table(["n", "block", "takes", "gives"], track.steps.enumerated().map { i, step in
-                [.int(i + 1), .string(out.trim(step.kind.title, 80)), .string(step.kind.input.rawValue), .string(step.kind.output.rawValue)]
-            })),
+            ("steps", .table(["n", "block", "takes", "gives"], stepRows(track.steps, prefix: "", out: out))),
             ("takes_text", .bool(track.steps.contains { $0.kind.input == .text })),
         ])
+    }
+
+    /// A row per step; a Branch's branches and their steps follow it, numbered 2.easy, 2.medium.1, …
+    static func stepRows(_ steps: [Step], prefix: String, out: Output) -> [[Out]] {
+        steps.enumerated().flatMap { i, step -> [[Out]] in
+            let n = prefix + "\(i + 1)"
+            var rows: [[Out]] = [[.string(n), .string(out.trim(step.kind.title, 80)), .string(step.kind.input.rawValue), .string(step.kind.output.rawValue)]]
+            if case .branch(_, let branches) = step.kind {
+                for branch in branches {
+                    rows.append([.string("\(n).\(branch.name)"), .string(branch.steps.isEmpty ? "branch · passes the text through" : "branch · " + out.trim(branch.when, 60)),
+                                 .string("text"), .string((branch.steps.last?.kind.output ?? .text).rawValue)])
+                    rows += stepRows(branch.steps, prefix: "\(n).\(branch.name).", out: out)
+                }
+            }
+            return rows
+        }
     }
 
     static func findTrack(_ tracks: [Track], _ id: String) throws -> Track {

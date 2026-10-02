@@ -37,7 +37,7 @@ build tracks in **Open Voice Pipes… → Tracks**. Three come by default:
 |---|---|---|
 | Fast dictation | ⌥ Space, hold | Mic → Transcribe (Parakeet v3, on this Mac) → Fix words → Paste |
 | Clean dictation | ⌥ ⇧ Space, toggle | Mic → Transcribe (MAI-Transcribe-2) → Fix words → LLM (Claude Haiku cleanup) → Paste |
-| Read aloud | ⌥ R, toggle | Text (selection → page → clipboard) → Speak (Pocket TTS) |
+| Read aloud | ⌥ R, toggle | Text (selection → page → clipboard) → Branch · Jev (easy / medium / hard) → Speak (Pocket TTS) |
 
 Click a track in the menu bar panel to run it once without its hotkey. **Run now** in the editor does the same.
 
@@ -66,6 +66,7 @@ to reorder the pipeline.
 | **Fix words** | text → text | Instant find-and-replace from your **Vocabulary** (below). |
 | **LLM** | text → text | Any OpenRouter language model with your instructions. `{{input}}` in the instructions places the text; otherwise the text is sent as the user message. Your Vocabulary is added as a glossary. **If this step fails**: pass the input through, or stop. |
 | **Route · Jev** | text → text | Jev reads the text and picks one of your **routes** (about 0.3 s); that route's model answers with that route's instructions, like an LLM step. Each route has a name, a **Use when…** description (what Jev chooses by), a model and instructions. Starts with *quick* (Claude Haiku 4.5), *web* (Perplexity Sonar) and *deep* (Claude Sonnet 5.5). The HUD and Activity show the pick, e.g. `Jev 260 ms → web 100% · sonar`. Without a Jev key, the first route answers. |
+| **Branch · Jev** | text → what the branches give | Jev answers your **question** about the text (about 0.3 s) and picks one **branch** by its **Use when…** description; that branch's own steps run (any blocks, even another branch), then the track carries on. A branch with no steps passes the text through. If branches end differently (one speaks, another gives text), the Branch must be the last block. Without a Jev key, the first branch runs. History lists the pick and each step the branch ran. |
 | **HTTP request** | text → text | GET/POST/PUT/PATCH anywhere. `{{input}}` (URL-encoded in the URL) or `{{input_json}}` (a JSON string) in the URL or body; optional dotted path into a JSON response, e.g. `data.text`. |
 | **Text template** | text → text | `{{input}}` / `{{input_json}}` substitution. |
 | **Paste at cursor** | text → text | Pastes into the focused app with ⌘V, then restores your clipboard (optional). Waits for you to let go of the trigger's modifier keys first. |
@@ -74,6 +75,13 @@ to reorder the pipeline.
 | **Show in HUD** | text → text | Shows the text for a few seconds. |
 
 Output blocks pass their text on, so a track can paste *and* POST, for example.
+
+**Branching.** A Branch block turns a straight pipeline into a fork. Read aloud starts with one: Jev asks *"How
+hard is this text for a text-to-speech voice to read aloud correctly?"* and picks **easy** (read as it is),
+**medium** (a fast model, Gemini Flash-Lite, first spells out numbers, prices and dates, about 0.6 s) or **hard**
+(Claude Haiku rewrites code, paths, URLs, markdown and tables into speakable sentences). Change any of it: give a
+branch a cloud voice of its own, add a branch, or ask a different question (what the text is about, its
+language, how long it is) and send each kind somewhere else.
 
 ### Choosing models
 

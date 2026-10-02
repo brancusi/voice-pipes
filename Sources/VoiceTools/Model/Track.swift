@@ -114,6 +114,9 @@ enum StepKind: Codable, Hashable {
     case llm(model: String, prompt: String, onFailure: FailurePolicy)
     /// Jev chooses one of the routes for the input; that route's model and instructions produce the output.
     case route(routes: [Route])
+    /// Jev answers `question` about the text and picks a branch; that branch's own steps run, then the track
+    /// carries on with what it produced. A branch with no steps passes the text through.
+    case branch(question: String?, branches: [Branch])
     case http(url: String, method: String, headers: [String: String], bodyTemplate: String, responseField: String)
     case template(String)
     /// Find-and-replace from the shared vocabulary (Voice Pipes → Vocabulary).
@@ -131,7 +134,7 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .route, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
+        case .llm, .route, .branch, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
         }
     }
 
@@ -142,6 +145,10 @@ enum StepKind: Codable, Hashable {
         // Outputs pass their text through so a track can, e.g., paste and then POST.
         case .paste, .copy, .showHUD: .text
         case .speak, .openRouterSpeech, .localSpeech: .none
+        // What every branch ends with (text if a branch has no steps); `none` when they differ.
+        case .branch(_, let branches):
+            Set(branches.map { $0.steps.last?.kind.output ?? .text }).count == 1
+                ? branches.first?.steps.last?.kind.output ?? .text : .none
         }
     }
 
@@ -149,7 +156,7 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
-        case .llm, .route, .http, .template, .fixWords: "Transform"
+        case .llm, .route, .branch, .http, .template, .fixWords: "Transform"
         case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: "Output"
         }
     }
@@ -167,6 +174,7 @@ enum StepKind: Codable, Hashable {
         case .openRouterSTT(let model): model
         case .llm(let model, _, _): "LLM · \(model)"
         case .route(let routes): "Route · Jev · " + routes.map(\.name).joined(separator: " / ")
+        case .branch(_, let branches): "Branch · Jev · " + branches.map(\.name).joined(separator: " / ")
         case .http(let url, let method, _, _, _): "\(method) \(URL(string: url)?.host ?? url)"
         case .template: "Text template"
         case .fixWords: "Fix words"
@@ -189,6 +197,7 @@ enum StepKind: Codable, Hashable {
         case .openRouterSTT(let model): model.split(separator: "/").last.map(String.init) ?? model
         case .llm(let model, _, _): model.split(separator: "/").last.map(String.init) ?? model
         case .route: "Jev route"
+        case .branch: "Jev branch"
         case .http(_, let method, _, _, _): method
         case .template: "Template"
         case .fixWords: "Fix words"
@@ -211,6 +220,7 @@ enum StepKind: Codable, Hashable {
         case .speak, .openRouterSpeech, .localSpeech: "Speak"
         case .llm: "LLM · OpenRouter"
         case .route: "Route · Jev"
+        case .branch: "Branch · Jev"
         default: title
         }
     }
@@ -222,6 +232,7 @@ enum StepKind: Codable, Hashable {
         .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
         .route(routes: Route.answerRoutes),
+        .branch(question: Branch.starterQuestion, branches: Branch.starters),
         .http(url: "https://", method: "POST", headers: ["Content-Type": "application/json"],
               bodyTemplate: #"{"text": {{input_json}}}"#, responseField: ""),
         .fixWords,
@@ -238,8 +249,32 @@ extension Track {
     var validationError: String? {
         guard let first = steps.first else { return "Add at least one step." }
         if first.kind.input != .none { return "The first step must be an input." }
-        for step in steps {
-            if case .route(let routes) = step.kind, routes.isEmpty { return "Route · Jev needs at least one route." }
+        return Self.chainError(steps)
+    }
+
+    /// Type checks a run of steps (a track's, or a branch's, which starts from text), branches included.
+    static func chainError(_ steps: [Step], from input: DataKind? = nil) -> String? {
+        if let input, let first = steps.first, first.kind.input != input {
+            return "\(first.kind.title) needs \(first.kind.input.rawValue), but the branch gets \(input.rawValue)."
+        }
+        for (i, step) in steps.enumerated() {
+            switch step.kind {
+            case .route(let routes) where routes.isEmpty:
+                return "Route · Jev needs at least one route."
+            case .branch(_, let branches):
+                if branches.isEmpty { return "Branch · Jev needs at least one branch." }
+                for branch in branches {
+                    if let input = branch.steps.first(where: { $0.kind.input == .none }) {
+                        return "\(branch.name): \(input.kind.blockTitle) can only start a track, not a branch."
+                    }
+                    if let error = chainError(branch.steps, from: .text) { return "\(branch.name): \(error)" }
+                }
+                if i < steps.count - 1, Set(branches.map { $0.steps.last?.kind.output ?? .text }).count > 1 {
+                    return "The branches end differently (some speak, some give text), so nothing can follow them: put the next steps inside each branch."
+                }
+            default:
+                break
+            }
         }
         for (a, b) in zip(steps, steps.dropFirst()) where a.kind.output != b.kind.input {
             return "\(b.kind.title) needs \(b.kind.input.rawValue), but \(a.kind.title) produces \(a.kind.output.rawValue)."
@@ -266,7 +301,43 @@ extension Track {
         Track(name: "Read aloud", colorHex: "#C3A3D4",
               triggers: [Trigger(combo: KeyCombo(key: .r, modifiers: [.option]), mode: .toggle)],
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
+                      Step(kind: .branch(question: Branch.starterQuestion, branches: Branch.starters)),
                       Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))]),
+    ]
+}
+
+/// One way through a Branch block: what Jev chooses it by, and the steps it runs.
+struct Branch: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var name: String
+    var when: String
+    var steps: [Step]
+
+    static let starterQuestion = "How hard is this text for a text-to-speech voice to read aloud correctly?"
+
+    static let speakablePrompt = """
+        Rewrite the text so a text-to-speech voice reads it naturally. Spell out symbols, currency, percentages, \
+        units, dates, times and abbreviations as spoken words. Keep the wording and meaning otherwise. Output only \
+        the rewritten text.
+        """
+
+    static let describePrompt = """
+        Rewrite the text so it can be read aloud and understood by ear. Spell out symbols, numbers, units, dates and \
+        abbreviations as spoken words; say commands, file paths and URLs the way a person would say them (or name \
+        them briefly when long); turn markdown, lists and tables into plain spoken sentences; describe code briefly \
+        instead of reading it character by character. Keep the meaning. Output only the rewritten text.
+        """
+
+    /// Read aloud's starter: plain text as it is; some figures rewritten by a fast model; technical text rewritten
+    /// by a stronger one. Jev decides in about 0.3 s (measured 8/8 on sample texts).
+    static let starters: [Branch] = [
+        Branch(name: "easy", when: "Plain prose: ordinary words and sentences that any voice reads correctly as written.", steps: []),
+        Branch(name: "medium",
+               when: "Mostly prose with a few things a voice may misread: some numbers, times, prices, dates, units or common abbreviations.",
+               steps: [Step(kind: .llm(model: "google/gemini-2.5-flash-lite", prompt: speakablePrompt, onFailure: .passThrough))]),
+        Branch(name: "hard",
+               when: "Dense or technical: code, commands, file paths, URLs, markdown, lists or tables, or many figures, symbols and acronyms.",
+               steps: [Step(kind: .llm(model: "anthropic/claude-haiku-4.5", prompt: describePrompt, onFailure: .passThrough))]),
     ]
 }
 
@@ -341,7 +412,38 @@ enum LocalVoiceEngine: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+extension Step {
+    /// This step and, for a Branch, every step inside it (any depth).
+    var flattened: [Step] {
+        if case .branch(_, let branches) = kind { return [self] + branches.flatMap { $0.steps.flatMap(\.flattened) } }
+        return [self]
+    }
+}
+
+extension Track {
+    /// Every step, including those inside branches: for checks such as "uses OpenRouter".
+    var allSteps: [Step] { steps.flatMap(\.flattened) }
+}
+
 extension StepKind {
+    /// The same settings with in-app identities (routes, branches, their steps) blanked: what the file stores.
+    var normalized: StepKind {
+        let blank = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+        switch self {
+        case .route(let routes):
+            return .route(routes: routes.map { var r = $0; r.id = blank; return r })
+        case .branch(let question, let branches):
+            return .branch(question: question, branches: branches.map { branch in
+                var b = branch
+                b.id = blank
+                b.steps = branch.steps.map { Step(id: blank, kind: $0.kind.normalized) }
+                return b
+            })
+        default:
+            return self
+        }
+    }
+
     /// A Route step's routes, else nil.
     var routes: [Route]? {
         if case .route(let routes) = self { routes } else { nil }
@@ -353,10 +455,7 @@ extension StepKind {
     }
 
     /// Equal settings, ignoring the routes' in-app identities (which the config file doesn't carry).
-    func sameSettings(as other: StepKind) -> Bool {
-        guard let mine = routes, let theirs = other.routes else { return self == other }
-        return mine.map { [$0.name, $0.when, $0.model, $0.prompt] } == theirs.map { [$0.name, $0.when, $0.model, $0.prompt] }
-    }
+    func sameSettings(as other: StepKind) -> Bool { normalized == other.normalized }
 }
 
 extension Track {
@@ -403,13 +502,37 @@ extension Track {
     }
 
     private mutating func adopt(old: Step, into i: Int) {
-        steps[i].id = old.id
-        guard var routes = steps[i].kind.routes, let oldRoutes = old.kind.routes else { return }
-        var unused = oldRoutes
-        for r in routes.indices {
-            let j = unused.firstIndex { $0.name == routes[r].name } ?? (unused.isEmpty ? nil : 0)
-            if let j { routes[r].id = unused.remove(at: j).id }
+        steps[i] = Self.adopting(steps[i], from: old)
+    }
+
+    /// `step` with `old`'s identity, and its routes' and branches' (by name, else in order), branches' steps by
+    /// position when they're the same block: an open editor keeps what it had open.
+    private static func adopting(_ step: Step, from old: Step) -> Step {
+        var step = step
+        step.id = old.id
+        switch (step.kind, old.kind) {
+        case (.route(var routes), .route(let oldRoutes)):
+            var unused = oldRoutes
+            for r in routes.indices {
+                let j = unused.firstIndex { $0.name == routes[r].name } ?? (unused.isEmpty ? nil : 0)
+                if let j { routes[r].id = unused.remove(at: j).id }
+            }
+            step.kind = .route(routes: routes)
+        case (.branch(let question, var branches), .branch(_, let oldBranches)):
+            var unused = oldBranches
+            for b in branches.indices {
+                guard let j = unused.firstIndex(where: { $0.name == branches[b].name }) ?? (unused.isEmpty ? nil : 0) else { continue }
+                let previous = unused.remove(at: j)
+                branches[b].id = previous.id
+                for k in branches[b].steps.indices where previous.steps.indices.contains(k)
+                    && previous.steps[k].kind.caseName == branches[b].steps[k].kind.caseName {
+                    branches[b].steps[k] = adopting(branches[b].steps[k], from: previous.steps[k])
+                }
+            }
+            step.kind = .branch(question: question, branches: branches)
+        default:
+            break
         }
-        steps[i].kind = .route(routes: routes)
+        return step
     }
 }

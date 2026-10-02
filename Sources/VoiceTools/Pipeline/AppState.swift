@@ -37,6 +37,8 @@ struct ActiveRun {
     /// Total processing time, set when the run finishes.
     var totalMs: Int?
     var heldBy: String?
+    /// Branch blocks (by step index): Jev's time, and the chosen branch's steps with their times, for History.
+    var branchDetail: [Int: (jevMs: Int, steps: [RunRecord.StepTiming])] = [:]
 }
 
 @MainActor
@@ -96,7 +98,6 @@ final class AppState {
     /// `startServices: false` builds the state without hotkeys, the HUD, the microphone or models (for rendering
     /// screens offscreen in a scratch harness).
     /// Parakeet's first download, 0…1 (nil when it isn't downloading).
-    private(set) var parakeetProgress: Double?
     /// Show the setup window: a first launch, or a permission is missing and setup was never finished.
     let needsOnboarding: Bool
 
@@ -183,7 +184,7 @@ final class AppState {
             }
         }
         // Load on-device voices that enabled tracks use, so the first read-aloud doesn't wait for it.
-        let engines = Set(store.tracks.filter(\.enabled).flatMap(\.steps).compactMap { step -> LocalVoiceEngine? in
+        let engines = Set(store.tracks.filter(\.enabled).flatMap(\.allSteps).compactMap { step -> LocalVoiceEngine? in
             if case .localSpeech(let engine, _, _) = step.kind { engine } else { nil }
         })
         for engine in engines { Task { try? await LocalVoices.shared.prepare(engine) } }
@@ -192,14 +193,12 @@ final class AppState {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
             if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
         }
-        if store.tracks.contains(where: { $0.steps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
+        if store.tracks.contains(where: { $0.allSteps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
             parakeetState = .loading
             refreshChecks()
-            await parakeet.setProgressHandler { fraction in
-                Task { @MainActor [weak self] in self?.parakeetProgress = fraction < 1 ? fraction : nil }
-            }
+            ModelDownloads.shared.track(.parakeet)
             await parakeet.load()
-            parakeetProgress = nil
+            ModelDownloads.shared.finish(.parakeet)
             parakeetState = await parakeet.state
         }
         refreshChecks()
@@ -407,7 +406,7 @@ final class AppState {
                 live = StreamingTranscriber(parakeet: parakeet, onPartial: showPartial)
             }
         }
-        if track.steps.contains(where: \.kind.usesOpenRouter) { OpenRouterClient.shared.prewarm() }
+        if track.allSteps.contains(where: \.kind.usesOpenRouter) { OpenRouterClient.shared.prewarm() }
 
         recorder.onSamples = live.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
         recorder.onLevel = { [weak self] level in
@@ -502,7 +501,9 @@ final class AppState {
                     return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
                 }
             }
-            setStepMs(index, Int(Date().timeIntervalSince(t0) * 1000), for: track)
+            // A Branch's own time is Jev's; the steps it ran are listed after it with theirs.
+            let jevMs = run?.trackID == track.id ? run?.branchDetail[index]?.jevMs : nil
+            setStepMs(index, jevMs ?? Int(Date().timeIntervalSince(t0) * 1000), for: track)
             if let text = payload.text {
                 run?.liveText = text
                 if step.kind.category == "Transcribe" { heard = text }
@@ -527,17 +528,18 @@ final class AppState {
     private func record(_ track: Track, startedAt: Date, heard: String?, failure: String?) -> Int {
         let total = Int(Date().timeIntervalSince(startedAt) * 1000)
         guard let text = run?.liveText, !text.isEmpty, run?.trackID == track.id else { return total }
-        let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().compactMap { index, pair -> RunRecord.StepTiming? in
+        let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().flatMap { index, pair -> [RunRecord.StepTiming] in
             // The microphone's time is how long you spoke, not processing.
-            guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return nil }
-            return RunRecord.StepTiming(title: pair.0, ms: ms, category: track.steps[safe: index]?.kind.category)
+            guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return [] }
+            return [RunRecord.StepTiming(title: pair.0, ms: ms, category: track.steps[safe: index]?.kind.category)]
+                + (run?.branchDetail[index]?.steps ?? [])
         }
         historyStore.add(RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
                                    heard: heard == text ? nil : heard, failure: failure))
         return total
     }
 
-    private func execute(_ kind: StepKind, payload: Payload, track: Track) async throws -> Payload {
+    private func execute(_ kind: StepKind, payload: Payload, track: Track, nested: Bool = false) async throws -> Payload {
         switch kind {
         case .microphone:
             throw PipelineError.misplacedInput
@@ -587,6 +589,48 @@ final class AppState {
                 run?.modelInfo = "\(route.name) → \(model) · " + (jevMs.map { "Jev \($0) ms \(Int(confidence * 100))%" } ?? "Jev failed")
             }
             return .text(try await complete(model: route.model, prompt: route.prompt, input: input))
+
+        case .branch(let question, let branches):
+            let input = try text(of: payload)
+            guard !branches.isEmpty else { throw PipelineError.noBranches }
+            let t0 = Date()
+            var chosen = 0
+            var confidence: Double?
+            do {
+                let pick = try await JevClient.shared.choose(input: input, question: question, options: branches.map { ($0.name, $0.when) })
+                chosen = pick.index
+                confidence = pick.probability
+            } catch {
+                // Without Jev the first branch runs, so the track keeps working.
+                NSLog("VoiceTools: Jev branching failed, taking the first branch: \(error)")
+            }
+            let jevMs = Int(Date().timeIntervalSince(t0) * 1000)
+            let branch = branches[chosen]
+            let pick = confidence.map { "Jev \(jevMs) ms → \(branch.name) \(Int($0 * 100))%" } ?? "Jev failed → \(branch.name)"
+            let index = run?.currentStep ?? 0
+            if !nested, run?.trackID == track.id, index < (run?.stepTitles.count ?? 0) {
+                run?.stepTitles[index] = "Branch · \(pick)"
+                run?.modelInfo = pick
+                run?.branchDetail[index] = (jevMs, [])
+            }
+            // The branch's steps, as a little track of their own (an LLM that fails can pass its input through).
+            var current: Payload = .text(input)
+            for step in branch.steps {
+                let s0 = Date()
+                do {
+                    current = try await execute(step.kind, payload: current, track: track, nested: true)
+                } catch {
+                    guard case .llm(_, _, .passThrough) = step.kind else { throw error }
+                    NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
+                }
+                if !nested, run?.trackID == track.id {
+                    run?.branchDetail[index]?.steps.append(RunRecord.StepTiming(title: "\(branch.name) › \(step.kind.title)",
+                                                                              ms: Int(Date().timeIntervalSince(s0) * 1000),
+                                                                              category: step.kind.category))
+                }
+                if let text = current.text { run?.liveText = text }
+            }
+            return current
 
         case .http(let url, let method, let headers, let body, let field):
             return .text(try await HTTPStep.run(input: try text(of: payload), url: url, method: method,
@@ -679,6 +723,7 @@ enum PipelineError: LocalizedError {
     case noText
     case expected(DataKind)
     case noRoutes
+    case noBranches
 
     var errorDescription: String? {
         switch self {
@@ -686,6 +731,7 @@ enum PipelineError: LocalizedError {
         case .noText: "No text found (nothing selected and clipboard empty)."
         case .expected(let kind): "This step expected \(kind.rawValue) input."
         case .noRoutes: "Route · Jev needs at least one route."
+        case .noBranches: "Branch · Jev needs at least one branch."
         }
     }
 }

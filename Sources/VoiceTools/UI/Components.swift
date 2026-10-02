@@ -366,3 +366,31 @@ struct WranglerEmptyState: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+/// A model's download: a thin bar that only moves forward, with "212 / 483 MB · 11 MB/s" (or "preparing for this
+/// Mac…" while it compiles). Same height from start to finish, so the row never jumps.
+struct ModelLoadBar: View {
+    let status: ModelDownloads.Status?
+
+    var body: some View {
+        let fraction = status?.fraction ?? 0
+        let preparing = status?.preparing ?? false
+        VStack(alignment: .leading, spacing: 4) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2).fill(Palette.bg300)
+                    RoundedRectangle(cornerRadius: 2).fill(preparing ? Palette.purple : Palette.cyan)
+                        .frame(width: max(4, geo.size.width * fraction))
+                        .animation(.linear(duration: 0.3), value: fraction)
+                }
+            }
+            .frame(height: 4)
+            Text(status?.label ?? "starting…")
+                .font(.system(size: 11, design: .monospaced)).monospacedDigit()
+                .foregroundStyle(Palette.fgMuted).lineLimit(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(preparing ? "Preparing" : "Downloading")
+        .accessibilityValue("\(Int(fraction * 100)) percent")
+    }
+}

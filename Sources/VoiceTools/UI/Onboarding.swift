@@ -168,9 +168,9 @@ struct OnboardingView: View {
             Card {
                 parakeetRow
                 Hairline()
-                voiceRow(.pocket, detail: "read aloud · 26 voices · 770 MB", optional: false)
+                voiceRow(.pocket, detail: "read aloud · 26 voices · 530 MB", optional: false)
                 Hairline()
-                voiceRow(.supertonic, detail: "faster voices · 100 MB · optional", optional: true)
+                voiceRow(.supertonic, detail: "faster voices · 170 MB · optional", optional: true)
             }
         case .keys:
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -323,7 +323,7 @@ struct OnboardingView: View {
         let (code, color, trailing): (String, Color, String) = switch app.parakeetState {
         case .ready: ("OK", Palette.green, "✓ Loaded")
         case .failed: ("FAIL", Palette.red, "failed: retry from Setup")
-        case .loading: ("PROC", Palette.yellow, app.parakeetProgress.map { "\(Int($0 * 460)) / 460 MB" } ?? "loading…")
+        case .loading: ("PROC", Palette.yellow, "")
         case .notLoaded: ("INFO", Palette.cyan, "waiting")
         }
         return HStack(spacing: 14) {
@@ -331,21 +331,13 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("Parakeet v3").font(VPFont.bodyStrong)
-                    Text("transcription · needed for Fast dictation").font(.system(size: 12, design: .monospaced))
+                    Text("transcription · 480 MB · needed for Fast dictation").font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(Palette.fgMuted).lineLimit(1)
                     Spacer(minLength: 8)
                     Text(trailing).font(.system(size: 12, design: .monospaced)).monospacedDigit()
                         .foregroundStyle(app.parakeetState == .ready ? Palette.green : Palette.fgMuted)
                 }
-                if let progress = app.parakeetProgress {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 2).fill(Palette.bg300)
-                            RoundedRectangle(cornerRadius: 2).fill(Palette.cyan).frame(width: geo.size.width * progress)
-                        }
-                    }
-                    .frame(height: 4)
-                }
+                if app.parakeetState == .loading { ModelLoadBar(status: ModelDownloads.shared.status[.parakeet]) }
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
@@ -361,16 +353,19 @@ struct OnboardingView: View {
         }
         return HStack(spacing: 14) {
             Text(code).font(VPFont.label).tracking(0.9).foregroundStyle(color).frame(width: 44, alignment: .leading)
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(engine.label).font(VPFont.bodyStrong)
-                Text(detail).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted).lineLimit(1)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(engine.label).font(VPFont.bodyStrong)
+                    Text(detail).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted).lineLimit(1)
+                }
+                if state == .loading { ModelLoadBar(status: ModelDownloads.shared.status[.init(engine)]) }
             }
             Spacer(minLength: 8)
             switch state {
             case .ready:
                 Text("✓ Loaded").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.green)
             case .loading:
-                Text("downloading…").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+                EmptyView()
             case .failed, .notLoaded:
                 if optional || { if case .failed = state { true } else { false } }() {
                     Button(optional ? "Load" : "Retry") { Task { try? await LocalVoices.shared.prepare(engine) } }

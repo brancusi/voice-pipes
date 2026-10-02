@@ -41,7 +41,7 @@ enum Diagnostics {
                                 fix: .relinkCLI))
         }
         let tracks = app.store.tracks.filter(\.enabled)
-        let steps = tracks.flatMap(\.steps).map(\.kind)
+        let steps = tracks.flatMap(\.allSteps).map(\.kind)
 
         if steps.contains(where: { if case .microphone = $0 { true } else { false } }) {
             switch AVCaptureDevice.authorizationStatus(for: .audio) {

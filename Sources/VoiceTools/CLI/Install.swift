@@ -328,6 +328,33 @@ enum AgentsInstaller {
           `--code <code>` on a machine without a browser. `echo "$KEY" | vp auth set typesafe` for Jev.
         - Never print, echo or log key values.
 
+        ## Branches: let Jev pick the path
+
+        A `branch` block asks Jev a question about the text and runs one branch's own steps, then the track carries
+        on. Use it whenever different inputs need different handling (how hard the text is, what it's about, its
+        language). Each branch: `name`, `when` (what Jev chooses it by), and `[[track.step.branch.step]]` blocks (any
+        type; none passes the text through). If branches end differently (one speaks, one gives text), nothing can
+        follow the branch: put the rest inside each branch. `vp tracks show <id>` lists branches as 2.easy, 2.hard.1.
+
+        ```toml
+          [[track.step]]
+          type = "branch"
+          question = "How hard is this text for a text-to-speech voice to read aloud correctly?"
+
+            [[track.step.branch]]
+            name = "easy"
+            when = "Plain prose that any voice reads correctly as written."
+
+            [[track.step.branch]]
+            name = "hard"
+            when = "Code, paths, URLs, markdown, tables, or many figures and symbols."
+
+              [[track.step.branch.step]]
+              type = "llm"
+              model = "anthropic/claude-haiku-4.5"
+              prompt = "Rewrite this so it can be read aloud and understood by ear. Output only the rewritten text."
+        ```
+
         ## Example: a voice-notes track
 
         ```toml

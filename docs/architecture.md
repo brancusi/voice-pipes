@@ -170,3 +170,19 @@ names). Pages report back (expanded step, open routes, focused field, filter, sh
 is opened by clicking the status item's button (`MenuBarPanel`). A config reload keeps step/route/trigger identities
 (`Track.adoptIdentities`) and reports what changed, which `showExternalChanges` turns into flashes and an editor
 request.
+
+## Branches
+
+`StepKind.branch(question:branches:)` holds `[Branch]`, each with its own `[Step]`, so a track is a tree.
+`AppState.execute` asks Jev (`JevClient.choose`) and runs the chosen branch's steps with the same `execute`
+(nested: true keeps the top-level step title and History detail, `ActiveRun.branchDetail`). Output type is the
+branches' common output (`none` when they differ, valid only as the last block); `Track.chainError` type-checks
+branches from text, recursively. Config: `[[track.step.branch]]` / `[[track.step.branch.step]]`, written by
+`ConfigFile.write(_:table:indent:)` recursively. Reloads keep branch and nested step identities
+(`Track.adoptIdentities`); `StepKind.normalized` blanks ids for comparisons. `Track.allSteps` flattens for checks.
+
+## Model download progress
+
+`ModelDownloads` measures each model's folder on disk (FluidAudio streams into `<file>.partial` there) three times
+a second while it loads: a forward-only fraction against measured totals, MB/s, and "preparing" once bytes stop
+near the end. FluidAudio's own progress callbacks restart per internal operation, so they aren't used for the bar.
