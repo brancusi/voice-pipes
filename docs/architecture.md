@@ -30,6 +30,9 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `IO/TextCapture.swift` | Selected text and page text via the Accessibility API. |
 | | `IO/Speaker.swift` | Read-aloud playback for all three engine families, with pause/resume/progress. |
 | UI | `UI/Theme.swift` | The design system in code: `Palette` (Sundown / Daylight, follows the system appearance; the HUD stays dark), `VPFont` (SF Mono scale), button styles, `Keycap`, `SectionLabel`, `vpCard()`, `vpWindow()`, pipeline category colours. Source of truth: the Voice Pipes design system artifact. |
+| | `UI/Components.swift` | Shared design-system pieces: cards, check codes, `VPSegmented`, `VPTextField`, checkboxes, filter chips, the wordmark, `PixelHeadline` (bundled Silkscreen), track palette colours. |
+| | `UI/Wrangler.swift`, `UI/WranglerArt.swift` | The mascot drawn crisp at whole-pixel scales; the art is a generated 20 × 30 grid per pose, converted exactly from the design system's SVGs. |
+| | `UI/AboutView.swift` | The About window: the pixel sundown scene with the Wrangler, version, hotkeys, release notes, updates. |
 | | `UI/MenuView.swift` | The panel (launcher). |
 | | `UI/MainWindow.swift` | Main window: Tracks / History / Vocabulary / Setup; activation-policy switching. |
 | | `UI/TrackEditorView.swift` | Track editor, step rows, per-block configuration, key recorder. |

@@ -119,21 +119,24 @@ struct SetupView: View {
     }
 
     private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let choice = Binding<AppearanceChoice> {
+            AppearanceChoice(rawValue: appearance) ?? .auto
+        } set: { appearance = $0.rawValue }
+        return VStack(alignment: .leading, spacing: 6) {
             SectionLabel("Appearance")
             Card {
-                HStack(spacing: 14) {
-                    Picker("Appearance", selection: $appearance) {
-                        ForEach(AppearanceChoice.allCases) { Text($0.label).tag($0.rawValue) }
+                HStack(alignment: .center, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        VPSegmented(selection: choice, options: AppearanceChoice.allCases.map { ($0, $0.label) })
+                        Text(choice.wrappedValue.detail + " The HUD stays dark.")
+                            .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 280)
-                    Text((AppearanceChoice(rawValue: appearance) ?? .auto).detail)
-                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                    Spacer()
+                    Spacer(minLength: 0)
+                    ThemeSwatch(name: "Daylight", dark: false, selected: choice.wrappedValue == .daylight) { choice.wrappedValue = .daylight }
+                    ThemeSwatch(name: "Sundown", dark: true, selected: choice.wrappedValue == .sundown) { choice.wrappedValue = .sundown }
                 }
-                .padding(14)
+                .padding(16)
             }
         }
         .onChange(of: appearance) { _, value in AppearanceChoice.apply(AppearanceChoice(rawValue: value) ?? .auto) }
@@ -147,7 +150,7 @@ struct SetupView: View {
                     StatusCode(level: updates.enabled ? .ok : .info)
                     Text("Voice Pipes \(updates.version)")
                     Spacer()
-                    Text(updates.enabled ? "checks every few minutes" : "updates are off in this build")
+                    Text(updates.enabled ? "signed, notarized · checks every few minutes" : "updates are off in this build")
                         .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     Button("Check now") { updates.check() }.buttonStyle(.vpSecondary).disabled(!updates.enabled)
                 }
@@ -172,7 +175,7 @@ struct SetupView: View {
         guard !catalog.models.isEmpty else { return "Models not loaded" }
         let text = catalog.models(for: .text).count, stt = catalog.models(for: .transcription).count
         let speech = catalog.models(for: .speech).count
-        let when = catalog.updated.map { " · updated \($0.formatted(.relative(presentation: .named)))" } ?? ""
+        let when = catalog.updated.map { " · updated \($0.shortAgo)" } ?? ""
         return "\(text) language · \(stt) transcription · \(speech) speech models\(when)"
     }
 
@@ -209,31 +212,6 @@ struct SetupView: View {
         case .warning: "WARN"
         case .problem: "FAIL"
         }
-    }
-}
-
-/// A bg-200 card whose rows stack edge to edge.
-private struct Card<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) { content }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .vpCard()
-    }
-}
-
-private struct Hairline: View {
-    var body: some View { Rectangle().fill(Palette.line).frame(height: 1) }
-}
-
-/// `OK`, `INFO`, `WARN`, `FAIL` in the level's colour, in a fixed-width column.
-private struct StatusCode: View {
-    let level: Check.Level
-
-    var body: some View {
-        Text(SetupView.code(level)).font(VPFont.label).tracking(0.9)
-            .foregroundStyle(MenuView.color(level)).frame(width: 40, alignment: .leading)
     }
 }
 
@@ -322,5 +300,34 @@ private struct KeyField: View {
         guard !key.isEmpty else { return }
         save(key)
         focused = false
+    }
+}
+
+/// A small preview of a theme: its window ground, a line of text, a hairline and the accent. Clicking it picks it.
+private struct ThemeSwatch: View {
+    let name: String
+    let dark: Bool
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Rectangle().fill(Color(hex: dark ? 0xF0E4CC : 0x2A211B)).frame(width: 45, height: 6)
+                    Rectangle().fill(Color(hex: dark ? 0x4A3F35 : 0xD3C2A3)).frame(width: 60, height: 6)
+                    Rectangle().fill(Color(hex: dark ? 0xC3A3D4 : 0x6C4A86)).frame(width: 30, height: 6)
+                }
+                .padding(8)
+                .frame(width: 92, height: 58, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: dark ? 0x1F1A15 : 0xF7EEDC)))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(selected ? Palette.purple : Palette.line, lineWidth: selected ? 2 : 1))
+                Text(name).font(VPFont.caption).foregroundStyle(selected ? Palette.fg : Palette.fgMuted)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(name) theme")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }

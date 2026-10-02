@@ -52,7 +52,7 @@ final class AppState {
     /// The menu bar Wrangler's lasso frame while recording (stepped at 6 fps; still under Reduce Motion).
     private(set) var lassoFrame = 0
     @ObservationIgnored private var lassoTimer: Timer?
-    let historyStore = HistoryStore()
+    let historyStore: HistoryStore
     /// Every run's text, newest first, kept on disk.
     var history: [RunRecord] { historyStore.records }
     private(set) var parakeetState: ParakeetService.State = .notLoaded
@@ -85,12 +85,22 @@ final class AppState {
         let started: Date
     }
 
-    init(store: TrackStore? = nil) {
+    /// `startServices: false` builds the state without hotkeys, the HUD, the microphone or models (for rendering
+    /// screens offscreen in a scratch harness).
+    init(store: TrackStore? = nil, history: HistoryStore? = nil, startServices: Bool = true) {
         self.store = store ?? TrackStore()
+        historyStore = history ?? HistoryStore()
+        guard startServices else { return }
         hud.attach(self)
         observeTracks()
         Task { await prepare() }
     }
+
+    #if SNAPSHOTS
+    /// Harness only: show a run in a given state.
+    func setPreviewRun(_ run: ActiveRun?) { self.run = run }
+    func setPreviewChecks(_ checks: [Check]) { self.checks = checks }
+    #endif
 
     private func prepare() async {
         _ = Clipboard.shared
@@ -171,6 +181,9 @@ final class AppState {
     var worstCheck: Check.Level { checks.map(\.level).max() ?? .ok }
 
     func refreshChecks() {
+        #if SNAPSHOTS
+        return
+        #endif
         guard !checking else {
             recheckPending = true
             return
@@ -409,9 +422,9 @@ final class AppState {
         let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().compactMap { index, pair -> RunRecord.StepTiming? in
             // The microphone's time is how long you spoke, not processing.
             guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return nil }
-            return RunRecord.StepTiming(title: pair.0, ms: ms)
+            return RunRecord.StepTiming(title: pair.0, ms: ms, category: track.steps[safe: index]?.kind.category)
         }
-        historyStore.add(RunRecord(trackName: track.name, date: Date(), text: text, totalMs: total, steps: steps,
+        historyStore.add(RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
                                    heard: heard == text ? nil : heard, failure: failure))
         return total
     }

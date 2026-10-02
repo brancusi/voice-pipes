@@ -20,57 +20,132 @@ struct TrainWordSheet: View {
     @State private var verdicts: [String: Double] = [:]
     @State private var selected: Set<String> = []
     @State private var message: String?
+    @State private var trainedSeconds: Double = 0
 
     private enum Phase { case idle, transcribing, judging }
     private var spelling: String { entry.write.trimmingCharacters(in: .whitespaces) }
     private var busy: Bool { phase != .idle }
 
+    #if SNAPSHOTS
+    /// Harness only: the sheet after a finished training run.
+    static func preview() -> some View {
+        let report = VocabularyTrainer.Report(results: [
+            .init(text: "aram zedickian", count: 38, fromYou: 30, fromVoices: 8, commonWords: false),
+            .init(text: "aaron zadikian", count: 22, fromYou: 20, fromVoices: 2, commonWords: false),
+            .init(text: "a ram zadikyan", count: 17, fromYou: 17, fromVoices: 0, commonWords: false),
+            .init(text: "aaron's attacking", count: 6, fromYou: 6, fromVoices: 0, commonWords: true),
+            .init(text: "erin zadig", count: 1, fromYou: 1, fromVoices: 0, commonWords: false),
+        ], correct: 41, total: 150)
+        let verdicts = ["aram zedickian": 0.97, "aaron zadikian": 0.91, "a ram zadikyan": 0.88, "aaron's attacking": 0.04, "erin zadig": 0.52]
+        return TrainWordSheet(parakeet: ParakeetService(), entry: .constant(VocabularyEntry(write: "Aram Zadikian", heardAs: [])),
+                              preview: (report, verdicts, 5, 4.8))
+    }
+
+    init(parakeet: ParakeetService, entry: Binding<VocabularyEntry>,
+         preview: (VocabularyTrainer.Report, [String: Double], Int, Double)) {
+        self.parakeet = parakeet
+        _entry = entry
+        _report = State(initialValue: preview.0)
+        _verdicts = State(initialValue: preview.1)
+        _takes = State(initialValue: Array(repeating: [], count: preview.2))
+        _trainedSeconds = State(initialValue: preview.3)
+        _selected = State(initialValue: Set(preview.1.filter { $0.value >= 0.6 }.map(\.key)))
+    }
+    #endif
+
+    init(parakeet: ParakeetService, entry: Binding<VocabularyEntry>) {
+        self.parakeet = parakeet
+        _entry = entry
+    }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let report {
+                successCard(report)
+                results(report)
+            } else {
+                setup
+            }
+            if let message { Text(message).font(VPFont.caption).foregroundStyle(Palette.orange) }
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                Text(report == nil ? "" : JevClient.hasKey || !verdicts.isEmpty ? "60% or more from Jev is pre-ticked." : "Repeats that aren't ordinary words are pre-ticked.")
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(.vpSecondary).keyboardShortcut(.cancelAction)
+                Button("Add \(selected.count) to Heard as") { add() }
+                    .buttonStyle(.vpPrimary)
+                    .disabled(selected.isEmpty || busy)
+            }
+        }
+        .padding(28)
+        .frame(width: 640)
+        .frame(minHeight: 300)
+        .background(Palette.bg100)
+        .vpWindow()
+        .onDisappear { if recording { _ = recorder.stop() } }
+    }
+
+    /// Before training: what to do, the takes, and the Train button with its progress.
+    private var setup: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Train “\(spelling)”").font(VPFont.title)
-            Text("Click **Start takes** and say it; click **Next take** and say it again — about five times, varying it a little. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
-                .font(.callout).foregroundStyle(.secondary)
+            Text("Click **Start takes** and say it; click **Next take** and say it again, about five times, varying it a little. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
+                .font(VPFont.caption).lineSpacing(2).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
             recordingControls
 
-            Toggle("Also have on-device voices say it (Pocket TTS and Supertonic, 36 voices at two speeds)", isOn: $useVoices)
-                .disabled(busy)
+            HStack(spacing: 8) {
+                VPCheckbox(isOn: $useVoices, label: "Also have on-device voices say it").disabled(busy)
+                Text("Also have on-device voices say it (Pocket TTS and Supertonic, 36 voices at two speeds)")
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    .onTapGesture { if !busy { useVoices.toggle() } }
+            }
 
-            HStack {
+            HStack(spacing: 10) {
                 Button("Train") { train() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.vpPrimary)
                     .disabled(busy || recording || spelling.isEmpty || (takes.isEmpty && !useVoices))
                 switch phase {
                 case .transcribing:
-                    ProgressView(value: Double(done), total: Double(max(total, 1))).frame(width: 200)
-                    Text("\(done) / \(total)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    ProgressBar(value: total > 0 ? Double(done) / Double(total) : 0).frame(width: 200)
+                    Text("\(done) / \(total)").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
                 case .judging:
                     ProgressView().controlSize(.small)
-                    Text("Asking Jev…").font(.caption).foregroundStyle(.secondary)
+                    Text("Asking Jev…").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 case .idle:
                     EmptyView()
                 }
                 Spacer()
             }
-            if let message { Text(message).font(.caption).foregroundStyle(.orange) }
-
-            if let report { results(report) }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Add \(selected.count) to Heard as") { add() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(selected.isEmpty || busy)
-            }
         }
-        .padding(20)
-        .frame(width: 640)
-        .background(Palette.bg100)
-        .vpWindow()
-        .frame(minHeight: 300)
-        .onDisappear { if recording { _ = recorder.stop() } }
+    }
+
+    /// After training: the Wrangler's wink, a flavour headline, and the plain numbers.
+    private func successCard(_ report: VocabularyTrainer.Report) -> some View {
+        HStack(alignment: .center, spacing: 20) {
+            Wrangler(pose: .done, scale: 3)
+            VStack(alignment: .leading, spacing: 6) {
+                PixelHeadline(report.results.isEmpty ? "already broke in" : "roped and branded", size: 20)
+                Text(summary(report)).font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("↻ Record more takes") { self.report = nil; verdicts = [:]; selected = [] }
+                    .buttonStyle(.vpGhost).padding(.leading, -8)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Palette.bg200))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.green, lineWidth: 1))
+    }
+
+    private func summary(_ report: VocabularyTrainer.Report) -> String {
+        var parts = ["“\(spelling)” · \(takes.count) \(takes.count == 1 ? "take" : "takes"), \(report.total) variants in \(String(format: "%.1f", trainedSeconds)) s."]
+        parts.append("Already right in \(report.correct) of \(report.total).")
+        if !verdicts.isEmpty { parts.append("Jev judged \(verdicts.count) \(verdicts.count == 1 ? "result" : "results").") }
+        if report.results.isEmpty { parts.append("Nothing else came out: it's already reliable.") }
+        return parts.joined(separator: " ")
     }
 
     // MARK: - Recording
@@ -78,33 +153,37 @@ struct TrainWordSheet: View {
     private var recordingControls: some View {
         HStack(spacing: 10) {
             if recording {
-                Rectangle().fill(Palette.red).frame(width: 9, height: 9)
-                Text("Take \(takes.count + 1)").font(.callout.monospacedDigit())
+                Rectangle().fill(Palette.red).frame(width: 7, height: 7)
+                Text("REC").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.red)
+                Text("take \(takes.count + 1)").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 LevelBars(level: level)
                 TimelineView(.periodic(from: takeStarted, by: 0.1)) { context in
                     Text(String(format: "%.1fs", context.date.timeIntervalSince(takeStarted)))
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
                 }
-                Button("Next take") { nextTake() }.keyboardShortcut(.space, modifiers: [])
-                Button("Finish") { finishTakes() }.keyboardShortcut(.return, modifiers: [])
+                Spacer()
+                Button("Next take") { nextTake() }.buttonStyle(.vpSecondary).keyboardShortcut(.space, modifiers: [])
+                Button("Finish") { finishTakes() }.buttonStyle(.vpPrimary).keyboardShortcut(.return, modifiers: [])
             } else {
-                Button { startTakes() } label: { Label(takes.isEmpty ? "Start takes" : "Record more takes", systemImage: "mic.circle") }
-                    .controlSize(.large)
+                Button { startTakes() } label: { Label(takes.isEmpty ? "Start takes" : "Record more takes", systemImage: "mic") }
+                    .buttonStyle(.vpSecondary)
                     .disabled(busy)
                 ForEach(takes.indices, id: \.self) { i in
                     HStack(spacing: 4) {
                         Text("\(i + 1) · \(String(format: "%.1f", Double(takes[i].count) / 16_000))s")
-                        Button { takes.remove(at: i) } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.borderless)
+                        Button { takes.remove(at: i) } label: { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)) }
+                            .buttonStyle(.plain).foregroundStyle(Palette.fgMuted)
+                            .help("Remove this take")
                     }
-                    .font(.caption.monospacedDigit())
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
+                    .padding(.horizontal, 6).frame(height: 20)
+                    .background(RoundedRectangle(cornerRadius: 2).fill(Palette.bg300))
                 }
+                Spacer()
             }
-            Spacer()
         }
-        .frame(minHeight: 30)
+        .padding(.horizontal, 12).frame(minHeight: 40)
+        .vpCard()
     }
 
     private func startTakes() {
@@ -152,12 +231,13 @@ struct TrainWordSheet: View {
         message = nil
         let trainer = VocabularyTrainer(parakeet: parakeet, spelling: spelling)
         let takes = takes, useVoices = useVoices, target = spelling
+        let started = Date()
         Task {
             let result = await trainer.run(takes: takes, useVoices: useVoices) { done, total in
                 self.done = done
                 self.total = total
             }
-            report = result
+            trainedSeconds = Date().timeIntervalSince(started)
             if JevClient.hasKey, !result.results.isEmpty {
                 phase = .judging
                 do {
@@ -167,6 +247,7 @@ struct TrainWordSheet: View {
                 }
             }
             preselect(result)
+            report = result
             phase = .idle
         }
     }
@@ -182,38 +263,74 @@ struct TrainWordSheet: View {
     }
 
     @ViewBuilder private func results(_ report: VocabularyTrainer.Report) -> some View {
-        let rate = report.total > 0 ? Int(Double(report.correct) / Double(report.total) * 100) : 0
-        Text("Parakeet got it right \(report.correct) of \(report.total) times (\(rate)%). \(report.results.count) other ways it came out:")
-            .font(.callout)
-        if report.results.isEmpty {
-            Text("Nothing else — it's already reliable.").foregroundStyle(.secondary)
-        } else {
-            List(sortedResults(report)) { result in
-                HStack {
-                    Toggle(isOn: Binding {
-                        selected.contains(result.text)
-                    } set: { on in
-                        if on { selected.insert(result.text) } else { selected.remove(result.text) }
-                    }) {
-                        Text(result.text)
-                    }
+        if !report.results.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    SectionLabel("How it came out")
                     Spacer()
-                    if let p = verdicts[result.text] {
-                        Text("Jev \(Int((p * 100).rounded()))%")
-                            .font(.caption.monospacedDigit().weight(.medium))
-                            .foregroundStyle(p >= 0.6 ? .green : p >= 0.35 ? .orange : .red)
-                            .help(p >= 0.6 ? "Jev thinks this is a garbled version of the word: safe to replace."
-                                  : "Jev thinks this could be something people actually write, so replacing it could change text you meant.")
-                    } else if result.commonWords {
-                        Label("ordinary words", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(.orange)
-                    }
-                    Text(source(result)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                        .frame(width: 110, alignment: .trailing)
+                    SectionLabel("×").frame(width: 40, alignment: .trailing)
+                    SectionLabel("Jev").frame(width: 56, alignment: .trailing)
                 }
+                ScrollView {
+                    Card {
+                        ForEach(Array(sortedResults(report).enumerated()), id: \.element.id) { index, result in
+                            if index > 0 { Hairline() }
+                            resultRow(result)
+                        }
+                    }
+                }
+                .frame(maxHeight: 340)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(minHeight: 200, maxHeight: 340)
         }
+    }
+
+    /// The whole row is one button that ticks the result.
+    private func resultRow(_ result: VocabularyTrainer.Result) -> some View {
+        let on = selected.contains(result.text)
+        return Button {
+            if on { selected.remove(result.text) } else { selected.insert(result.text) }
+        } label: {
+            HStack(spacing: 12) {
+                CheckboxMark(isOn: on)
+                HStack(spacing: 0) {
+                    Text(result.text).foregroundStyle(Palette.fg)
+                    if result.commonWords {
+                        Text(" · ordinary words").font(VPFont.caption).foregroundStyle(Palette.orange)
+                    } else if result.count == 1 {
+                        Text(" · once").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    }
+                }
+                .lineLimit(1)
+                Spacer()
+                Text("\(result.count)").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
+                    .frame(width: 40, alignment: .trailing)
+                Group {
+                    if let p = verdicts[result.text] {
+                        Text("\(Int((p * 100).rounded()))%")
+                            .foregroundStyle(p >= 0.6 ? Palette.green : p >= 0.35 ? Palette.yellow : Palette.orange)
+                    } else {
+                        Text("—").foregroundStyle(Palette.comment)
+                    }
+                }
+                .monospacedDigit()
+                .frame(width: 56, alignment: .trailing)
+            }
+            .padding(.horizontal, 12).frame(minHeight: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(helpText(result))
+        .accessibilityAddTraits(on ? [.isSelected] : [])
+    }
+
+    private func helpText(_ result: VocabularyTrainer.Result) -> String {
+        var text = source(result)
+        if let p = verdicts[result.text] {
+            text += p >= 0.6 ? ". Jev thinks this is a garbled version of the word: safe to replace."
+                : ". Jev thinks this could be something people actually write, so replacing it could change text you meant."
+        }
+        return text
     }
 
     /// Most likely to be safe first when Jev has judged them; otherwise most frequent first.
@@ -242,17 +359,32 @@ struct TrainWordSheet: View {
     }
 }
 
-/// Five bars showing the microphone level, so it's obvious a take is actually being heard.
+/// Eight bars showing the microphone level, so it's obvious a take is actually being heard.
 private struct LevelBars: View {
     let level: Float
 
     var body: some View {
         HStack(alignment: .center, spacing: 2) {
             ForEach(0..<8, id: \.self) { i in
-                Capsule()
-                    .fill(level > Float(i) / 8 ? Color.green : Color.primary.opacity(0.15))
+                Rectangle()
+                    .fill(level > Float(i) / 8 ? Palette.green : Palette.bg300)
                     .frame(width: 3, height: 6 + CGFloat(i % 4) * 3)
             }
         }
+    }
+}
+
+/// A thin progress bar: lavender on leather.
+struct ProgressBar: View {
+    let value: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 2).fill(Palette.bg300)
+                RoundedRectangle(cornerRadius: 2).fill(Palette.purple).frame(width: geo.size.width * min(max(value, 0), 1))
+            }
+        }
+        .frame(height: 4)
     }
 }

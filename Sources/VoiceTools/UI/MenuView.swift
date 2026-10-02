@@ -33,7 +33,7 @@ struct MenuView: View {
         HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Voice Pipes").font(VPFont.title)
+                Wordmark(size: 15, weight: .bold)
                 HStack(spacing: 6) {
                     Rectangle().fill(headline.1).frame(width: 7, height: 7)
                     Text(headline.0).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
@@ -63,7 +63,7 @@ struct MenuView: View {
     private func updateCard(_ version: String) -> some View {
         HStack(spacing: 10) {
             Text("NEW").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.green)
-            Text("Version \(version) is ready").font(VPFont.body)
+            Text("Version \(version) is ready").font(VPFont.body).lineLimit(1).minimumScaleFactor(0.85)
             Spacer()
             Button("Install…") { updates.check() }.buttonStyle(.vpPrimary)
         }
@@ -103,10 +103,12 @@ struct MenuView: View {
             Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
                 .buttonStyle(.vpIcon)
                 .help("Copy a report for troubleshooting")
-            Button { updates.check() } label: { Image(systemName: "arrow.down.circle") }
+            Button {
+                openWindow(id: "about")
+                NSApp.activate(ignoringOtherApps: true)
+            } label: { Image(systemName: "info.circle") }
                 .buttonStyle(.vpIcon)
-                .help(updates.enabled ? "Check for updates (version \(updates.version))" : "Updates are off in this build")
-                .disabled(!updates.enabled)
+                .help("About Voice Pipes \(updates.version)")
             Spacer()
             Button { NSApp.terminate(nil) } label: { Text("Quit").foregroundStyle(Palette.fgMuted) }
                 .buttonStyle(.vpGhost)
@@ -127,7 +129,7 @@ struct MenuView: View {
             ForEach(Array(app.store.tracks.enumerated()), id: \.element.id) { index, track in
                 if index > 0 { Rectangle().fill(Palette.line).frame(height: 1) }
                 Button { app.start(track) } label: {
-                    TrackRow(track: track, playing: app.run?.trackID == track.id)
+                    TrackRow(track: track, state: app.run?.trackID == track.id ? app.run?.phase : nil)
                 }
                 .buttonStyle(.plain)
                 .opacity(track.enabled ? 1 : 0.4)
@@ -218,20 +220,27 @@ struct MenuView: View {
 
 private struct TrackRow: View {
     let track: Track
-    let playing: Bool
+    /// The phase of this track's run, if it's the one running.
+    let state: ActiveRun.Phase?
     @State private var hovering = false
+    private var recording: Bool { state == .recording }
 
-    /// One line: colour, name, hotkeys. The pipeline is in the tooltip and the main window.
+    /// One line: colour, name, hotkeys. The pipeline is in the tooltip and the main window. A recording track
+    /// shows REC in red rock; any other running track a lavender ▶.
     var body: some View {
         HStack(spacing: 8) {
-            Rectangle().fill(Color(hex: track.colorHex)).frame(width: 7, height: 7)
+            Rectangle().fill(recording ? Palette.red : Palette.track(track.colorHex)).frame(width: 7, height: 7)
             Text(track.name).font(VPFont.body).lineLimit(1)
             Spacer(minLength: 8)
-            if playing { Text("▶").font(VPFont.caption).foregroundStyle(Palette.purple) }
+            if recording {
+                Text("REC").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.red)
+            } else if state != nil {
+                Text("▶").font(VPFont.caption).foregroundStyle(Palette.purple)
+            }
             ForEach(track.triggers) { trigger in Keycap(text: trigger.combo.display) }
         }
         .padding(.horizontal, 12).frame(height: 30)
-        .background(hovering || playing ? Palette.bg300 : .clear)
+        .background(hovering || state != nil ? Palette.bg300 : .clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .help(track.steps.map(\.kind.chip).joined(separator: " › ")
@@ -247,7 +256,7 @@ private struct HistoryRow: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 0) {
-                    Text("\(record.trackName) · \(record.date.formatted(.relative(presentation: .named))) · \(record.totalMs) ms")
+                    Text("\(record.trackName) · \(record.date.shortAgo) · \(record.totalMs.msLabel)")
                         .foregroundStyle(Palette.fgMuted)
                     if record.failure != nil { Text(" · failed").foregroundStyle(Palette.orange) }
                 }

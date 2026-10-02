@@ -59,6 +59,25 @@ final class OpenRouterCatalog {
             }
         }
 
+        /// Compact, for the picker chip: "$1/$5" (in/out per 1M tokens), "$15/1M ch", "free".
+        func shortPrice(for capability: Capability) -> String? {
+            func perMillion(_ value: String?) -> String? {
+                guard let value, let v = Double(value), v > 0 else { return nil }
+                let cents = (v * 1_000_000 * 100).rounded() / 100
+                if cents == 0 { return "<$0.01" }
+                return cents == cents.rounded() ? String(format: "$%.0f", cents) : String(format: "$%.2f", cents)
+            }
+            switch capability {
+            case .speech:
+                if let chars = perMillion(pricing?.prompt) { return "\(chars)/1M ch" }
+                return pricing == nil ? nil : "free"
+            case .text, .transcription:
+                let input = perMillion(pricing?.prompt), output = perMillion(pricing?.completion)
+                if input == nil, output == nil { return pricing == nil ? nil : "free" }
+                return "\(input ?? "$0")/\(output ?? "$0")"
+            }
+        }
+
         func priceLabel(for capability: Capability) -> String {
             func perMillion(_ value: String?) -> String? {
                 guard let value, let v = Double(value), v > 0 else { return nil }

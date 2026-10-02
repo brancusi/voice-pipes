@@ -8,6 +8,7 @@ struct VoiceToolsApp: App {
     init() {
         // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
         BundleRename.migrateIfNeeded()
+        VPFont.registerBundledFonts()
         _app = State(initialValue: AppState())
         // Light, dark or Auto, as chosen in Setup → Appearance.
         DispatchQueue.main.async { AppearanceChoice.apply() }
@@ -26,6 +27,13 @@ struct VoiceToolsApp: App {
         }
         .defaultSize(width: 1100, height: 760)
         .windowResizability(.contentMinSize)
+        .commands { AboutCommand() }
+
+        Window("About Voice Pipes", id: "about") {
+            AboutView(app: app).environmentObject(updates)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
     }
 
     /// The Wrangler: a bust in his hat, swinging a lasso while recording. A speaker while reading aloud, a warning
@@ -39,6 +47,20 @@ struct VoiceToolsApp: App {
                 Image(systemName: "exclamationmark.triangle")
             } else {
                 Image(nsImage: MenuBarGlyph.image(updates.available != nil && app.run == nil ? .update : .idle))
+            }
+        }
+    }
+}
+
+/// The app menu's "About Voice Pipes" opens our About window instead of the standard panel.
+private struct AboutCommand: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Voice Pipes") {
+                openWindow(id: "about")
+                NSApp.activate(ignoringOtherApps: true)
             }
         }
     }

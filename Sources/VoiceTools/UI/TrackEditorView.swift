@@ -7,47 +7,97 @@ struct TrackDetailView: View {
     let onDelete: () -> Void
     @State private var expandedStep: Step.ID?
     @State private var draggingStep: Step.ID?
+    @State private var confirmingDelete = false
+
+    init(app: AppState, track: Binding<Track>, expanded: Step.ID? = nil, onDelete: @escaping () -> Void) {
+        self.app = app
+        _track = track
+        self.onDelete = onDelete
+        _expandedStep = State(initialValue: expanded)
+    }
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Name", text: $track.name).font(VPFont.display)
-                Toggle("Enabled", isOn: $track.enabled)
-                ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
-            }
-            .listRowBackground(Palette.bg200)
-
-            Section("Triggers") {
-                ForEach($track.triggers) { $trigger in
-                    HStack(spacing: 12) {
-                        KeyRecorder(combo: $trigger.combo, app: app)
-                        Picker("Mode", selection: $trigger.mode) {
-                            Text("Toggle").tag(Trigger.Mode.toggle)
-                            Text("Press & hold").tag(Trigger.Mode.hold)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(minWidth: 150, maxWidth: 200)
-                        if app.store.conflicts.contains(trigger.combo) {
-                            Label("Also used by another trigger", systemImage: "exclamationmark.triangle")
-                                .font(.caption).foregroundStyle(.orange)
-                        } else if app.unavailableCombos.contains(trigger.combo) {
-                            Label("Taken by another app", systemImage: "exclamationmark.triangle")
-                                .font(.caption).foregroundStyle(.orange)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                titleRow
+                VPSection("Triggers") { triggers }
+                VPSection("Pipeline", accessory: {
+                    Text("drag ⋮⋮ to reorder").font(VPFont.caption).foregroundStyle(Palette.comment)
+                }) { pipeline }
+                VStack(spacing: 12) {
+                    Hairline()
+                    HStack(spacing: 10) {
+                        Text("Saved").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                            .help("Changes save as you make them")
                         Spacer()
-                        Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.borderless)
+                        Button("Delete track") { confirmingDelete = true }.buttonStyle(.vpDanger)
                     }
                 }
+                .padding(.top, 8)
+            }
+            .padding(.horizontal, 32).padding(.vertical, 24)
+            .frame(maxWidth: 900, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Palette.bg100)
+        .confirmationDialog("Delete “\(track.name)”?", isPresented: $confirmingDelete) {
+            Button("Delete track", role: .destructive, action: onDelete)
+        } message: {
+            Text("Its hotkeys stop working. Its runs stay in History.")
+        }
+    }
+
+    /// Colour, name, Enabled and Run now.
+    private var titleRow: some View {
+        HStack(spacing: 12) {
+            TrackColorMenu(hex: $track.colorHex)
+            TextField("", text: $track.name, prompt: Text("Track name").foregroundStyle(Palette.fgMuted))
+                .labelsHidden()
+                .textFieldStyle(.plain)
+                .font(VPFont.display)
+                .frame(minWidth: 120)
+            Spacer(minLength: 8)
+            Text("Enabled").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+            Toggle("Enabled", isOn: $track.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            Button("▶ Run now") { app.start(track) }.buttonStyle(.vpPrimary)
+        }
+    }
+
+    private var triggers: some View {
+        Card {
+            ForEach($track.triggers) { $trigger in
+                if trigger.id != track.triggers.first?.id { Hairline() }
+                HStack(spacing: 12) {
+                    KeyRecorder(combo: $trigger.combo, app: app)
+                    VPSegmented(selection: $trigger.mode, options: [(.toggle, "Toggle"), (.hold, "Press & hold")])
+                    if app.store.conflicts.contains(trigger.combo) {
+                        Text("WARN · also used by another trigger").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
+                    } else if app.unavailableCombos.contains(trigger.combo) {
+                        Text("WARN · taken by another app").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.vpIcon).help("Remove this trigger")
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+            }
+            if !track.triggers.isEmpty { Hairline() }
+            HStack {
                 Button("+ Add trigger") {
                     track.triggers.append(Trigger(combo: KeyCombo(key: .n, modifiers: [.control, .option]), mode: .toggle))
                 }
                 .buttonStyle(.vpGhost)
+                if track.triggers.isEmpty {
+                    Text("No hotkey yet: run it from the menu bar panel, or add one.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                }
             }
-            .listRowBackground(Palette.bg200)
+            .padding(.horizontal, 6).padding(.vertical, 6)
+        }
+    }
 
-            Section {
+    private var pipeline: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(spacing: 4) {
                 ForEach($track.steps) { $step in
                     StepRow(step: $step, speaker: app.speaker, expanded: expandedStep == step.id) {
                         expandedStep = expandedStep == step.id ? nil : step.id
@@ -58,39 +108,22 @@ struct TrackDetailView: View {
                     }
                     .onDrop(of: [.text], delegate: StepDropDelegate(target: step.id, steps: $track.steps, dragging: $draggingStep))
                 }
+            }
+            HStack(spacing: 12) {
                 addStepMenu
-            } header: {
-                HStack(spacing: 10) {
-                    Text("Pipeline")
-                    Text("drag ⋮⋮ to reorder").font(VPFont.caption).foregroundStyle(Palette.comment)
-                }
-            } footer: {
                 if let error = track.validationError {
-                    Text("WARN  " + error).font(VPFont.caption).foregroundStyle(Palette.orange)
-                } else {
+                    Text("WARN · " + error).font(VPFont.caption).foregroundStyle(Palette.orange)
+                } else if !track.steps.isEmpty {
                     Text("✓ Steps connect: " + ([track.steps.first?.kind.input.rawValue ?? "none"]
                          + track.steps.map(\.kind.output.rawValue)).map { $0 == "none" ? "—" : $0 }.joined(separator: " → "))
                         .font(VPFont.caption).foregroundStyle(Palette.green)
                 }
             }
-            .listRowBackground(Palette.bg200)
-
-            Section {
-                HStack {
-                    Button("▶ Run now") { app.start(track) }.buttonStyle(.vpPrimary)
-                    Spacer()
-                    Button("Delete track", role: .destructive, action: onDelete).buttonStyle(.vpDanger)
-                }
-            }
-            .listRowBackground(Palette.bg200)
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(Palette.bg100)
     }
 
     private var addStepMenu: some View {
-        Menu("+ Add step") {
+        Menu {
             ForEach(["Input", "Transcribe", "Transform", "Output"], id: \.self) { category in
                 Section(category) {
                     ForEach(StepKind.catalog.filter { $0.category == category }, id: \.self) { kind in
@@ -102,22 +135,82 @@ struct TrackDetailView: View {
                     }
                 }
             }
+        } label: {
+            Text("+ Add step").font(VPFont.bodyStrong).foregroundStyle(Palette.purple)
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
-    }
-
-    private var colorBinding: Binding<Color> {
-        Binding {
-            Color(hex: track.colorHex)
-        } set: { color in
-            let c = NSColor(color).usingColorSpace(.sRGB) ?? .systemBlue
-            track.colorHex = String(format: "#%02X%02X%02X", Int(c.redComponent * 255),
-                                    Int(c.greenComponent * 255), Int(c.blueComponent * 255))
-        }
     }
 }
 
+/// The track's colour square; click for the palette (or any colour).
+private struct TrackColorMenu: View {
+    @Binding var hex: String
+
+    var body: some View {
+        Menu {
+            ForEach(Palette.trackSwatches, id: \.hex) { swatch in
+                Button { hex = swatch.hex } label: {
+                    Label { Text(swatch.name) } icon: { Image(nsImage: Self.swatch(swatch.hex, size: 10)) }
+                }
+            }
+            Divider()
+            Button("Other colour…") {
+                ColorPanelTarget.shared.open(Color(hex: hex)) { color in
+                    let c = color.usingColorSpace(.sRGB) ?? color
+                    hex = String(format: "#%02X%02X%02X", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
+                }
+            }
+        } label: {
+            Image(nsImage: Self.swatch(hex, size: 12))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Track colour")
+        // This track's editor is going away: the colour panel must not write into it any more.
+        .onDisappear { ColorPanelTarget.shared.detach() }
+    }
+
+    /// Drawn when shown, so a palette colour picks its Sundown or Daylight version.
+    private static func swatch(_ hex: String, size: CGFloat) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            NSColor(Palette.track(hex)).setFill()
+            rect.fill()
+            return true
+        }
+        return image
+    }
+}
+
+/// Bridges the shared colour panel to a closure. One long-lived instance: NSColorPanel doesn't retain its target.
+private final class ColorPanelTarget: NSObject {
+    static let shared = ColorPanelTarget()
+    private var onChange: ((NSColor) -> Void)?
+
+    func open(_ color: Color, onChange: @escaping (NSColor) -> Void) {
+        let panel = NSColorPanel.shared
+        // Setting the colour sends the action at once, so detach first and attach the new closure after.
+        self.onChange = nil
+        panel.setTarget(self)
+        panel.setAction(#selector(changed(_:)))
+        panel.showsAlpha = false
+        panel.color = NSColor(color)
+        self.onChange = onChange
+        panel.orderFront(nil)
+    }
+
+    func detach() {
+        onChange = nil
+        if NSColorPanel.shared.isVisible { NSColorPanel.shared.close() }
+    }
+
+    @objc private func changed(_ panel: NSColorPanel) { onChange?(panel.color) }
+}
+
+/// One block of the pipeline: handle, category tile, category and title, its types, expand and delete. Expanded,
+/// its settings sit under it, indented to the title, and the row is outlined in lavender.
 private struct StepRow: View {
     @Binding var step: Step
     let speaker: Speaker
@@ -127,7 +220,7 @@ private struct StepRow: View {
     let onDragStart: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Text("⋮⋮")
                     .font(VPFont.body).tracking(-2)
@@ -150,18 +243,23 @@ private struct StepRow: View {
                         .tracking(0.8).foregroundStyle(step.kind.tint)
                     Text(step.kind.title).font(VPFont.bodyStrong).lineLimit(1)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 Text("\(step.kind.input.rawValue == "none" ? "—" : step.kind.input.rawValue) → \(step.kind.output.rawValue == "none" ? "—" : step.kind.output.rawValue)")
-                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1).fixedSize()
                 Button(action: onToggle) { Image(systemName: expanded ? "chevron.up" : "chevron.down") }
-                    .buttonStyle(.vpIcon)
-                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon)
+                    .buttonStyle(.vpIcon).help(expanded ? "Hide settings" : "Settings")
+                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon).help("Remove this step")
             }
             if expanded {
-                StepConfigView(kind: $step.kind, speaker: speaker).padding(.leading, 40)
+                VStack(alignment: .leading, spacing: 10) {
+                    StepConfigView(kind: $step.kind, speaker: speaker)
+                }
+                .padding(.leading, 66).padding(.bottom, 4)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg200))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(expanded ? Palette.purple : Palette.line, lineWidth: 1))
     }
 
     private var icon: String {
@@ -215,11 +313,11 @@ private struct StepConfigView: View {
     var body: some View {
         switch kind {
         case .microphone:
-            Text("Default input device · 16 kHz mono").font(.caption).foregroundStyle(.secondary)
+            Text("Default input device · 16 kHz mono").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
 
         case .text(let sources):
             VStack(alignment: .leading, spacing: 4) {
-                Text("Uses the first source that has text:").font(.caption).foregroundStyle(.secondary)
+                Text("Uses the first source that has text:").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 ForEach(TextSource.allCases) { source in
                     Toggle(source.label, isOn: Binding {
                         sources.contains(source)
@@ -234,13 +332,16 @@ private struct StepConfigView: View {
         case .parakeet(let pauseMs, let storedMode):
             let mode = storedMode ?? .onRelease
             transcriptionPicker
-            Picker("Mode", selection: Binding { mode } set: { kind = .parakeet(chunkOnPauseMs: pauseMs, mode: $0) }) {
-                ForEach(ParakeetMode.allCases) { Text($0.label).tag($0) }
+            ConfigRow("Mode") {
+                Picker("Mode", selection: Binding { mode } set: { kind = .parakeet(chunkOnPauseMs: pauseMs, mode: $0) }) {
+                    ForEach(ParakeetMode.allCases) { Text($0.label).tag($0) }
+                }
+                .labelsHidden().fixedSize()
             }
-            Text(mode.detail).font(.caption).foregroundStyle(.secondary)
+            Text(mode.detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             if mode == .pauseChunks {
                 HStack {
-                    Text("Cut at pauses longer than")
+                    Text("Cut at pauses longer than").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     Slider(value: Binding { Double(pauseMs) } set: { kind = .parakeet(chunkOnPauseMs: Int($0), mode: mode) },
                            in: 300...1200, step: 50)
                     Text("\(pauseMs) ms").monospacedDigit().frame(width: 60, alignment: .trailing)
@@ -248,33 +349,29 @@ private struct StepConfigView: View {
             }
             if mode != .onRelease {
                 Text("Chunking and streaming apply when this step directly follows Microphone.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             }
 
         case .openRouterSTT:
             transcriptionPicker
 
         case .llm(let model, let prompt, let policy):
-            LabeledContent("Model") {
+            ConfigRow("Model") {
                 ModelPicker(capability: .text, modelID: Binding { model } set: { kind = .llm(model: $0, prompt: prompt, onFailure: policy) })
             }
-            Picker("If this step fails", selection: Binding { policy } set: { kind = .llm(model: model, prompt: prompt, onFailure: $0) }) {
-                Text("Pass input through").tag(FailurePolicy.passThrough)
-                Text("Stop the track").tag(FailurePolicy.stop)
+            ConfigRow("If it fails") {
+                VPSegmented(selection: Binding { policy } set: { kind = .llm(model: model, prompt: prompt, onFailure: $0) },
+                            options: [(.passThrough, "Pass input through"), (.stop, "Stop the track")])
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions. Use {{input}} to place the text; otherwise it's sent as the user message.")
-                    .font(.caption).foregroundStyle(.secondary)
-                TextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) })
-                    .font(.system(size: 12))
-                    .frame(minHeight: 70)
+            FieldLabel("Instructions", help: "{{input}} places the text; otherwise it's sent as the user message.") {
+                VPTextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) })
             }
 
         case .route(let routes):
             Text("Jev reads the text and picks the route whose description fits best (about 0.3 s); that route's model answers with its instructions. Without a Jev key, the first route is used.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
-                RouteEditor(route: Binding {
+                RouteEditor(index: index, route: Binding {
                     routes[index]
                 } set: { updated in
                     var all = routes
@@ -288,17 +385,21 @@ private struct StepConfigView: View {
                 kind = .route(routes: routes + [Route(name: "route \(routes.count + 1)", when: "",
                                                       model: "anthropic/claude-haiku-4.5", prompt: "")])
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.vpGhost).padding(.leading, -8)
 
         case .http(let url, let method, let headers, let body, let field):
             let set = { (u: String, m: String, h: [String: String], b: String, f: String) in
                 kind = .http(url: u, method: m, headers: h, bodyTemplate: b, responseField: f)
             }
-            Picker("Method", selection: Binding { method } set: { set(url, $0, headers, body, field) }) {
-                ForEach(["GET", "POST", "PUT", "PATCH"], id: \.self) { Text($0).tag($0) }
+            ConfigRow("Method") {
+                VPSegmented(selection: Binding { method } set: { set(url, $0, headers, body, field) },
+                            options: ["GET", "POST", "PUT", "PATCH"].map { ($0, $0) })
             }
-            TextField("URL", text: Binding { url } set: { set($0, method, headers, body, field) })
-            TextField("Headers (Name: value, one per line)", text: Binding {
+            FieldLabel("URL", help: "{{input}} here is URL-encoded.") {
+                VPTextField("https://…", text: Binding { url } set: { set($0, method, headers, body, field) })
+            }
+            FieldLabel("Headers", help: "Name: value, one per line.") {
+              VPTextField("Authorization: Bearer …", text: Binding {
                 headers.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
             } set: { text in
                 let parsed = text.split(separator: "\n").reduce(into: [String: String]()) { dict, line in
@@ -306,15 +407,21 @@ private struct StepConfigView: View {
                     if parts.count == 2 { dict[parts[0].trimmingCharacters(in: .whitespaces)] = parts[1].trimmingCharacters(in: .whitespaces) }
                 }
                 set(url, method, parsed, body, field)
-            }, axis: .vertical)
-            TextField("Body ({{input}} or {{input_json}})", text: Binding { body } set: { set(url, method, headers, $0, field) },
-                      axis: .vertical)
-                .font(.system(.body, design: .monospaced))
-            TextField("Response field (dotted path, empty = whole body)",
-                      text: Binding { field } set: { set(url, method, headers, body, $0) })
+              }, axis: .vertical)
+            }
+            FieldLabel("Body", help: "{{input}} or {{input_json}} (a JSON string).") {
+                VPTextField("{\"text\": {{input_json}}}", text: Binding { body } set: { set(url, method, headers, $0, field) },
+                            axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64)
+            }
+            FieldLabel("Response field", help: "A dotted path into the JSON response, e.g. data.text; empty uses the whole body.") {
+                VPTextField("data.text", text: Binding { field } set: { set(url, method, headers, body, $0) })
+            }
 
         case .template(let template):
-            TextField("Template ({{input}})", text: Binding { template } set: { kind = .template($0) }, axis: .vertical)
+            FieldLabel("Template", help: "{{input}} or {{input_json}} places the text.") {
+                VPTextField("{{input}}", text: Binding { template } set: { kind = .template($0) }, axis: .vertical,
+                            font: .system(size: 12, design: .monospaced), minHeight: 64)
+            }
 
         case .fixWords:
             FixWordsSummary()
@@ -323,41 +430,44 @@ private struct StepConfigView: View {
             Toggle("Restore previous clipboard after pasting", isOn: Binding { restore } set: { kind = .paste(restoreClipboard: $0) })
 
         case .copy:
-            Text("Leaves the text on the clipboard.").font(.caption).foregroundStyle(.secondary)
+            Text("Leaves the text on the clipboard.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
 
         case .speak(let voiceID, let rate):
             speechPicker
-            Picker("Voice", selection: Binding { voiceID ?? "" } set: { kind = .speak(voiceID: $0.isEmpty ? nil : $0, rate: rate) }) {
-                Text("System default (best installed)").tag("")
-                ForEach(Self.voices, id: \.identifier) { voice in
-                    Text("\(voice.name) · \(voice.quality == .premium ? "Premium" : voice.quality == .enhanced ? "Enhanced" : "Default")")
-                        .tag(voice.identifier)
+            ConfigRow("Voice") {
+                Picker("Voice", selection: Binding { voiceID ?? "" } set: { kind = .speak(voiceID: $0.isEmpty ? nil : $0, rate: rate) }) {
+                    Text("System default (best installed)").tag("")
+                    ForEach(Self.voices, id: \.identifier) { voice in
+                        Text("\(voice.name) · \(voice.quality == .premium ? "Premium" : voice.quality == .enhanced ? "Enhanced" : "Default")")
+                            .tag(voice.identifier)
+                    }
                 }
+                .labelsHidden().frame(maxWidth: 280)
             }
             HStack {
-                Text("Speed")
+                Text("Speed").font(VPFont.caption).foregroundStyle(Palette.fgMuted).frame(width: 90, alignment: .leading)
                 Slider(value: Binding { Double(rate) } set: { kind = .speak(voiceID: voiceID, rate: Float($0)) }, in: 0.6...2.0, step: 0.1)
                 Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
             }
 
         case .openRouterSpeech(let model, let voice, let rate):
             speechPicker
-            LabeledContent("Voice") {
+            ConfigRow("Voice") {
                 VoicePicker(modelID: model, voice: Binding { voice } set: { kind = .openRouterSpeech(model: model, voice: $0, rate: rate) },
                             speaker: speaker)
             }
             HStack {
-                Text("Speed")
+                Text("Speed").font(VPFont.caption).foregroundStyle(Palette.fgMuted).frame(width: 90, alignment: .leading)
                 Slider(value: Binding { Double(rate) } set: { kind = .openRouterSpeech(model: model, voice: voice, rate: Float($0)) },
                        in: 0.6...2.0, step: 0.1)
                 Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
             }
             Text("Long text is read in passages: the first starts within a second or two, the next downloads while you listen.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
 
         case .localSpeech(let engine, let voice, let rate):
             speechPicker
-            LabeledContent("Voice") {
+            ConfigRow("Voice") {
                 HStack {
                     Picker("Voice", selection: Binding { voice } set: { kind = .localSpeech(engine: engine, voice: $0, rate: rate) }) {
                         ForEach(engine.voices, id: \.self) { Text(engine.voiceLabel($0)).tag($0) }
@@ -368,15 +478,15 @@ private struct StepConfigView: View {
                 }
             }
             HStack {
-                Text("Speed")
+                Text("Speed").font(VPFont.caption).foregroundStyle(Palette.fgMuted).frame(width: 90, alignment: .leading)
                 Slider(value: Binding { Double(rate) } set: { kind = .localSpeech(engine: engine, voice: voice, rate: Float($0)) },
                        in: 0.6...2.0, step: 0.1)
                 Text(String(format: "%.1f×", rate)).monospacedDigit().frame(width: 44, alignment: .trailing)
             }
-            Text(engine.detail).font(.caption).foregroundStyle(.secondary)
+            Text(engine.detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
 
         case .showHUD:
-            Text("Shows the text in the HUD for a few seconds.").font(.caption).foregroundStyle(.secondary)
+            Text("Shows the text in the HUD for a few seconds.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
         }
     }
 
@@ -394,7 +504,7 @@ private struct StepConfigView: View {
         case .openRouterSTT(let model): model
         default: Self.parakeetOption.id
         }
-        return LabeledContent("Model") {
+        return ConfigRow("Model") {
             ModelPicker(capability: .transcription, selection: selection, local: [Self.parakeetOption]) { pick in
                 switch pick {
                 case .local:
@@ -415,7 +525,7 @@ private struct StepConfigView: View {
         case .speak(_, let r): ("local:macos", r, nil)
         default: ("", 1, nil)
         }
-        return LabeledContent("Model") {
+        return ConfigRow("Model") {
             ModelPicker(capability: .speech, selection: selection, local: Self.speechOptions) { pick in
                 switch pick {
                 case .local(let option) where option.id == "local:macos":
@@ -506,43 +616,90 @@ private struct LocalPreviewButton: View {
                 playing = false
             }
         } label: {
-            Image(systemName: playing ? "stop.circle" : "play.circle")
+            Image(systemName: playing ? "stop.fill" : "play.fill")
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.vpIcon)
         .help(error ?? "Preview this voice (first use downloads the model)")
     }
 }
 
-/// One route of a Route step: its name and description (what Jev chooses by), then the model and instructions.
+/// One route of a Route step, as a card: its name (in the route's colour) and model; then what Jev chooses by
+/// ("use when ›"). Click it to edit: the card is outlined in rose and shows the fields.
 private struct RouteEditor: View {
+    let index: Int
     @Binding var route: Route
     let onDelete: (() -> Void)?
+    @State private var editing = false
+
+    private static let colors = [Palette.green, Palette.cyan, Palette.purple, Palette.yellow, Palette.orange]
+    private var color: Color { editing ? Palette.pink : Self.colors[index % Self.colors.count] }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                TextField("", text: $route.name, prompt: Text("Name"))
-                    .labelsHidden()
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(maxWidth: 160)
-                Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                if editing {
+                    VPTextField("Name", text: $route.name, font: VPFont.bodyStrong, color: Palette.pink).frame(width: 160)
+                } else {
+                    Text(route.name.isEmpty ? "unnamed" : route.name).font(VPFont.bodyStrong).foregroundStyle(color)
+                }
+                Spacer(minLength: 8)
+                ModelPicker(capability: .text, modelID: $route.model)
+                Button { editing.toggle() } label: { Image(systemName: editing ? "checkmark" : "pencil") }
+                    .buttonStyle(.vpIcon).help(editing ? "Done" : "Edit this route")
                 if let onDelete {
-                    Button(action: onDelete) { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless)
-                        .help("Remove this route")
+                    Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon).help("Remove this route")
                 }
             }
-            TextField("", text: $route.when, prompt: Text("Use when… (Jev reads this to choose)"), axis: .vertical)
-                .labelsHidden()
-            LabeledContent("Model") {
-                ModelPicker(capability: .text, modelID: $route.model)
+            if editing {
+                FieldLabel("Use when", help: "Jev reads this to choose the route.") {
+                    VPTextField("Use when…", text: $route.when, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 38)
+                }
+                FieldLabel("Instructions", help: "{{input}} places the text.") {
+                    VPTextField("Instructions", text: $route.prompt, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64)
+                }
+            } else {
+                (Text("use when › ").foregroundColor(Palette.comment) + Text(route.when.isEmpty ? "(no description: Jev can't pick it)" : route.when))
+                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+                    .lineLimit(2)
+                    .onTapGesture { editing = true }
             }
-            TextField("", text: $route.prompt, prompt: Text("Instructions ({{input}} places the text)"), axis: .vertical)
-                .labelsHidden()
-                .font(.system(size: 12))
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg100))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(editing ? Palette.pink : Palette.line, lineWidth: 1))
+    }
+}
+
+/// A setting with its label in a fixed caption column.
+private struct ConfigRow<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: Content
+    init(_ label: String, @ViewBuilder content: () -> Content) { self.label = label; self.content = content() }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(label).font(VPFont.caption).foregroundStyle(Palette.fgMuted).frame(width: 90, alignment: .leading)
+            content
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// A field with a caption above and optional help below.
+private struct FieldLabel<Content: View>: View {
+    let label: String
+    var help: String?
+    @ViewBuilder let content: Content
+    init(_ label: String, help: String? = nil, @ViewBuilder content: () -> Content) {
+        self.label = label; self.help = help; self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            content
+            if let help { Text(help).font(VPFont.caption).foregroundStyle(Palette.fgMuted) }
+        }
     }
 }
 
@@ -551,6 +708,6 @@ private struct FixWordsSummary: View {
     var body: some View {
         let count = VocabularyStore.shared.entries.count
         Text("Replaces mishearings from your Vocabulary (\(count) \(count == 1 ? "word" : "words")) — instant, no model. Edit the list under Vocabulary in the sidebar.")
-            .font(.caption).foregroundStyle(.secondary)
+            .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
     }
 }

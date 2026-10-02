@@ -1,5 +1,13 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.4.0**
+- **Every screen in the Sundown look.** The editor, History, Vocabulary, Setup, word training and the menu bar panel now match the new design in both Daylight and Sundown: cards, log-style status codes, lavender selections, rose focus rings.
+- **A cleaner track editor.** The title row has the track's colour, its name, Enabled and **▶ Run now**. Each step is its own row, outlined when open. Route · Jev shows each route as a card with its model and price (e.g. `$1/$5`) and what Jev chooses it by; click a route to edit it. Deleting a track now asks first.
+- **History you can browse.** Runs are grouped by day, chips filter by track, and each run's steps are listed in order with their times, coloured by kind. A run that failed is highlighted with what went wrong.
+- **The Wrangler moves in.** An empty History shows him busking ("quiet on the range"), training a word ends with his wink ("roped and branded"), and there's a new **About Voice Pipes** window with a pixel sundown. Open it from the ⓘ in the panel's footer.
+- **Live words in the HUD.** With a streaming or chunked Parakeet mode, the HUD shows your words as they land, with a cursor.
+- Your tracks' original colours switch to the matching Sundown colours, which also adjust for Daylight. Colours you picked yourself stay as they were.
+
 **1.3.0**
 - **Meet the Wrangler, in your menu bar.** The Voice Pipes cowboy now sits up there in his hat. While you're recording, he raises an arm and swings a lasso over his head, so you can tell at a glance that the mic is open.
 - **Light, dark or Auto.** Setup → Appearance: **Auto** follows your Mac, **Daylight** is always light, **Sundown** is always dark. Applies to the whole app, menu bar panel included; the HUD stays dark either way.

@@ -6,10 +6,15 @@ struct RunRecord: Codable, Identifiable, Hashable {
     struct StepTiming: Codable, Hashable {
         let title: String
         let ms: Int
+        /// The step's category (Input, Transcribe, Transform, Output), for colouring the chain. Missing in runs
+        /// saved before 1.4.0.
+        var category: String?
     }
 
     var id = UUID()
     let trackName: String
+    /// The track's colour when it ran. Missing in runs saved before 1.4.0.
+    var colorHex: String?
     let date: Date
     /// The run's final text (what was pasted, copied or read).
     let text: String

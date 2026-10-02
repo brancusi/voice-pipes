@@ -18,7 +18,8 @@ final class TrackStore {
                 tracks = try JSONDecoder().decode([Track].self, from: data)
                 let pocket = Self.migrateReadAloudToPocket(&tracks)
                 let fixWords = Self.addFixWords(&tracks)
-                if pocket || fixWords { save() }
+                let colors = Self.sundownColors(&tracks)
+                if pocket || fixWords || colors { save() }
             } catch {
                 // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
                 let backup = fileURL.deletingPathExtension()
@@ -67,6 +68,23 @@ final class TrackStore {
             }) else { continue }
             tracks[i].steps.insert(Step(kind: .fixWords), at: index + 1)
             changed = true
+        }
+        return changed
+    }
+
+    /// One-time (1.4.0): the old default track colours become their Sundown palette colours (which also switch to
+    /// their Daylight versions in light mode). Colours the user picked themselves are left alone.
+    private static func sundownColors(_ tracks: inout [Track]) -> Bool {
+        let key = "migration.sundownColors.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
+        UserDefaults.standard.set(true, forKey: key)
+        let map = ["#D9731A": "#F0A35E", "#0A66D8": "#8FB8D6", "#6B4FD1": "#C3A3D4", "#1F9D55": "#A9BF8A"]
+        var changed = false
+        for i in tracks.indices {
+            if let new = map[tracks[i].colorHex.uppercased()] {
+                tracks[i].colorHex = new
+                changed = true
+            }
         }
         return changed
     }

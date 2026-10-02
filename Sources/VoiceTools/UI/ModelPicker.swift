@@ -40,22 +40,25 @@ struct ModelPicker: View {
 
     var body: some View {
         Button { showing = true } label: {
-            HStack(spacing: 6) {
-                VStack(alignment: .leading, spacing: 1) {
-                    if let option = local.first(where: { $0.id == selection }) {
-                        Text(option.name).lineLimit(1)
-                        Text("On this Mac").font(.system(size: 10)).foregroundStyle(.secondary)
-                    } else {
-                        Text(catalog.model(selection)?.shortName ?? selection).lineLimit(1)
-                        Text("OpenRouter · \(selection)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            HStack(spacing: 8) {
+                if let option = local.first(where: { $0.id == selection }) {
+                    Text(option.name).foregroundStyle(Palette.fg).lineLimit(1)
+                    Text("on this Mac").foregroundStyle(Palette.fgMuted).lineLimit(1)
+                } else {
+                    Text(catalog.model(selection)?.shortName ?? selection).foregroundStyle(Palette.fg).lineLimit(1)
+                    if let price = catalog.model(selection)?.shortPrice(for: capability) {
+                        Text(price).foregroundStyle(Palette.fgMuted).lineLimit(1)
                     }
                 }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text("▾").foregroundStyle(Palette.fgMuted)
             }
+            .font(.system(size: 12, design: .monospaced))
+            .padding(.horizontal, 8).frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg300))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
+        .help(local.contains { $0.id == selection } ? "Runs on this Mac" : "OpenRouter · \(selection)")
         .popover(isPresented: $showing, arrowEdge: .bottom) {
             ModelList(capability: capability, selection: selection, local: local) { pick in
                 onPick(pick)
@@ -89,16 +92,15 @@ private struct ModelList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(capability.title).font(.headline)
+                Text(capability.title).font(VPFont.title)
                 Spacer()
                 if catalog.loading { ProgressView().controlSize(.small) }
                 Button { catalog.refresh() } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).help("Reload the list from OpenRouter")
             }
-            TextField("Search \(local.count + catalog.models(for: capability).count) models", text: $query)
-                .textFieldStyle(.roundedBorder)
+            VPTextField("Search \(local.count + catalog.models(for: capability).count) models", text: $query)
             if let error = catalog.error {
-                Text(error).font(.caption).foregroundStyle(.orange)
+                Text(error).font(VPFont.caption).foregroundStyle(Palette.orange)
             }
             List {
                 if !localMatches.isEmpty {
@@ -123,7 +125,7 @@ private struct ModelList: View {
             }
             .listStyle(.plain)
             HStack {
-                Text("Or type an OpenRouter model id:").font(.caption).foregroundStyle(.secondary)
+                Text("Or type an OpenRouter model id:").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 TextField("provider/model", text: $query, onCommit: {
                     let id = query.trimmingCharacters(in: .whitespaces)
                     if id.contains("/") { pick(.openRouter(catalog.model(id) ?? .init(id: id, name: id))) }
@@ -134,6 +136,8 @@ private struct ModelList: View {
         }
         .padding(12)
         .frame(width: 460, height: 480)
+        .background(Palette.bg200)
+        .vpWindow()
     }
 
     private func row(title: String, subtitle: String, mono: Bool = false, trailing: String, extra: String? = nil,
@@ -142,15 +146,15 @@ private struct ModelList: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).fontWeight(selected ? .semibold : .regular)
-                    Text(subtitle).font(mono ? .system(size: 10, design: .monospaced) : .system(size: 11))
-                        .foregroundStyle(.secondary).lineLimit(2)
+                    Text(subtitle).font(VPFont.micro)
+                        .foregroundStyle(Palette.fgMuted).lineLimit(2)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(trailing).font(.caption).foregroundStyle(.secondary)
-                    if let extra { Text(extra).font(.caption2).foregroundStyle(.tertiary) }
+                    Text(trailing).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    if let extra { Text(extra).font(VPFont.micro).foregroundStyle(Palette.comment) }
                 }
-                if selected { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                if selected { Text("✓").foregroundStyle(Palette.purple) }
             }
             .contentShape(Rectangle())
         }
@@ -179,29 +183,31 @@ struct VoicePicker: View {
     var body: some View {
         HStack {
             Button { showing = true } label: {
-                HStack {
-                    Text(voice.isEmpty ? "Choose a voice" : OpenRouterCatalog.Model.voiceLabel(voice)).lineLimit(1)
-                    Spacer(minLength: 4)
-                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(voice.isEmpty ? "Choose a voice" : OpenRouterCatalog.Model.voiceLabel(voice)).foregroundStyle(Palette.fg).lineLimit(1)
+                    Text("▾").foregroundStyle(Palette.fgMuted)
                 }
+                .font(.system(size: 12, design: .monospaced))
+                .padding(.horizontal, 8).frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg300))
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
             .popover(isPresented: $showing, arrowEdge: .bottom) { list }
             previewButton(voice)
         }
-        if let previewError { Text(previewError).font(.caption).foregroundStyle(.orange).lineLimit(3) }
+        if let previewError { Text(previewError).font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(3) }
     }
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Voices · \(catalog.model(modelID)?.shortName ?? modelID)").font(.headline)
+            Text("Voices · \(catalog.model(modelID)?.shortName ?? modelID)").font(VPFont.title)
             if (catalog.model(modelID)?.voices ?? []).isEmpty {
                 Text("OpenRouter doesn't list voices for this model. Type a voice id, or leave it empty for the model's default.")
-                    .font(.caption).foregroundStyle(.secondary)
-                TextField("Voice id", text: $voice).textFieldStyle(.roundedBorder)
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                VPTextField("Voice id", text: $voice)
             } else {
-                TextField("Search voices", text: $query).textFieldStyle(.roundedBorder)
+                VPTextField("Search voices", text: $query)
                 List(voices, id: \.self) { id in
                     HStack {
                         Button {
@@ -210,14 +216,14 @@ struct VoicePicker: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(OpenRouterCatalog.Model.voiceLabel(id)).fontWeight(id == voice ? .semibold : .regular)
-                                Text(id).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                                Text(id).font(VPFont.micro).foregroundStyle(Palette.fgMuted)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         previewButton(id)
-                        if id == voice { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                        if id == voice { Text("✓").foregroundStyle(Palette.purple) }
                     }
                 }
                 .listStyle(.plain)
@@ -225,6 +231,8 @@ struct VoicePicker: View {
         }
         .padding(12)
         .frame(width: 380, height: 420)
+        .background(Palette.bg200)
+        .vpWindow()
     }
 
     private func previewButton(_ id: String) -> some View {
@@ -241,9 +249,9 @@ struct VoicePicker: View {
                 if previewing == id { previewing = nil }
             }
         } label: {
-            Image(systemName: previewing == id ? "stop.circle" : "play.circle")
+            Image(systemName: previewing == id ? "stop.fill" : "play.fill")
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.vpIcon)
         .help("Preview this voice")
         .disabled(id.isEmpty && !(catalog.model(modelID)?.voices ?? []).isEmpty)
     }

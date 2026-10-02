@@ -251,16 +251,16 @@ extension Track {
         """
 
     static let defaults: [Track] = [
-        Track(name: "Fast dictation", colorHex: "#D9731A",
+        Track(name: "Fast dictation", colorHex: "#F0A35E",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option]), mode: .hold)],
               steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
                       Step(kind: .fixWords), Step(kind: .paste(restoreClipboard: true))]),
-        Track(name: "Clean dictation", colorHex: "#0A66D8",
+        Track(name: "Clean dictation", colorHex: "#8FB8D6",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option, .shift]), mode: .toggle)],
               steps: [Step(kind: .microphone), Step(kind: .openRouterSTT(model: "microsoft/mai-transcribe-2")), Step(kind: .fixWords),
                       Step(kind: .llm(model: "anthropic/claude-haiku-4.5", prompt: cleanupPrompt, onFailure: .passThrough)),
                       Step(kind: .paste(restoreClipboard: true))]),
-        Track(name: "Read aloud", colorHex: "#6B4FD1",
+        Track(name: "Read aloud", colorHex: "#C3A3D4",
               triggers: [Trigger(combo: KeyCombo(key: .r, modifiers: [.option]), mode: .toggle)],
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
                       Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))]),

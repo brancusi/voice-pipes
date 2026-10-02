@@ -96,7 +96,8 @@ spellings too. The list lives in `~/Library/Application Support/VoiceTools/vocab
 4. With a **TypeSafe Jev** key (Setup), each result is judged: how safe is it to replace everywhere? Garbled
    versions of the word score high (green, pre-ticked at 60%+); real words, other names and specialist terms score
    low. Without a key, results that came up twice and aren't ordinary dictionary words are pre-ticked.
-5. **Add to Heard as**.
+5. **Add to Heard as**. The results list ticks a row with one click anywhere on it; hover a row for where each result
+   came from (your takes or the voices).
 
 Tip: if your first name comes out right and the surname doesn't, add and train the surname as its own entry too.
 
@@ -117,6 +118,7 @@ its read-aloud buttons.
 | Tag | Meaning |
 |---|---|
 | `■ REC 00:04` + level bars | Recording |
+| `■ REC 00:11 …your words▌` | Recording with a streaming or chunked Parakeet mode: the words so far, with a cursor |
 | `PROC 312ms` | Processing since you let go |
 | `OK 186ms` | Done — total processing time; fades in under a second |
 | `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice, with **⏸/▶** and **⏹** buttons (pressing the track's hotkey again also pauses and resumes) |
@@ -134,7 +136,14 @@ field) is never lost. The menu bar panel shows the last three runs with a copy b
 **History** in the Voice Pipes window, where you can search everything, copy any run back to the clipboard, and see
 each step's time. A run that failed partway keeps the text it had, marked with what went wrong. When later steps
 changed what you said (a question and its answer, dictation and its cleanup), what transcription heard is shown
-above the result. The last 1,000 runs are kept; **Clear history…** removes them all.
+above the result. Runs are grouped by day; the chips next to the search box filter by track, and each run's steps
+are listed in order with their times, coloured by kind (transcription blue, transforms lavender, outputs green). The
+last 1,000 runs are kept; **Clear history…** removes them all.
+
+## About
+
+**About Voice Pipes** (the ⓘ button in the menu bar panel's footer, or the app menu while the window is open) shows
+the version, your first few hotkeys, **Release notes** and **Check for updates**.
 
 ## Setup
 

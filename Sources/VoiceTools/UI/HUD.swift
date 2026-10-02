@@ -100,9 +100,12 @@ struct HUDView: View {
     @ViewBuilder private func content(_ run: ActiveRun) -> some View {
         switch run.phase {
         case .recording:
+            // Streaming and chunked transcription show the words as they land, with a cursor; otherwise the level.
             TimelineView(.periodic(from: run.recordingStarted, by: 1)) { context in
                 HUDTag(state: .recording, label: "REC",
-                       detail: HUDTag.clock(context.date.timeIntervalSince(run.recordingStarted)), level: run.level)
+                       detail: HUDTag.clock(context.date.timeIntervalSince(run.recordingStarted)),
+                       level: run.liveText.isEmpty ? run.level : nil,
+                       liveText: run.liveText.isEmpty ? nil : run.liveText)
             }
         case .processing:
             TimelineView(.animation(minimumInterval: 0.05)) { context in
@@ -133,6 +136,8 @@ struct HUDTag: View {
     let label: String
     var detail: String?
     var level: Float?
+    /// Dictation so far (streaming modes), shown with its tail visible and a sage cursor.
+    var liveText: String?
     var controls: PlaybackControls?
 
     var body: some View {
@@ -141,6 +146,11 @@ struct HUDTag: View {
             Text(label).foregroundStyle(Palette.hudFG)
             if let detail { Text(detail).foregroundStyle(Palette.hudMuted).truncationMode(.tail) }
             if let level { Meter(level: level) }
+            if let liveText {
+                Text(liveText).foregroundStyle(Palette.hudFG).truncationMode(.head).frame(maxWidth: 260, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                BlinkingCursor()
+            }
             if let controls { controls.padding(.leading, 2) }
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -149,11 +159,11 @@ struct HUDTag: View {
         .padding(.horizontal, 9)
         .frame(height: 22)
         .background(
-            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+            RoundedRectangle(cornerRadius: 2)
                 .fill(Palette.hudBG)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2.5, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
         )
-        .overlay(RoundedRectangle(cornerRadius: 2.5, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.hudFG.opacity(0.14), lineWidth: 0.5))
         .environment(\.colorScheme, .dark)
         .frame(maxWidth: HUDController.size.width - 20)
     }
@@ -199,7 +209,7 @@ struct PlaybackControls: View {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .bold))
                 .frame(width: 20, height: 16)
-                .background(RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.14)))
+                .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudFG.opacity(0.14)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -209,7 +219,7 @@ struct PlaybackControls: View {
 }
 
 /// The model answering this run (and the route Jev picked), on a quieter line under the tag.
-private struct ModelLine: View {
+struct ModelLine: View {
     let text: String
 
     var body: some View {
@@ -220,7 +230,7 @@ private struct ModelLine: View {
             .truncationMode(.middle)
             .padding(.horizontal, 7)
             .frame(height: 17)
-            .background(RoundedRectangle(cornerRadius: 2.5, style: .continuous).fill(Palette.hudBG))
+            .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudBG))
             .environment(\.colorScheme, .dark)
             .frame(maxWidth: HUDController.size.width - 20)
     }
@@ -234,10 +244,23 @@ private struct Meter: View {
         HStack(alignment: .center, spacing: 1.5) {
             ForEach(0..<5, id: \.self) { i in
                 Rectangle()
-                    .fill(.white.opacity(level > Float(i) / 5 ? 0.85 : 0.2))
+                    .fill(Palette.hudFG.opacity(level > Float(i) / 5 ? 1 : 0.25))
                     .frame(width: 2, height: 4 + CGFloat(i % 3) * 2.5)
             }
         }
+    }
+}
+
+/// The live-text cursor: a sage ▌, 530 ms on and 530 ms off; solid under Reduce Motion.
+private struct BlinkingCursor: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.53)) { context in
+            let on = reduceMotion || Int(context.date.timeIntervalSinceReferenceDate / 0.53) % 2 == 0
+            Text("▌").foregroundStyle(Color(hex: 0xA9BF8A)).opacity(on ? 1 : 0)
+        }
+        .accessibilityHidden(true)
     }
 }
 

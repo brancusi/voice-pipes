@@ -115,3 +115,18 @@ AppKit controls but drops SwiftUI text. Good enough to check layout, not looks.
 type 'Substring' to expected argument type 'String'` for `string + key.suffix(4)`, which built locally. → Wrap
 `prefix`/`suffix` results in `String(…)` when concatenating. A failed tag publishes nothing, so fixing and
 force-moving the tag is safe (check `gh release view v<VERSION> -R brancusi/voice-tools-releases` first).
+
+**`.fontDesign(.monospaced)` swallows custom fonts.** `vpWindow()` sets the monospaced design for the whole window,
+and SwiftUI applies it to `Font.custom("Silkscreen-Regular", …)` too, so the pixel face silently became SF Mono.
+→ Build the font from the `NSFont` (`Font(nsFont as CTFont)`) and set `.fontDesign(nil)` on that text
+(`PixelHeadline`). Look fonts up by PostScript name (`Silkscreen-Regular`).
+
+**A TextField's `prompt` colour is ignored.** `prompt: Text(…).foregroundStyle(muted)` drew placeholders in full
+ink. → `VPTextField` draws its own placeholder under an empty field.
+
+**Rendering screens offscreen.** A scratch SwiftPM package can compile `Sources/VoiceTools` (minus
+`VoiceToolsApp.swift`) with `-D SNAPSHOTS`, build `AppState(startServices: false)` and draw views into an
+`NSHostingView` in an offscreen window with `cacheDisplay`. Run it with `CFFIXED_USER_HOME` pointing at a scratch
+home holding *copies* of the data files; under `SNAPSHOTS` the Keychain returns fake keys (an unsigned binary would
+prompt) and checks don't run. `NavigationSplitView`, and a `ScrollView` as the window's root, render blank this way:
+render the sidebar and page side by side in an `HStack` instead (`MainWindowView.snapshotBody`).
