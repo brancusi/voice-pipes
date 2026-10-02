@@ -1,7 +1,7 @@
 ---
 title: "The vp command"
 nav: "CLI reference"
-description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.6.2."
+description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.6.5."
 order: 2
 ---
 
@@ -9,7 +9,7 @@ order: 2
 manage the config, vocabulary, keys and history. It is built to be driven by agents as well as people: compact
 output, next-step hints, errors on stdout, and no prompts. Not installed yet? See [Install](/docs/install).
 
-This page matches Voice Pipes **1.6.2**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
+This page matches Voice Pipes **1.6.5**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
 one command's usage and flags.
 
 ## At a glance
@@ -22,6 +22,11 @@ vp status
 # Speak; ask out loud and print the spoken answer
 vp say "Tests passed."
 vp ask "Deploy to staging or production?"
+
+# Read a long text with the follow-along card, and speed it up while it plays
+vp open reading
+printf '%s' "$SUMMARY" | vp say
+vp speed 1.4
 
 # Send text through a track (Clean dictation then pastes it at your cursor)
 vp run clean-dictation --text "um so the build is uh green"
@@ -53,6 +58,9 @@ running, `vp` starts it in the background, without taking focus, and waits up to
 | `voices` for `pocket` and `supertonic` | `open`, `close`, `ui`, `update` |
 | `install`, `agents` | |
 
+`vp speed` is the exception: it changes what's playing, so it never starts the app and fails with `app_not_running`
+when the app isn't running.
+
 The app runs one thing at a time. If a track, `vp say`, `vp listen` or a hotkey run is already going, a command that
 needs it fails with `busy`; run `vp stop` or wait.
 
@@ -82,7 +90,7 @@ vp --version
 ```
 
 ```text
-version: 1.6.2
+version: 1.6.5
 ```
 
 ## Errors and exit codes
@@ -129,6 +137,7 @@ The main codes:
 | `no_such_track`, `invalid_track`, `takes_no_text`, `run_failed` | `vp run` problems; `run_failed` says which block failed |
 | `no_microphone`, `no_speech`, `cancelled` | Recording: no permission or device, nothing heard, or stopped with `vp stop` or Esc |
 | `bad_speed`, `bad_model`, `no_such_voice`, `speak_failed` | `vp say` and `vp ask` |
+| `not_speaking` | `vp speed` when nothing is being read aloud |
 | `no_such_file`, `bad_audio` | `vp transcribe` or `vp config check` can't read the file |
 | `config_invalid`, `vocabulary_invalid`, `vocabulary_unreadable` | The file doesn't check out; fix it, then retry |
 | `no_such_provider`, `no_login`, `bad_name` | `vp auth` and `vp secret` |
@@ -227,7 +236,7 @@ git log -1 --format=%s | vp run read-aloud
 vp say "…" [--model pocket|supertonic|macos|<openrouter-id>] [--voice <id>] [--speed 0.6–2.0]
 ```
 
-Speaks text and returns when it has finished, printing what was said, the `model` and `ms`. The default model is
+Speaks text and returns when the reading ends, printing what was said, the `model` and `ms`. The default model is
 Pocket TTS on your Mac. `supertonic` is the other on-device model, `macos` uses the system voices, and an OpenRouter
 speech model id (for example `provider/model`) uses your OpenRouter key and is paid. `--speed` runs from 0.6 to 2.0
 (default 1.0). `vp voices --model <model>` lists the voices.
@@ -239,6 +248,12 @@ cat notes.txt | vp say
 ```
 
 Keep spoken text plain: markdown, code and URLs are read out literally.
+
+While it reads, the HUD at the bottom of the screen shows the progress with pause and stop buttons, and its
+follow-along card ([`vp open reading`](#vp-open-vp-close-vp-ui)) shows the whole text, a sentence per line, with the
+word being spoken underlined (exact with `macos` voices, estimated with the others). Clicking a sentence there reads on
+from it, with any voice, and `vp say` still returns only when the reading ends: when it finishes, or is stopped from
+the HUD or with `vp stop`.
 
 ### vp listen
 
@@ -284,6 +299,23 @@ vp pause
 
 # Carry on
 vp resume
+```
+
+### vp speed
+
+```sh
+vp speed <0.6–2.0>
+```
+
+Changes the speed of what's being read aloud, on the spot, with every kind of voice, and answers with the new
+`speed`. It applies to this reading only: the next `vp say` uses its own `--speed` and a track its block's `speed`.
+It rounds to tenths, like the **−** and **+** on the follow-along card. Fails with `not_speaking` when nothing is
+being read, `bad_value` outside 0.6 to 2.0, and `app_not_running` when the app isn't running (it never starts it).
+
+```sh
+# From another shell while vp say is reading
+vp speed 1.4
+vp speed 0.8
 ```
 
 ### vp watch
@@ -442,6 +474,9 @@ vp open onboarding --step permissions
 # The menu bar panel
 vp open menu
 
+# The follow-along card for read-aloud, now and for later readings
+vp open reading
+
 # What's on screen now
 vp ui
 
@@ -460,10 +495,12 @@ open block and the focused field. No screen recording or Accessibility access is
 | `vocabulary` | `--word <word>`, `--add` |
 | `setup` | `--section checks\|connections\|cli\|models\|appearance\|updates`, `--field <name>` (such as `openrouter-key`) |
 | `onboarding` | `--step welcome\|permissions\|models\|keys\|agents\|try` |
+| `reading` | The HUD's follow-along card: it shows with the current reading, or the next one, and stays open for later readings until closed |
 | `menu`, `about`, `config` | `config` opens config.toml in your editor |
 
 `--background` shows a window without taking the keyboard from the app you're in. `vp close` takes `main`, `menu`,
-`about`, `onboarding`, `sheet` (an open sheet) or `all`.
+`reading`, `about`, `onboarding`, `sheet` (an open sheet) or `all`. `vp ui` also reports `reading` (`open`, `closed`,
+or `open (shows when reading aloud)`) and, while something is read aloud, its `speed`.
 
 ### vp update
 

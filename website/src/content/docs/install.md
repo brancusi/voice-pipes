@@ -147,8 +147,14 @@ next. The [CLI reference](/docs/cli) has every command.
 ## Updates
 
 The app updates itself: it checks for a new version every 5 minutes, and when one is out the menu bar panel offers
-**Install…**. `vp update` checks now. Because `vp` is a link to the app's binary, it is updated with the app, and
-the app refreshes any installed agent skill when it starts. Permissions carry over between versions.
+**Install…**. `vp update` checks now. Because `vp` is a link to the app's binary, it is updated with the app.
+Permissions carry over between versions.
+
+The rest follows the app each time it starts: it refreshes the installed [agent skill](/docs/agents#install-the-skill)
+and gives it to agents installed since, points the Claude Code session hook at the current `vp`, and, if you moved
+Voice Pipes to another folder, repoints the `vp` links. A link it can't change without your password shows up in
+Setup → Checks as "vp points at a moved app", with **Fix…**. This upkeep runs only for a copy of the app in
+`/Applications` or `~/Applications`.
 
 To reinstall or repair, run the one-line installer again.
 

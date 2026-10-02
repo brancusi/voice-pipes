@@ -3,19 +3,25 @@
 // and the newest flashes, like the app outlining what changed. Without JavaScript, or with reduced motion, every step
 // shows at once (the finished state). It runs only while the figure is on screen and the tab is visible, and the
 // figure's own Pause and Replay buttons control it. Nothing here touches the microphone, speakers or network.
+// A figure can also change state from stage to stage: the figure carries data-stage="n" (in the markup, the
+// finished stage, so that is what shows without JavaScript), and the styles below match space-separated stage lists:
+// data-on (shown only at those stages), data-cur and data-done (a read-along sentence being read, or already read),
+// data-ul (the word under the cursor), data-hov (the pointer over it) and data-lit (a control or note in use).
 ---
 
 <script>
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
   for (const fig of document.querySelectorAll<HTMLElement>('[data-flow]')) {
     const steps = [...fig.querySelectorAll<HTMLElement>('[data-step]')];
-    const last = Math.max(...steps.map((el) => Number(el.dataset.step)));
+    // The finished stage: data-stage in the markup, else the highest data-step.
+    const last = Number(fig.dataset.stage ?? Math.max(...steps.map((el) => Number(el.dataset.step))));
     const controls = fig.querySelector<HTMLElement>('[data-flow-controls]');
     const pause = fig.querySelector<HTMLButtonElement>('[data-flow-pause]');
     let stage = last, timer = 0, held = false, inView = false;
 
     const show = (s: number) => {
       stage = s;
+      fig.dataset.stage = String(s);
       for (const el of steps) {
         const n = Number(el.dataset.step);
         el.toggleAttribute('data-off', n > s);
@@ -46,3 +52,97 @@
     }).observe(fig);
   }
 </script>
+
+<style is:global>
+  /* Stage lists (see above), for stages 0 to 7. Only blog posts load these styles. */
+  [data-stage="0"] [data-on]:not([data-on~="0"]),
+  [data-stage="1"] [data-on]:not([data-on~="1"]),
+  [data-stage="2"] [data-on]:not([data-on~="2"]),
+  [data-stage="3"] [data-on]:not([data-on~="3"]),
+  [data-stage="4"] [data-on]:not([data-on~="4"]),
+  [data-stage="5"] [data-on]:not([data-on~="5"]),
+  [data-stage="6"] [data-on]:not([data-on~="6"]),
+  [data-stage="7"] [data-on]:not([data-on~="7"]) {
+    display: none;
+  }
+  [data-stage="0"] [data-cur~="0"],
+  [data-stage="1"] [data-cur~="1"],
+  [data-stage="2"] [data-cur~="2"],
+  [data-stage="3"] [data-cur~="3"],
+  [data-stage="4"] [data-cur~="4"],
+  [data-stage="5"] [data-cur~="5"],
+  [data-stage="6"] [data-cur~="6"],
+  [data-stage="7"] [data-cur~="7"] {
+    --bar: var(--purple);
+    color: var(--fg);
+  }
+  [data-stage="0"] [data-done~="0"],
+  [data-stage="1"] [data-done~="1"],
+  [data-stage="2"] [data-done~="2"],
+  [data-stage="3"] [data-done~="3"],
+  [data-stage="4"] [data-done~="4"],
+  [data-stage="5"] [data-done~="5"],
+  [data-stage="6"] [data-done~="6"],
+  [data-stage="7"] [data-done~="7"] {
+    color: rgba(184, 168, 142, 0.6);
+  }
+  [data-stage="0"] [data-cur~="0"] [data-ul~="0"],
+  [data-stage="1"] [data-cur~="1"] [data-ul~="1"],
+  [data-stage="2"] [data-cur~="2"] [data-ul~="2"],
+  [data-stage="3"] [data-cur~="3"] [data-ul~="3"],
+  [data-stage="4"] [data-cur~="4"] [data-ul~="4"],
+  [data-stage="5"] [data-cur~="5"] [data-ul~="5"],
+  [data-stage="6"] [data-cur~="6"] [data-ul~="6"],
+  [data-stage="7"] [data-cur~="7"] [data-ul~="7"] {
+    text-decoration: underline 1px var(--purple);
+    text-underline-offset: 3px;
+  }
+  [data-stage="0"] [data-hov~="0"],
+  [data-stage="1"] [data-hov~="1"],
+  [data-stage="2"] [data-hov~="2"],
+  [data-stage="3"] [data-hov~="3"],
+  [data-stage="4"] [data-hov~="4"],
+  [data-stage="5"] [data-hov~="5"],
+  [data-stage="6"] [data-hov~="6"],
+  [data-stage="7"] [data-hov~="7"] {
+    background: rgba(240, 228, 204, 0.07);
+  }
+  [data-stage="0"] [data-lit~="0"],
+  [data-stage="1"] [data-lit~="1"],
+  [data-stage="2"] [data-lit~="2"],
+  [data-stage="3"] [data-lit~="3"],
+  [data-stage="4"] [data-lit~="4"],
+  [data-stage="5"] [data-lit~="5"],
+  [data-stage="6"] [data-lit~="6"],
+  [data-stage="7"] [data-lit~="7"] {
+    --lit-bg: var(--purple);
+    --lit-fg: var(--on-accent);
+    color: var(--fg);
+  }
+
+  /* The read-along card and HUD tag, as drawn in the app's HUD.swift (ReadAlongCard, HUDTag, PlaybackControls) */
+  .ra { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ra__card { box-sizing: border-box; width: 100%; max-width: 500px; background: var(--hud-bg); border: 1px solid rgba(240, 228, 204, 0.14); border-radius: 2px; font-size: 12px; line-height: 18px; }
+  .ra__text { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+  .ra__s { position: relative; margin: 0; padding: 1px 4px 1px 10px; border-radius: 2px; color: rgba(240, 228, 204, 0.7); }
+  .ra__s::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 2px; background: var(--bar, transparent); }
+  .ra__s--para { margin-top: 7px; }
+  .ra__foot { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 10px; border-top: 1px solid rgba(240, 228, 204, 0.1); font-size: 11px; color: var(--fg-muted); }
+  .ra__voice { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ra__rate { width: 4ch; text-align: center; color: var(--fg); }
+  .ra__btn { display: inline-grid; place-items: center; width: 20px; height: 16px; border-radius: 2px; background: var(--lit-bg, rgba(240, 228, 204, 0.14)); color: var(--lit-fg, var(--fg)); font-size: 10px; line-height: 1; }
+  .ra__tag .ra__btn { margin-left: -5px; }
+  .ra__tag .c-muted + .ra__btn { margin-left: 2px; }
+  .prose .ra__keys { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12px; line-height: 18px; color: var(--fg-muted); }
+  .prose .ra__keys li { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ra__keys .key { gap: 5px; background: var(--lit-bg, var(--bg-300)); color: var(--lit-fg, var(--fg-muted)); }
+
+  /* A small read-along card above a HUD tag */
+  .fig__stack { align-self: flex-start; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .fig__mini { display: flex; flex-direction: column; gap: 5px; width: 170px; padding: 7px 8px 7px 14px; background: var(--hud-bg); border: 1px solid rgba(240, 228, 204, 0.14); border-radius: 2px; }
+  .fig__mini-line { height: 4px; border-radius: 1px; background: rgba(240, 228, 204, 0.25); }
+  .fig__mini-line:nth-child(2) { width: 80%; }
+  .fig__mini-line:nth-child(3) { width: 60%; }
+  .fig__mini-line--now { position: relative; background: var(--fg-muted); }
+  .fig__mini-line--now::before { content: ''; position: absolute; left: -7px; top: -2px; bottom: -2px; width: 2px; background: var(--purple); }
+</style>

@@ -6,13 +6,15 @@ import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import CopyCode from '../../components/CopyCode.astro';
 import FlowFigures from '../../components/FlowFigures.astro';
-import { formatDate, posts } from '../../lib/content';
+import { blogPath, formatDate, posts } from '../../lib/content';
 
 export async function getStaticPaths() {
-  return (await posts()).map((post) => ({ params: { slug: post.id }, props: { post } }));
+  // Newest first: the newer post is the one before, the older the one after.
+  const list = await posts();
+  return list.map((post, i) => ({ params: { slug: post.id }, props: { post, newer: list[i - 1], older: list[i + 1] } }));
 }
 
-const { post } = Astro.props;
+const { post, newer, older } = Astro.props;
 const { Content } = await render(post);
 ---
 
@@ -32,6 +34,14 @@ const { Content } = await render(post);
         <p class="lede">{post.data.description}</p>
         <Content />
       </article>
+      {
+        (newer || older) && (
+          <nav class="docs-pager post__pager" aria-label="Newer and older posts">
+            {newer && <a class="card docs-pager__link" href={blogPath(newer.id)} rel="prev"><span class="eyebrow">Newer</span>{newer.data.title}</a>}
+            {older && <a class="card docs-pager__link docs-pager__link--next" href={blogPath(older.id)} rel="next"><span class="eyebrow">Older</span>{older.data.title}</a>}
+          </nav>
+        )
+      }
     </div>
   </main>
   <SiteFooter />

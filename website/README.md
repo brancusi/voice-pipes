@@ -4,7 +4,7 @@ The marketing site for [voicepipes.app](https://voicepipes.app): [Astro](https:/
 HTML and CSS, served by Cloudflare Workers static assets. The plan, copy and sitemap are in
 [docs/website](../docs/website/README.md).
 
-**Status: home page implemented, previewed, not in production.** The home page is the "Home · voicepipes" artboard
+**Status: live at [voicepipes.app](https://voicepipes.app)** (home, `/setup`, `/docs` and `/blog`). The home page is the "Home · voicepipes" artboard
 of the Voice Pipes Website design (a Claude design canvas), built on the Voice Pipes design system (its Philosophy,
 Sundown tokens, components and logo rules) with the system's own logo and mascot files. See `docs/brand.md` for the
 direction. `/setup` is the key setup guide the app links to (`/setup#openrouter`, `/setup#jev`; keep those anchors).
@@ -60,7 +60,11 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 - **Figures** in a post are plain HTML in the Markdown file, using the `fig__*` classes in `global.css` (see
   `why-i-built-voice-pipes.md`; keep each figure free of blank lines). In `<figure data-flow>`, elements with
   `data-step="n"` appear one stage at a time (`FlowFigures.astro`); without JavaScript or with reduced motion
-  everything shows at once. Label recreations of the app as illustrative, not screenshots.
+  everything shows at once. A figure that changes state from stage to stage (the read-along card in
+  `read-it-to-me.md`) carries `data-stage` set to its finished stage, and its parts list the stages they belong to
+  (`data-on`, `data-cur`, `data-done`, `data-ul`, `data-hov`, `data-lit`; `FlowFigures.astro` documents each). Those
+  styles live in `FlowFigures.astro`, so only blog posts load them. Label recreations of the app as illustrative,
+  not screenshots.
 - Code blocks are plain (no highlighter). Fence commands as `sh` and they get a Copy button; fence sample output as
   `text` and they don't.
 - Docs describe the app as shipped: check commands against the CLI source (`Sources/VoiceTools/CLI/`) and
@@ -102,8 +106,8 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 
 ## Keeping it fast
 
-- **Almost no client JavaScript:** only the hero demo's sequencer (about 2 kB, inline). `npm run payload` holds each
-  page to 3 kB. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
+- **Almost no client JavaScript:** the hero demo's sequencer (about 2 kB), the docs' Copy buttons and the blog
+  figures' stepper, all inline. `npm run payload` holds each page to 3 kB. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
   under reduced motion, and the demo shows a finished take without JavaScript.
 - **CSS inlined** in each page (`build.inlineStylesheets: 'always'`) and the illustrations are inline SVG, so a page
   is its HTML plus the two fonts.
@@ -128,7 +132,7 @@ the setup here (`wrangler.jsonc`):
 | Account | Whichever account the Wrangler login uses. It must be the one holding the `voicepipes.app` zone (`account_id` is unset) |
 | workers.dev | Production isn't (`workers_dev: false`); Previews are, at `<preview>-voice-pipes-website.<subdomain>.workers.dev` with `X-Robots-Tag: noindex` |
 
-Nothing is in production yet. To publish an approved version:
+To publish an approved version:
 
 1. `npm ci && npm run verify`
 2. Log in to the Cloudflare account that holds `voicepipes.app` (`npx wrangler login`, or a `CLOUDFLARE_API_TOKEN`

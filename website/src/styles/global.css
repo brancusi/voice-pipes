@@ -513,6 +513,7 @@ a:hover {
 .fig__box { width: 12px; height: 12px; border: 1px solid var(--fg-muted); border-radius: 2px; display: inline-grid; place-items: center; font-size: 10px; line-height: 1; }
 .fig__box--on { background: var(--green); border-color: var(--green); color: var(--on-accent); }
 .fig__controls { display: flex; gap: 6px; }
+.fig__controls[hidden] { display: none; }
 [data-off] { visibility: hidden; }
 [data-now] { outline: 2px solid var(--pink); outline-offset: 2px; border-radius: 4px; }
 @media (max-width: 640px) {
@@ -527,6 +528,7 @@ a:hover {
 .post-card__title a:hover { color: var(--pink); }
 .post { padding-block: 56px 96px; }
 .post__back { text-decoration: none; }
+.post__pager { max-width: 80ch; margin-top: 56px; font-size: 15px; }
 
 @media (max-width: 1100px) {
   .navlinks { display: none; }
@@ -573,7 +575,6 @@ a:hover {
 }
 .site-footer .wordmark { font-size: 14px; }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
-.site-footer__note { font-size: 12px; color: var(--fg-muted); }
 .site-footer__credit { margin: 0 auto; padding-block: 0 28px; font-size: 12px; color: var(--fg-muted); }
 
 /* Text colours, named after the design-system tokens; last, so they win over component colours */
