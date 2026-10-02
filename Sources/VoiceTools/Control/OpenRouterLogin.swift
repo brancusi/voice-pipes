@@ -86,6 +86,8 @@ private final class CallbackCatcher: @unchecked Sendable {
     private var continuation: CheckedContinuation<String, Error>?
     private var finished = false
     private var readyResumed = false
+    /// A callback that lands before `code(timeout:)` is waiting (a fast browser) is kept here until it is.
+    private var early: Result<String, Error>?
 
     init() throws {
         let parameters = NWParameters.tcp
@@ -119,6 +121,7 @@ private final class CallbackCatcher: @unchecked Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 self.continuation = continuation
+                if let early = self.early { return self.finish(early) }
                 self.queue.asyncAfter(deadline: .now() + timeout) {
                     self.finish(.failure(AgentError("login_timeout", "No answer from the browser within \(Int(timeout / 60)) minutes.",
                                                     hint: "vp auth login openrouter (or --headless on a machine without a browser)")))
@@ -147,7 +150,11 @@ private final class CallbackCatcher: @unchecked Sendable {
     }
 
     private func finish(_ result: Result<String, Error>) {
-        guard !finished, let continuation else { return }
+        guard !finished else { return }
+        guard let continuation else {
+            if early == nil { early = result }
+            return
+        }
         finished = true
         continuation.resume(with: result)
     }

@@ -1,5 +1,12 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.6.0**
+- **Your setup is now a file.** Tracks, hotkeys and settings live in `~/.config/voice-pipes/config.toml`, and the vocabulary in `vocabulary.toml` beside it: readable, commented TOML with a full block reference at the end and a schema your editor can check. Save and it applies within a second. If an edit doesn't check out, the last good version keeps running and Setup → Checks says what's wrong, on which line, with a "did you mean". Every change keeps a backup, including edits from outside the app, and a config.toml symlinked from your dotfiles stays linked. Your current tracks and words move over by themselves.
+- **`vp`, the command line.** Setup → **Install command-line tool** (also a new step in the setup window) puts `vp` on your PATH. Run a track with text (`vp run clean-dictation --text "…"`, or pipe text in), speak (`vp say`), ask a question out loud and get the spoken answer back (`vp ask`), listen, transcribe a file on this Mac, browse history, edit vocabulary, check the config, and watch runs as they happen. It's built for agents: compact output, next-step hints, and no prompts.
+- **Sign in to OpenRouter from the command line.** `vp auth login openrouter` opens the browser and saves the key to your Keychain; `vp auth set typesafe` takes a Jev key. Keys are never printed.
+- **Secrets for your own endpoints.** `vp secret set notes`, then `${secret:notes}` in an HTTP block's URL, headers or body. The value stays in the Keychain, not in the file.
+- **Agents know Voice Pipes.** Installing the command-line tool also installs a skill for Claude Code, Codex and other agents, so they can tell you things out loud, ask you questions by voice, run your tracks and safely edit your config.
+
 **1.5.1**
 - **Welcome to Voice Pipes, redrawn.** The first-run window has a step bar, plain titles, and live status: Continue waits until both permissions are on (or Skip), the models step shows Parakeet's download in MB and offers the optional Supertonic voices, the keys step links to openrouter.ai and lets you **Skip, stay local**, and Try it shows your first run's timings before the Wrangler tips his hat.
 - **Empty pages with somewhere to go.** An empty Vocabulary offers **Train a word…** (type the spelling, then say it a few times); with no tracks left, **Restore the starter tracks** brings back Fast dictation, Clean dictation and Read aloud, leaving off any hotkey another track already uses.

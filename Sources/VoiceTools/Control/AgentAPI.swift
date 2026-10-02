@@ -36,9 +36,10 @@ extension AppState {
         case "say":
             reply.result(try await agentSay(args))
         case "stop":
-            let was = speaker.state != .idle || capture != nil
+            let was = speaker.state != .idle || capture != nil || agentRecording
             speaker.clear()
             cancelCapture()
+            if agentRecording { agentCancelled = true }
             reply.result(["stopped": was])
         case "pause", "resume":
             let paused = speaker.state == .paused
@@ -47,7 +48,11 @@ extension AppState {
         case "listen":
             reply.result(try await agentListen(args))
         case "ask":
-            _ = try await agentSay(args.merging(["text": args["question"] ?? ""]) { _, b in b })
+            // voice_model speaks the question; model (if any) transcribes the answer.
+            var speech = args
+            speech["text"] = args["question"] ?? ""
+            speech["model"] = args["voice_model"]
+            _ = try await agentSay(speech)
             reply.result(try await agentListen(args))
         case "transcribe":
             reply.result(try await agentTranscribe(args))
@@ -211,8 +216,15 @@ extension AppState {
 
     // MARK: Running
 
+    /// A run in progress (from a hotkey or another vp command) owns the HUD; wait or stop it.
     private func ensureIdle() throws {
-        guard capture == nil else { throw AgentError("busy", "A track is recording.", hint: "vp stop") }
+        let active: Bool = switch run?.phase {
+        case .recording, .processing, .speaking: true
+        default: false
+        }
+        guard capture == nil, !agentRecording, !active else {
+            throw AgentError("busy", "\(run?.trackName ?? "A track") is running.", hint: "vp stop   (or wait, then retry)")
+        }
     }
 
     /// Runs a track. With text, it starts at the first block that takes text; a microphone track without text records
@@ -248,6 +260,7 @@ extension AppState {
 
     /// Speaks text with a speech model (default: Pocket TTS on this Mac). Answers when it's finished.
     private func agentSay(_ args: [String: Any]) async throws -> [String: Any] {
+        try ensureIdle()
         guard let text = (args["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
             throw AgentError("missing_text", "Nothing to say.", hint: "vp say \"Build passed\"")
         }
@@ -282,12 +295,14 @@ extension AppState {
     private func agentListen(_ args: [String: Any]) async throws -> [String: Any] {
         try ensureIdle()
         let samples = try await recordUntilSilence(label: "Listening (vp)", track: nil, args: args)
+        let listening = run?.trackID
+        // Whatever happens, the HUD doesn't stay on "processing".
+        defer { if run?.trackID == listening { run = nil } }
         let model = args["model"] as? String ?? "parakeet"
         let t0 = Date()
         let text = model == "parakeet"
             ? try await parakeet.transcribe(samples)
             : try await OpenRouterClient.shared.transcribe(wav: WAV.encode(samples), model: model)
-        run = nil
         return ["text": text, "seconds": Double(samples.count) / AudioRecorder.sampleRate, "ms": Int(Date().timeIntervalSince(t0) * 1000)]
     }
 
@@ -315,6 +330,8 @@ extension AppState {
                         stepMs: Array(repeating: nil, count: max(1, track?.steps.count ?? 1)), heldBy: "vp")
         run?.recordingStarted = Date()
         let meter = LevelGate(silence: silence)
+        beginAgentRecording()
+        defer { endAgentRecording() }
         recorder.onSamples = nil
         recorder.onLevel = { [weak self] level in
             meter.add(level)
@@ -325,11 +342,14 @@ extension AppState {
             throw AgentError("no_microphone", "Microphone unavailable: \(error.localizedDescription)")
         }
         let started = Date()
-        while Date().timeIntervalSince(started) < maxSeconds, !meter.done, run?.phase == .recording {
+        while Date().timeIntervalSince(started) < maxSeconds, !meter.done, !agentCancelled {
             try? await Task.sleep(for: .milliseconds(100))
         }
         let samples = recorder.stop()
-        guard run?.phase == .recording else { throw AgentError("cancelled", "Stopped.") }
+        guard !agentCancelled else {
+            run = nil
+            throw AgentError("cancelled", "Stopped (vp stop or Esc).")
+        }
         run?.phase = .processing
         run?.processingStarted = Date()
         guard samples.count > Int(AudioRecorder.sampleRate * 0.3), meter.heardSpeech else {

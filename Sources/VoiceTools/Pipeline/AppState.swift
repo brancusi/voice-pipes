@@ -96,6 +96,32 @@ final class AppState {
     /// Show the setup window: a first launch, or a permission is missing and setup was never finished.
     let needsOnboarding: Bool
 
+    /// Only for this track's run, and only in range: another run may have replaced it meanwhile.
+    private func setStepMs(_ index: Int, _ ms: Int, for track: Track) {
+        guard run?.trackID == track.id, index < (run?.stepMs.count ?? 0) else { return }
+        run?.stepMs[index] = ms
+    }
+
+    /// A vp recording starts: it owns the microphone; Esc (and `vp stop`) cancel it.
+    func beginAgentRecording() {
+        agentRecording = true
+        agentCancelled = false
+        cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
+            if pressed { self?.agentCancelled = true }
+        })
+    }
+
+    func endAgentRecording() {
+        agentRecording = false
+        if let cancelHotkey { hotkeys.remove(cancelHotkey) }
+        cancelHotkey = nil
+    }
+
+    @ObservationIgnored private var registeredSignature: [String]?
+    /// True while `vp listen` / `vp ask` / a vp microphone run records; hotkeys wait, `vp stop` and Esc cancel it.
+    @ObservationIgnored var agentRecording = false
+    @ObservationIgnored var agentCancelled = false
+
     /// `vp watch` connections, sent every run event.
     @ObservationIgnored var watchers: [ControlReply] = []
     /// A word `vp vocab train` asked to train; the Vocabulary page opens its training sheet.
@@ -282,8 +308,14 @@ final class AppState {
     private func registerHotkeys(for tracks: [Track]) {
         guard !hotkeysSuspended else {
             hotkeys.unregisterAll()
+            registeredSignature = nil
             return
         }
+        // A config reload re-assigns the tracks even when nothing about hotkeys changed; re-registering then would
+        // drop a recording's Esc and a held key's release, so skip it.
+        let signature = tracks.filter(\.enabled).flatMap { track in track.triggers.map { "\(track.id)|\($0.combo.key.code)|\($0.combo.modifiers.rawValue)|\($0.mode)" } }
+        guard signature != registeredSignature else { return }
+        registeredSignature = signature
         var bindings: [(KeyCombo, HotkeyManager.Handler)] = []
         for track in tracks where track.enabled {
             for trigger in track.triggers {
@@ -294,6 +326,12 @@ final class AppState {
             }
         }
         unavailableCombos = hotkeys.register(bindings)
+        // register() replaced every hotkey, including a recording's Esc.
+        if capture != nil || agentRecording {
+            cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
+                if pressed { self?.cancelCapture() }
+            })
+        }
     }
 
     private func handleTrigger(trackID: Track.ID, mode: Trigger.Mode, pressed: Bool, label: String) {
@@ -305,6 +343,8 @@ final class AppState {
             if ends { Task { await finishCapture() } }
             return
         }
+        // `vp listen` / a vp-started run owns the microphone and the HUD until it's done.
+        if agentRecording { return }
         guard pressed else { return }
 
         // Pressing a speaking track's trigger pauses or resumes it.
@@ -383,6 +423,7 @@ final class AppState {
     }
 
     func cancelCapture() {
+        if agentRecording { agentCancelled = true }
         guard let live = capture.map({ $0.live }) else { return }
         _ = recorder.stop()
         live?.cancel()
@@ -403,7 +444,7 @@ final class AppState {
         let samples = recorder.stop()
         run?.phase = .processing
         run?.processingStarted = Date()
-        run?.stepMs[0] = Int(Date().timeIntervalSince(capture.started) * 1000)
+        setStepMs(0, Int(Date().timeIntervalSince(capture.started) * 1000), for: capture.track)
 
         // Ignore accidental taps.
         guard samples.count > Int(AudioRecorder.sampleRate * 0.25) else {
@@ -412,7 +453,7 @@ final class AppState {
         }
 
         if let live = capture.live {
-            run?.currentStep = 1
+            if run?.trackID == capture.track.id { run?.currentStep = 1 }
             let released = Date()
             var text = (try? await live.finish()) ?? ""
             if text.isEmpty {
@@ -420,7 +461,7 @@ final class AppState {
                 NSLog("VoiceTools: live transcription returned nothing; transcribing the whole recording")
                 text = (try? await parakeet.transcribe(samples)) ?? ""
             }
-            run?.stepMs[1] = Int(Date().timeIntervalSince(released) * 1000)
+            setStepMs(1, Int(Date().timeIntervalSince(released) * 1000), for: capture.track)
             await runSteps(capture.track, from: 2, payload: .text(text), startedAt: released)
         } else {
             await runSteps(capture.track, from: 1, payload: .audio(samples))
@@ -441,7 +482,7 @@ final class AppState {
         var heard: String?
         while index < track.steps.count {
             let step = track.steps[index]
-            run?.currentStep = index
+            if run?.trackID == track.id { run?.currentStep = index }
             let t0 = Date()
             do {
                 payload = try await execute(step.kind, payload: payload, track: track)
@@ -456,7 +497,7 @@ final class AppState {
                     return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
                 }
             }
-            run?.stepMs[index] = Int(Date().timeIntervalSince(t0) * 1000)
+            setStepMs(index, Int(Date().timeIntervalSince(t0) * 1000), for: track)
             if let text = payload.text {
                 run?.liveText = text
                 if step.kind.category == "Transcribe" { heard = text }
@@ -536,7 +577,7 @@ final class AppState {
             }
             let route = routes[chosen]
             let model = route.model.split(separator: "/").last ?? ""
-            if let index = run?.currentStep, run?.trackID == track.id {
+            if let index = run?.currentStep, run?.trackID == track.id, index < (run?.stepTitles.count ?? 0) {
                 run?.stepTitles[index] = "\(label) · \(model)"
                 run?.modelInfo = "\(route.name) → \(model) · " + (jevMs.map { "Jev \($0) ms \(Int(confidence * 100))%" } ?? "Jev failed")
             }

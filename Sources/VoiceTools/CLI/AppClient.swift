@@ -74,7 +74,8 @@ enum AppClient {
 
     /// The .app this binary belongs to (resolving the `vp` symlink).
     static var bundleURL: URL? {
-        let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        // Not argv[0]: run from PATH that's a bare "vp".
+        let exe = CLIInstaller.executable
         let candidate = exe.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         if candidate.pathExtension == "app" { return candidate }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "io.github.brancusi.voice-tools")

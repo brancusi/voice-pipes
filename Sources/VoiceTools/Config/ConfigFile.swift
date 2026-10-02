@@ -234,13 +234,15 @@ enum ConfigFile {
 
     /// `fast-dictation` from "Fast dictation".
     static func slug(_ name: String) -> String {
-        let lowered = name.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" }
+        // ASCII only ("Café notes" → cafe-notes), so ids are easy to type in a shell.
+        let folded = name.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: nil).lowercased()
+        let lowered = folded.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" }
         let collapsed = String(lowered).split(separator: "-").joined(separator: "-")
         return collapsed.isEmpty ? "track" : collapsed
     }
 
     static func isValidSlug(_ s: String) -> Bool {
-        !s.isEmpty && s.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" } && s.first != "-" && s.last != "-"
+        !s.isEmpty && s.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") } && s.first != "-" && s.last != "-"
     }
 
     /// Gives every track a unique slug, keeping the ones it has.
@@ -367,7 +369,7 @@ enum ConfigFile {
 
         var steps: [Step] = []
         let stepTables = r.tables("step") ?? []
-        if stepTables.isEmpty { r.error("step", "a track needs at least one [[track.step]]") }
+        if stepTables.isEmpty { r.warning("step", "has no [[track.step]] yet, so its hotkey does nothing") }
         for (i, table) in stepTables.enumerated() {
             var s = TableReader(table, path: "\(r.path).step[\(i + 1)]")
             if let kind = readStep(&s) { steps.append(Step(kind: kind)) }
@@ -419,7 +421,7 @@ enum ConfigFile {
             known += ["route"]
             var routes: [Route] = []
             let tables = s.tables("route") ?? []
-            if tables.isEmpty { s.error("route", "a route step needs at least one [[track.step.route]]") }
+            if tables.isEmpty { s.warning("route", "has no [[track.step.route]] yet, so it routes nothing") }
             for (i, table) in tables.enumerated() {
                 var r = TableReader(table, path: "\(s.path).route[\(i + 1)]")
                 let route = Route(name: r.string("name", required: true) ?? "", when: r.string("when") ?? "",
@@ -497,7 +499,7 @@ enum ConfigFile {
 
     private static func write(_ track: Track) -> String {
         let rule = String(repeating: "─", count: max(4, 100 - track.name.count))
-        var out = "# ── \(track.name) \(rule)\n"
+        var out = "# ── \(track.name.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "\r", with: " ")) \(rule)\n"
         out += "[[track]]\n"
         out += "id = \(quote(track.slug ?? slug(track.name)))  # how the CLI and agents name it: vp run \(track.slug ?? slug(track.name))\n"
         out += "name = \(quote(track.name))\n"
@@ -651,7 +653,7 @@ enum ConfigFile {
         #  Keys and secrets are never stored here.
         #    • Providers:  vp auth login openrouter   ·   vp auth set typesafe
         #    • Your own (for http blocks):  vp secret set <name>, then use ${secret:<name>} in a url, header or
-        #      body. Environment variables work too: ${env:NAME}.
+        #      body. ${env:NAME} reads the app's own environment (launchd's, not your shell's).
         #
         #  Vocabulary (the words Fix words corrects) lives beside this file, in vocabulary.toml.
         # ════════════════════════════════════════════════════════════════════════════════════════════════════

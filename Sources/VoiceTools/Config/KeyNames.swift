@@ -3,7 +3,8 @@ import Foundation
 
 /// Hotkeys as text, for the config file and the CLI: `"option+space"`, `"control+shift+r"`, `"command+f5"`.
 /// Modifiers first (control, option, shift, command; aliases ctrl, alt/opt, cmd), then one key, joined with `+`.
-/// Letters and digits follow the current keyboard layout, the way the app shows them.
+/// Letters and digits follow the current keyboard layout, the way the app shows them; any other key is `key-<code>`
+/// (its virtual key code), so every combo the recorder can capture can be written down.
 enum KeyNames {
     static let modifierNames: [(String, KeyCombo.Modifiers)] = [
         ("control", .control), ("option", .option), ("shift", .shift), ("command", .command),
@@ -26,7 +27,14 @@ enum KeyNames {
         ("f20", kVK_F20), ("minus", kVK_ANSI_Minus), ("equal", kVK_ANSI_Equal), ("comma", kVK_ANSI_Comma),
         ("period", kVK_ANSI_Period), ("slash", kVK_ANSI_Slash), ("semicolon", kVK_ANSI_Semicolon), ("quote", kVK_ANSI_Quote),
         ("backslash", kVK_ANSI_Backslash), ("grave", kVK_ANSI_Grave), ("left-bracket", kVK_ANSI_LeftBracket),
-        ("right-bracket", kVK_ANSI_RightBracket),
+        ("right-bracket", kVK_ANSI_RightBracket), ("help", kVK_Help), ("fn", kVK_Function),
+        ("keypad-0", kVK_ANSI_Keypad0), ("keypad-1", kVK_ANSI_Keypad1), ("keypad-2", kVK_ANSI_Keypad2),
+        ("keypad-3", kVK_ANSI_Keypad3), ("keypad-4", kVK_ANSI_Keypad4), ("keypad-5", kVK_ANSI_Keypad5),
+        ("keypad-6", kVK_ANSI_Keypad6), ("keypad-7", kVK_ANSI_Keypad7), ("keypad-8", kVK_ANSI_Keypad8),
+        ("keypad-9", kVK_ANSI_Keypad9), ("keypad-decimal", kVK_ANSI_KeypadDecimal), ("keypad-plus", kVK_ANSI_KeypadPlus),
+        ("keypad-minus", kVK_ANSI_KeypadMinus), ("keypad-multiply", kVK_ANSI_KeypadMultiply),
+        ("keypad-divide", kVK_ANSI_KeypadDivide), ("keypad-equals", kVK_ANSI_KeypadEquals),
+        ("keypad-enter", kVK_ANSI_KeypadEnter), ("keypad-clear", kVK_ANSI_KeypadClear),
     ]
     private static let namedByCode = Dictionary(named.map { ($0.1, $0.0) }, uniquingKeysWith: { a, _ in a })
     private static let codeByName = Dictionary(named.map { ($0.0, $0.1) }, uniquingKeysWith: { a, _ in a })
@@ -48,7 +56,7 @@ enum KeyNames {
             switch self {
             case .empty: "is empty"
             case .unknownModifier(let m): "has an unknown modifier '\(m)' (use control, option, shift, command)"
-            case .unknownKey(let k): "has an unknown key '\(k)' (a letter, a digit, space, return, tab, escape, f1–f20, an arrow, …)"
+            case .unknownKey(let k): "has an unknown key '\(k)' (a letter, a digit, space, return, tab, escape, f1–f20, an arrow, keypad-1, key-<code>, …)"
             case .noKey: "names modifiers but no key"
             case .twoKeys: "names more than one key"
             }
@@ -72,6 +80,7 @@ enum KeyNames {
     private static func code(for name: String) throws -> UInt32 {
         let name = aliases[name] ?? name
         if let code = codeByName[name] { return UInt32(code) }
+        if name.hasPrefix("key-"), let code = UInt32(name.dropFirst(4)), code < 128 { return code }
         if name.count == 1, let character = name.first {
             if let code = KeyCombo.keyCode(producing: character) { return code }
             if let code = ansi[character] { return UInt32(code) }
@@ -88,7 +97,9 @@ enum KeyNames {
             parts.append(name)
         } else {
             let display = KeyCombo.name(for: combo.key.code).lowercased()
-            parts.append(display.count == 1 ? display : "key-\(code)")
+            // A single letter or digit reads back the same way; anything else ("+", a dead key, "") by its code.
+            let plain = display.count == 1 && display.allSatisfy { $0.isLetter || $0.isNumber }
+            parts.append(plain ? display : "key-\(code)")
         }
         return parts.joined(separator: "+")
     }

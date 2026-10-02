@@ -8,17 +8,25 @@ enum ControlSocket {
     /// In Application Support, or a short per-user path in /tmp when that would exceed a socket path's 104 bytes.
     static var url: URL {
         let preferred = TrackStore.defaultURL.deletingLastPathComponent().appendingPathComponent("control.sock")
-        return preferred.path.utf8.count < 100 ? preferred : URL(fileURLWithPath: "/tmp/voicepipes-\(getuid()).sock")
+        // The fallback is this user's private temp folder (not the shared /tmp, where another user could bind it).
+        return preferred.path.utf8.count < 100 ? preferred
+            : URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("voicepipes.sock")
     }
 }
 
-/// Sends JSON lines back on one connection. Safe to call from any thread.
+/// Sends JSON lines back on one connection. Safe to call from any thread, and never blocks the caller: writes happen
+/// on the connection's own queue, and a client that stops reading (a stalled `vp watch`) times out and is dropped.
 final class ControlReply: @unchecked Sendable {
     private let fd: Int32
     private let lock = NSLock()
     private var closed = false
+    private let writer = DispatchQueue(label: "VoicePipes.control.reply")
 
-    init(fd: Int32) { self.fd = fd }
+    init(fd: Int32) {
+        self.fd = fd
+        var timeout = timeval(tv_sec: 2, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+    }
 
     func event(_ data: [String: Any]) { send(["type": "event"].merging(data) { a, _ in a }) }
 
@@ -41,19 +49,29 @@ final class ControlReply: @unchecked Sendable {
     }
 
     private func send(_ object: [String: Any]) {
-        guard var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
+        guard JSONSerialization.isValidJSONObject(object),
+              var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
         data.append(0x0A)
-        lock.lock(); defer { lock.unlock() }
-        guard !closed else { return }
-        let written = data.withUnsafeBytes { raw in Darwin.write(fd, raw.baseAddress, raw.count) }
-        if written < 0 { closed = true; Darwin.close(fd) }
+        writer.async { [self] in
+            lock.lock(); defer { lock.unlock() }
+            guard !closed else { return }
+            var offset = 0
+            while offset < data.count {
+                let n = data.withUnsafeBytes { raw in Darwin.write(fd, raw.baseAddress! + offset, raw.count - offset) }
+                if n <= 0 { closed = true; Darwin.close(fd); return }  // gone, or not reading for 2 s
+                offset += n
+            }
+        }
     }
 
+    /// Closes once everything queued before it has been written.
     func close() {
-        lock.lock(); defer { lock.unlock() }
-        guard !closed else { return }
-        closed = true
-        Darwin.close(fd)
+        writer.async { [self] in
+            lock.lock(); defer { lock.unlock() }
+            guard !closed else { return }
+            closed = true
+            Darwin.close(fd)
+        }
     }
 }
 
@@ -98,7 +116,10 @@ final class ControlServer: @unchecked Sendable {
         guard fd >= 0 else { return }
         var noSigPipe: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
-        queue.async { [weak self] in self?.readRequest(fd) }
+        // A client that connects and never finishes its request gives up after 5 s, on its own thread.
+        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.readRequest(fd) }
     }
 
     private func readRequest(_ fd: Int32) {

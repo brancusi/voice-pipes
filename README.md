@@ -28,6 +28,14 @@ Apple silicon, macOS 14 or later. Self-updating.
 It checks for updates every 5 minutes; when one is out the panel offers **Install…**. Permissions carry over
 between versions.
 
+## Config and the command line
+
+Tracks, hotkeys and settings live in `~/.config/voice-pipes/config.toml` (commented TOML with a JSON Schema; saves
+apply within a second), the vocabulary in `vocabulary.toml` beside it. `vp`, the command-line tool (Setup → Install
+command-line tool), runs tracks, speaks, listens, transcribes and manages keys, config and history, agent-first
+(TOON output, `help[]` hints). An agent skill teaches Claude Code, Codex and others to use it. See the
+[user guide](docs/user-guide.md#the-config-file).
+
 ## A quick tour
 
 - **Menu bar panel** — a launcher: your tracks (click to run), what's playing, the last few runs, and one line

@@ -74,7 +74,7 @@ struct OnboardingView: View {
         _step = State(initialValue: step)
     }
 
-    enum Step: Int, CaseIterable { case welcome, permissions, models, keys, tryIt }
+    enum Step: Int, CaseIterable { case welcome, permissions, models, keys, agents, tryIt }
 
     static let contentSize = CGSize(width: SundownScene.size.width, height: 532)
 
@@ -116,7 +116,7 @@ struct OnboardingView: View {
         switch step {
         case .welcome:
             PixelHeadline("howdy, partner", size: 28)
-            Text("Voice Pipes turns your voice into text, answers and speech through pipelines you play from the keyboard. Four quick steps: allow the microphone and paste, load the on-device models, add keys if you want cloud models, and try it.")
+            Text("Voice Pipes turns your voice into text, answers and speech through pipelines you play from the keyboard. A few quick steps: allow the microphone and paste, load the on-device models, add keys if you want cloud models, optionally set up the command line for agents, and try it.")
                 .font(VPFont.body).lineSpacing(5).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 620, alignment: .leading)
@@ -181,6 +181,15 @@ struct OnboardingView: View {
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }
+        case .agents:
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Command line and agents").font(VPFont.display)
+                Text("optional").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+            }
+            Text("Install vp to run your tracks from Terminal, and the skill so coding agents (Claude Code, Codex and others) can speak to you, ask you things out loud and edit your config.")
+                .font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            Card { CommandLineCard() }
         case .tryIt:
             Text("Try it").font(VPFont.display)
             HStack(spacing: 6) {
@@ -237,6 +246,11 @@ struct OnboardingView: View {
                 Spacer()
                 Button { go(+1) } label: { Text("Skip, stay local").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
                 Button("Continue") { go(+1) }.buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+            case .agents:
+                back
+                Spacer()
+                Button { go(+1) } label: { Text("Skip").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
+                Button("Continue") { go(+1) }.buttonStyle(.vpSecondary).keyboardShortcut(.defaultAction)
             case .tryIt:
                 back
                 Spacer()

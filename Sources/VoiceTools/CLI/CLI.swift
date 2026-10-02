@@ -16,9 +16,11 @@ enum CLI {
     static func main() -> Never {
         var args = Array(CommandLine.arguments.dropFirst())
         if args.first == "--cli" { args.removeFirst() }
-        let json = args.contains("--json")
-        let full = args.contains("--full")
-        args.removeAll { $0 == "--json" || $0 == "--full" }
+        // Output flags anywhere before `--`; after it everything is text (vp say -- --json).
+        let cut = args.firstIndex(of: "--") ?? args.count
+        let json = args[..<cut].contains("--json")
+        let full = args[..<cut].contains("--full")
+        args = args[..<cut].filter { $0 != "--json" && $0 != "--full" } + args[cut...]
         let output = Output(json: json, full: full)
         do {
             try run(args, output)
@@ -82,6 +84,10 @@ struct Parsed {
         var i = 0
         while i < args.count {
             let arg = args[i]
+            if arg == "--" {
+                positionals += args[(i + 1)...]
+                break
+            }
             if arg.hasPrefix("--"), arg.count > 2 {
                 var name = String(arg.dropFirst(2))
                 var value: String?
@@ -122,7 +128,7 @@ struct Parsed {
 
     func int(_ flag: String) throws -> Int? {
         guard let raw = flags[flag] else { return nil }
-        guard let value = Int(raw) else { throw UsageError("bad_value", "--\(flag) should be a whole number, not '\(raw)'.") }
+        guard let value = Int(raw), value >= 0 else { throw UsageError("bad_value", "--\(flag) should be a whole number, not '\(raw)'.") }
         return value
     }
 

@@ -45,12 +45,16 @@ final class VocabularyStore {
     init(fileURL: URL = ConfigPaths.vocabulary, watch: Bool = true) {
         self.fileURL = fileURL
         let cached = (try? Data(contentsOf: legacyURL)).flatMap { try? JSONDecoder().decode([VocabularyEntry].self, from: $0) }
-        if let text = try? String(contentsOf: fileURL, encoding: .utf8) {
+        switch DiskText.read(fileURL) {
+        case .text(let text):
             diskText = text
             let result = VocabularyFile.parse(text)
             entries = result.entries ?? cached ?? Self.starters
             issues = result.errors + result.warnings
-        } else {
+        case .unreadable:
+            entries = cached ?? Self.starters
+            issues = [Self.unreadable]
+        case .missing:
             // 1.6.0: the list moves from vocabulary.json to vocabulary.toml, once (the JSON stays as a last-good copy).
             entries = cached ?? Self.starters
             save()
@@ -62,7 +66,13 @@ final class VocabularyStore {
     var glossary: [String] { entries.map(\.write).filter { !$0.isEmpty } }
 
     func reloadFromDisk() {
-        guard let text = try? String(contentsOf: fileURL, encoding: .utf8), text != diskText else { return }
+        let text: String
+        switch DiskText.read(fileURL) {
+        case .text(let t): text = t
+        case .unreadable: setIssues([Self.unreadable]); return
+        case .missing: return
+        }
+        guard text != diskText else { return }
         if let previous = diskText { ConfigBackups.save(previous, of: fileURL, in: backupsURL) }
         diskText = text
         let result = VocabularyFile.parse(text)
@@ -74,6 +84,8 @@ final class VocabularyStore {
         }
         setIssues(result.errors + result.warnings)
     }
+
+    private static let unreadable = ConfigIssue(severity: .error, path: "", message: "isn't readable as UTF-8 text; fix or remove it (a copy goes to backups/ before the app writes it)")
 
     private var backupsURL: URL { fileURL.deletingLastPathComponent().appendingPathComponent("backups", isDirectory: true) }
 
@@ -87,9 +99,9 @@ final class VocabularyStore {
         let text = VocabularyFile.write(entries)
         guard text != diskText else { return }
         try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let previous = diskText { ConfigBackups.save(previous, of: fileURL, minimumGap: 60, in: backupsURL) }
+        ConfigBackups.beforeWrite(fileURL, ours: diskText, broken: issues.contains { $0.severity == .error }, in: backupsURL)
         do {
-            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            try writeConfigText(text, to: fileURL)
             diskText = text
             watcher?.noteWrite(fileURL)
             writeCache()

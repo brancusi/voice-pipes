@@ -130,3 +130,30 @@ ink. → `VPTextField` draws its own placeholder under an empty field.
 home holding *copies* of the data files; under `SNAPSHOTS` the Keychain returns fake keys (an unsigned binary would
 prompt) and checks don't run. `NavigationSplitView`, and a `ScrollView` as the window's root, render blank this way:
 render the sidebar and page side by side in an `HStack` instead (`MainWindowView.snapshotBody`).
+
+**TOMLDecoder hands back the parent table for a keyed container on a scalar.** Decoding a generic TOML tree by trying
+`container(keyedBy:)` first recursed forever (stack overflow) on `version = 1`. → `TOMLValue` tries scalars first,
+then arrays, then tables.
+
+**`@Observable` + `didSet` + `inout` saves even when nothing changed.** Running the one-time migrations as
+`migrate(&tracks)` called the setter (and `save()`), which overwrote a config.toml that didn't check out at launch.
+→ Migrate a local copy, assign once in `init` (no observer), save only when something changed and the file isn't
+broken.
+
+**Our `Commands` enum shadowed SwiftUI's `Commands` protocol** (the About menu stopped compiling). → `VPCommands`.
+
+**The control socket.** A client that connects and hangs up (vp's "is the app running?" probe) made the next write
+raise SIGPIPE and kill the process, despite `SO_NOSIGPIPE`. → `signal(SIGPIPE, SIG_IGN)` in the server and no reply
+to an empty request. Socket paths must fit 104 bytes; very long home paths fall back to `/tmp/voicepipes-<uid>.sock`.
+
+**stdin in `vp`.** Agents' shells may leave stdin an open, empty pipe; reading it would hang. → Only read piped text
+that's there within 200 ms (or after an explicit `-`).
+
+## Config path and saves
+
+- The config directory is always `~/.config/voice-pipes`, never `$XDG_CONFIG_HOME`: the app is started by launchd and
+  doesn't see shell variables, so the app and `vp` would read different files.
+- Every write of config.toml / vocabulary.toml (app and `vp`) goes through `ConfigBackups.beforeWrite` and
+  `writeConfigText`: whatever is on disk and isn't the app's own last write is backed up first (raw bytes if it isn't
+  UTF-8), and the write follows a symlink instead of replacing it. A file that isn't UTF-8 is never overwritten at
+  launch.

@@ -7,11 +7,12 @@ enum HTTPStep {
                     bodyTemplate: String, responseField: String) async throws -> String {
         let encodedInput = input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input
         // ${secret:name} (Keychain, `vp secret set`) and ${env:NAME}, resolved only now, never stored in the config.
+        let template = url
         let url = Secrets.interpolate(url)
         let headers = headers.mapValues(Secrets.interpolate)
         let bodyTemplate = Secrets.interpolate(bodyTemplate)
         guard let requestURL = URL(string: url.replacingOccurrences(of: "{{input}}", with: encodedInput)) else {
-            throw HTTPStepError.badURL(url)
+            throw HTTPStepError.badURL(template)  // as written: the resolved one may hold a secret
         }
         var request = URLRequest(url: requestURL)
         request.httpMethod = method

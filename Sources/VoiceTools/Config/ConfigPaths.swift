@@ -1,11 +1,11 @@
 import Foundation
 
-/// Where config.toml and friends live: `$XDG_CONFIG_HOME/voice-pipes`, else `~/.config/voice-pipes`.
+/// Where config.toml and friends live: always `~/.config/voice-pipes`. Not `$XDG_CONFIG_HOME`: the app is launched
+/// by launchd, which doesn't see a shell's environment, so the app and `vp` could disagree about the path.
 enum ConfigPaths {
     static var directory: URL {
-        let base = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config", isDirectory: true)
-        return base.appendingPathComponent("voice-pipes", isDirectory: true)
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config", isDirectory: true).appendingPathComponent("voice-pipes", isDirectory: true)
     }
 
     static var config: URL { directory.appendingPathComponent("config.toml") }
@@ -28,13 +28,32 @@ enum ConfigPaths {
     }
 }
 
-/// Keeps dated copies of config.toml / vocabulary.toml before they change, newest 30 of each.
+/// Keeps dated copies of config.toml / vocabulary.toml before they change, newest 50 of each.
 enum ConfigBackups {
-    static let keep = 30
+    static let keep = 50
 
     struct Backup {
         let url: URL
         let date: Date
+    }
+
+    /// A file that exists but isn't readable text: keep its bytes before anything replaces it.
+    static func saveRaw(_ file: URL, in directory: URL = ConfigPaths.backups) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stamp = ISO8601DateFormatter.backup.string(from: Date())
+        let name = "\(file.deletingPathExtension().lastPathComponent)-\(stamp).\(file.pathExtension)"
+        try? FileManager.default.copyItem(at: file.resolvingSymlinksInPath(), to: directory.appendingPathComponent(name))
+    }
+
+    /// Before the app writes `file`: back up what's there. Text we wrote ourselves is backed up at most once a minute;
+    /// anything else (an outside edit the watcher hasn't applied yet, a broken edit, unreadable bytes) always.
+    static func beforeWrite(_ file: URL, ours: String?, broken: Bool, in directory: URL) {
+        switch DiskText.read(file) {
+        case .text(let current) where current != ours || broken: save(current, of: file, in: directory)
+        case .text(let current): save(current, of: file, minimumGap: 60, in: directory)
+        case .unreadable: saveRaw(file, in: directory)
+        case .missing: break
+        }
     }
 
     /// Copies `text` (the version about to be replaced) into backups/, unless one was made less than `minimumGap` ago.
@@ -56,7 +75,10 @@ enum ConfigBackups {
         let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return urls.compactMap { url -> Backup? in
             let name = url.deletingPathExtension().lastPathComponent
-            guard name.hasPrefix(prefix), let date = ISO8601DateFormatter.backup.date(from: String(name.dropFirst(prefix.count))) else { return nil }
+            let stamp = String(name.dropFirst(prefix.count))
+            guard name.hasPrefix(prefix),
+                  let date = ISO8601DateFormatter.backup.date(from: stamp) ?? ISO8601DateFormatter.backupSeconds.date(from: stamp)
+            else { return nil }
             return Backup(url: url, date: date)
         }
         .sorted { $0.date > $1.date }
@@ -64,8 +86,16 @@ enum ConfigBackups {
 }
 
 extension ISO8601DateFormatter {
-    /// File-name safe: 2026-10-02T13-05-22Z.
+    /// File-name safe, to the millisecond: 2026-10-02T130522.123Z.
     static let backup: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate, .withTime, .withFractionalSeconds, .withTimeZone]
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    /// The 1.6.0 beta stamp (whole seconds), still read so older backups are listed and pruned.
+    static let backupSeconds: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withFullDate, .withTime, .withTimeZone]
         f.timeZone = TimeZone(identifier: "UTC")
@@ -103,4 +133,21 @@ final class FileWatcher {
     }
 
     deinit { timer?.invalidate() }
+}
+
+/// What's on disk at a config path.
+enum DiskText: Equatable {
+    case missing
+    case unreadable
+    case text(String)
+
+    static func read(_ url: URL) -> DiskText {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        return (try? String(contentsOf: url, encoding: .utf8)).map(DiskText.text) ?? .unreadable
+    }
+}
+
+/// Writes through a symlink (a config kept in a dotfiles repo stays linked), atomically.
+func writeConfigText(_ text: String, to url: URL) throws {
+    try text.write(to: url.resolvingSymlinksInPath(), atomically: true, encoding: .utf8)
 }

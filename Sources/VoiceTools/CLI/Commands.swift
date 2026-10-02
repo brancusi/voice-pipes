@@ -17,8 +17,9 @@ enum VPCommands {
         CommandSpec(name: "resume", usage: "vp resume", summary: "Resume reading aloud", handler: { _, out in try simple("resume", out) }),
         CommandSpec(name: "listen", usage: "vp listen [--max <s>] [--silence <s>] [--model parakeet|<openrouter-id>]",
                     summary: "Record until you stop talking, then print the transcript", values: ["max", "silence", "model"], handler: listen),
-        CommandSpec(name: "ask", usage: "vp ask \"<question>\" [--max <s>] [--silence <s>] [--voice <id>] [--model …]",
-                    summary: "Speak a question, then record and print the spoken answer", values: ["max", "silence", "voice", "model", "speed"], handler: ask),
+        CommandSpec(name: "ask", usage: "vp ask \"<question>\" [--max <s>] [--silence <s>] [--voice <id>] [--voice-model <m>] [--listen-model <m>]",
+                    summary: "Speak a question, then record and print the spoken answer",
+                    values: ["max", "silence", "voice", "voice-model", "listen-model", "speed"], handler: ask),
         CommandSpec(name: "transcribe", usage: "vp transcribe <audio-file> [--model parakeet|<openrouter-id>]",
                     summary: "Transcribe an audio file (on this Mac by default)", values: ["model"], handler: transcribe),
         CommandSpec(name: "history", usage: "vp history [show <n>] [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
@@ -207,9 +208,10 @@ enum VPCommands {
             throw UsageError("missing_question", "What should I ask?", hint: "vp ask \"Which branch should I deploy?\"")
         }
         var args: [String: Any] = ["question": question]
-        for key in ["voice", "model"] { if let v = parsed[key] { args[key] = v } }
+        if let v = parsed["voice"] { args["voice"] = v }
+        if let v = parsed["voice-model"] { args["voice_model"] = v }   // speaks the question
+        if let v = parsed["listen-model"] { args["model"] = v }        // transcribes the answer
         for key in ["max", "silence", "speed"] { if let v = try parsed.double(key) { args[key] = v } }
-        if args["model"] as? String == "parakeet" { args.removeValue(forKey: "model") }
         let data = try AppClient.request("ask", args)
         out.emit(.object([("question", .string(out.trim(question, 120))), ("answer", .string(data["text"] as? String ?? "")),
                           ("seconds", .double(data["seconds"] as? Double ?? 0))]))
@@ -293,7 +295,14 @@ enum VPCommands {
 
     static func vocab(_ parsed: Parsed, _ out: Output) throws {
         let url = ConfigPaths.vocabulary
-        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? VocabularyFile.write(VocabularyStore.starters)
+        let text: String
+        switch DiskText.read(url) {
+        case .text(let t): text = t
+        case .missing: text = VocabularyFile.write(VocabularyStore.starters)
+        case .unreadable:
+            throw AppClient.Failure(code: "vocabulary_unreadable", message: "vocabulary.toml isn't readable as UTF-8 text.",
+                                    hint: "fix or remove \(ConfigPaths.tilde(url)), then vp vocab")
+        }
         let result = VocabularyFile.parse(text)
         guard var entries = result.entries else {
             throw AppClient.Failure(code: "vocabulary_invalid", message: "vocabulary.toml doesn't check out: \(result.errors.first?.description ?? "")",
@@ -302,7 +311,7 @@ enum VPCommands {
         func save() throws {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             ConfigBackups.save(text, of: url)
-            try VocabularyFile.write(entries).write(to: url, atomically: true, encoding: .utf8)
+            try writeConfigText(VocabularyFile.write(entries), to: url)
         }
         switch parsed.positionals.first {
         case nil, "list":
@@ -397,8 +406,8 @@ enum VPCommands {
             guard n >= 1, n <= sorted.count else { throw AppClient.Failure(code: "no_such_backup", message: "There are \(sorted.count) backups.", hint: "vp config backups") }
             let backup = sorted[n - 1]
             let target = backup.url.lastPathComponent.hasPrefix("vocabulary") ? ConfigPaths.vocabulary : ConfigPaths.config
-            if let current = try? String(contentsOf: target, encoding: .utf8) { ConfigBackups.save(current, of: target) }
-            try String(contentsOf: backup.url, encoding: .utf8).write(to: target, atomically: true, encoding: .utf8)
+            ConfigBackups.beforeWrite(target, ours: nil, broken: true, in: ConfigPaths.backups)
+            try writeConfigText(String(contentsOf: backup.url, encoding: .utf8), to: target)
             out.emit(.object([("restored", .string(backup.url.lastPathComponent)), ("to", .string(ConfigPaths.tilde(target)))]),
                      help: ["vp config check"])
         case "reload":
@@ -524,8 +533,8 @@ enum VPCommands {
 
     static func writeConfig(_ config: AppConfig) throws {
         let url = ConfigPaths.config
-        if let current = try? String(contentsOf: url, encoding: .utf8) { ConfigBackups.save(current, of: url) }
-        try ConfigFile.write(config).write(to: url, atomically: true, encoding: .utf8)
+        ConfigBackups.beforeWrite(url, ours: nil, broken: true, in: ConfigPaths.backups)
+        try writeConfigText(ConfigFile.write(config), to: url)
     }
 
     static func issueSummary(_ issues: [ConfigIssue]) -> String {

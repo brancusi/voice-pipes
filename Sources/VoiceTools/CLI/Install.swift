@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Foundation
 
 extension VPCommands {
@@ -60,8 +61,11 @@ enum CLIInstaller {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return try CLI.names.map { name in
             let link = dir.appendingPathComponent(name)
-            if let existing = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path) {
-                guard existing != executable.path else { return link }
+            if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) != nil {
+                guard isVoicePipes(link) || !FileManager.default.fileExists(atPath: link.path) else {
+                    throw AppClient.Failure(code: "exists", message: "\(link.path) points at another program; left alone.", hint: "vp install --dir <another dir>")
+                }
+                if link.resolvingSymlinksInPath() == executable { return link }
                 try FileManager.default.removeItem(at: link)
             } else if FileManager.default.fileExists(atPath: link.path) {
                 throw AppClient.Failure(code: "exists", message: "\(link.path) exists and isn't a Voice Pipes link; left alone.", hint: "vp install --dir <another dir>")
@@ -75,10 +79,17 @@ enum CLIInstaller {
         (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").contains { URL(fileURLWithPath: String($0)).standardizedFileURL == dir.standardizedFileURL }
     }
 
-    /// Where `vp` currently resolves on the default PATHs, if linked to this app.
+    /// Where `vp` currently resolves on the default PATHs, if linked to this app (any copy of it).
     static var installedLink: URL? {
         ["/usr/local/bin", "/opt/homebrew/bin", "\(NSHomeDirectory())/.local/bin"].map { URL(fileURLWithPath: $0).appendingPathComponent("vp") }
-            .first { (try? FileManager.default.destinationOfSymbolicLink(atPath: $0.path)) != nil }
+            .first { (try? FileManager.default.destinationOfSymbolicLink(atPath: $0.path)) != nil && isVoicePipes($0) }
+    }
+
+    /// True when `url` resolves to the executable inside a Voice Pipes app bundle.
+    static func isVoicePipes(_ url: URL) -> Bool {
+        let exe = url.resolvingSymlinksInPath()
+        let app = exe.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return app.pathExtension == "app" && Bundle(url: app)?.bundleIdentifier == "io.github.brancusi.voice-tools"
     }
 }
 
@@ -133,33 +144,59 @@ enum AgentsInstaller {
     // MARK: Claude Code session hook
 
     static var claudeSettings: URL { targets[0].home.appendingPathComponent("settings.json") }
-    private static var hookCommand: String { "\(CLIInstaller.installedLink?.path ?? CLIInstaller.executable.path) agents context" }
+    /// Quoted for the shell (the app's path has a space); the bundle executable needs `--cli` to act as `vp`.
+    private static var hookCommand: String {
+        let quote = { (path: String) in "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        if let link = CLIInstaller.installedLink { return "\(quote(link.path)) agents context" }
+        return "\(quote(CLIInstaller.executable.path)) --cli agents context"
+    }
 
     static var hookInstalled: Bool {
         ((try? String(contentsOf: claudeSettings, encoding: .utf8)) ?? "").contains("agents context")
     }
 
+    /// settings.json as an object; nil when there's none yet. Anything else is left alone.
+    private static func readSettings() throws -> [String: Any]? {
+        guard let data = try? Data(contentsOf: claudeSettings) else { return nil }
+        if data.allSatisfy({ $0 == 0x20 || $0 == 0x0A || $0 == 0x0D || $0 == 0x09 }) { return [:] }
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            throw AppClient.Failure(code: "claude_settings_invalid", message: "~/.claude/settings.json isn't a JSON object, so it was left alone.",
+                                    hint: "fix it, then vp agents install --hook")
+        }
+        return object
+    }
+
+    /// Keeps a dated copy of the old file, then replaces it atomically (through a symlink, if it is one).
+    private static func writeSettings(_ settings: [String: Any]) throws {
+        let target = claudeSettings.resolvingSymlinksInPath()
+        if let data = try? Data(contentsOf: target) {
+            let stamp = ISO8601DateFormatter.backup.string(from: Date())
+            try data.write(to: target.deletingLastPathComponent().appendingPathComponent("settings.json.voice-pipes-\(stamp).bak"))
+        }
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+            .write(to: target, options: .atomic)
+    }
+
     /// Adds a SessionStart hook that prints `vp agents context`, keeping everything else in settings.json (backed up).
     static func installHook() throws {
         guard !hookInstalled else { return }
-        var settings = (try? JSONSerialization.jsonObject(with: Data(contentsOf: claudeSettings))) as? [String: Any] ?? [:]
-        if let data = try? Data(contentsOf: claudeSettings) { try data.write(to: claudeSettings.appendingPathExtension("voice-pipes-backup")) }
+        var settings = try readSettings() ?? [:]
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         var start = hooks["SessionStart"] as? [[String: Any]] ?? []
         start.append(["hooks": [["type": "command", "command": hookCommand]]])
         hooks["SessionStart"] = start
         settings["hooks"] = hooks
-        try FileManager.default.createDirectory(at: claudeSettings.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]).write(to: claudeSettings)
+        try writeSettings(settings)
     }
 
     static func removeHook() throws {
-        guard var settings = (try? JSONSerialization.jsonObject(with: Data(contentsOf: claudeSettings))) as? [String: Any],
+        guard var settings = try readSettings(),
               var hooks = settings["hooks"] as? [String: Any], var start = hooks["SessionStart"] as? [[String: Any]] else { return }
         start.removeAll { entry in ((entry["hooks"] as? [[String: Any]]) ?? []).contains { ($0["command"] as? String)?.hasSuffix("agents context") == true } }
         hooks["SessionStart"] = start.isEmpty ? nil : start
         settings["hooks"] = hooks.isEmpty ? nil : hooks
-        try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]).write(to: claudeSettings)
+        try writeSettings(settings)
     }
 
     // MARK: The skill
@@ -253,4 +290,86 @@ enum AgentsInstaller {
 
         Then `vp config check`, and `vp run voice-note --text "remember to renew the cert"` to try it.
         """
+}
+
+/// The app's "Install command-line tool": links vp into /usr/local/bin (macOS asks for the password once) or, if
+/// that's declined, ~/.local/bin; then installs the agent skill everywhere it applies.
+@MainActor
+enum CLISetup {
+    struct State: Equatable {
+        var link: URL?
+        var skills: [String]   // agent names with the skill
+    }
+
+    static var state: State {
+        State(link: CLIInstaller.installedLink,
+              skills: AgentsInstaller.targets.filter(AgentsInstaller.isInstalled).map(\.name))
+    }
+
+    /// Returns a line describing what happened.
+    static func install() -> String {
+        // Quoted for the shell, then escaped for the AppleScript string around it.
+        let shellQuoted = "'" + CLIInstaller.executable.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let exe = shellQuoted.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        // Never replace someone else's vp (or voicepipes) in /usr/local/bin: fall back to ~/.local/bin instead.
+        let system = URL(fileURLWithPath: "/usr/local/bin")
+        let taken = CLI.names.contains { name in
+            let path = system.appendingPathComponent(name)  // a dangling link isn't anyone's
+            return FileManager.default.fileExists(atPath: path.path) && !CLIInstaller.isVoicePipes(path)
+        }
+        let script = """
+            do shell script "mkdir -p /usr/local/bin && ln -sfh \(exe) /usr/local/bin/vp && ln -sfh \(exe) /usr/local/bin/voicepipes" \
+            with prompt "Voice Pipes wants to add its command-line tool (vp) to /usr/local/bin." with administrator privileges
+            """
+        var linkedTo: String
+        var error: NSDictionary?
+        if !taken { NSAppleScript(source: script)?.executeAndReturnError(&error) }
+        if !taken, error == nil {
+            linkedTo = "/usr/local/bin"
+        } else {
+            let fallback = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin")
+            linkedTo = ((try? CLIInstaller.link(into: fallback)) != nil) ? "~/.local/bin (add it to your PATH)" : "nowhere"
+        }
+        let skills = (try? AgentsInstaller.installSkill())?.count ?? 0
+        return "vp linked in \(linkedTo); skill installed for \(skills) agent\(skills == 1 ? "" : "s")."
+    }
+}
+
+/// The card shown in Setup and the setup window: where vp is, which agents have the skill, and the button.
+struct CommandLineCard: View {
+    @State private var state = CLISetup.state
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                StatusCode(level: state.link == nil ? .info : .ok)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("vp").font(VPFont.bodyStrong)
+                    Text(state.link.map { "linked at \(ConfigPaths.tilde($0))" } ?? "not installed: run Voice Pipes from Terminal and agents")
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                }
+                Spacer()
+                Button(state.link == nil ? "Install command-line tool" : "Reinstall") {
+                    message = CLISetup.install()
+                    state = CLISetup.state
+                }
+                .buttonStyle(state.link == nil ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
+            }
+            HStack(spacing: 12) {
+                StatusCode(level: state.skills.isEmpty ? .info : .ok)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agent skill").font(VPFont.bodyStrong)
+                    Text(state.skills.isEmpty ? "installed with the tool, for Claude Code, Codex and other agents"
+                         : "installed for " + state.skills.joined(separator: ", "))
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                }
+            }
+            if let message { Text(message).font(VPFont.caption).foregroundStyle(Palette.green) }
+            Text("Agents can then speak to you (vp say), ask you things out loud (vp ask), run your tracks and edit ~/.config/voice-pipes/config.toml.")
+                .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .onAppear { state = CLISetup.state }
+    }
 }

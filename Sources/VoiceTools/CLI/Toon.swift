@@ -89,7 +89,9 @@ extension Out {
     init(any value: Any?) {
         switch value {
         case let s as String: self = .string(s)
-        case let b as Bool: self = .bool(b)
+        // JSONSerialization gives NSNumber for both; `as Bool` would also match 0 and 1.
+        case let n as NSNumber where CFGetTypeID(n) == CFBooleanGetTypeID(): self = .bool(n.boolValue)
+        case let n as NSNumber where !CFNumberIsFloatType(n): self = .int(n.intValue)
         case let i as Int: self = .int(i)
         case let d as Double: self = .double(d)
         case let a as [Any]: self = .list(a.map { Out(any: $0) })

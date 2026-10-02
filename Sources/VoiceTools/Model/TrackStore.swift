@@ -38,9 +38,11 @@ final class TrackStore {
         var text: String?
         var found: [ConfigIssue] = []
         var fresh = false
-        if let disk = try? String(contentsOf: configURL, encoding: .utf8) {
-            text = disk
-            let result = ConfigFile.parse(disk, existing: cached ?? [])
+        let disk = DiskText.read(configURL)
+        switch disk {
+        case .text(let content):
+            text = content
+            let result = ConfigFile.parse(content, existing: cached ?? [])
             if let config = result.config {
                 loaded = config.tracks
                 AppearanceChoice.store(config.appearance)
@@ -49,25 +51,37 @@ final class TrackStore {
                 loaded = cached ?? Track.defaults
             }
             found = result.errors + result.warnings
-        } else if let legacy = cached {
-            // 1.6.0: tracks move from tracks.json to config.toml, once. tracks.json stays as the last-good copy.
-            loaded = legacy
-        } else if FileManager.default.fileExists(atPath: fileURL.path) {
-            // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
-            let backup = fileURL.deletingPathExtension()
-                .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
-            try? FileManager.default.moveItem(at: fileURL, to: backup)
-            NSLog("VoiceTools: couldn't read tracks; moved them to \(backup.lastPathComponent)")
-            loaded = Track.defaults
-        } else {
-            loaded = Track.defaults
-            fresh = true
+            // The pre-1.6 migrations are for tracks.json only; a config.toml (maybe copied from another Mac) is
+            // taken as written.
+            Self.markLegacyMigrationsDone()
+        case .unreadable:
+            loaded = cached ?? Track.defaults
+            found = [ConfigIssue(severity: .error, path: "", message: "isn't readable as UTF-8 text; fix or remove it (a copy goes to backups/ before the app writes it)")]
+            Self.markLegacyMigrationsDone()
+        case .missing:
+            if let legacy = cached {
+                // 1.6.0: tracks move from tracks.json to config.toml, once. tracks.json stays as the last-good copy.
+                loaded = legacy
+            } else if FileManager.default.fileExists(atPath: fileURL.path) {
+                // Never overwrite tracks we can't read: keep them aside, then start from the defaults.
+                let backup = fileURL.deletingPathExtension()
+                    .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                try? FileManager.default.moveItem(at: fileURL, to: backup)
+                NSLog("VoiceTools: couldn't read tracks; moved them to \(backup.lastPathComponent)")
+                loaded = Track.defaults
+            } else {
+                loaded = Track.defaults
+                fresh = true
+            }
         }
-        // All three run (each is one-time, behind its own flag).
-        let pocket = Self.migrateReadAloudToPocket(&loaded)
-        let fixWords = Self.addFixWords(&loaded)
-        let colors = Self.sundownColors(&loaded)
-        let migrated = pocket || fixWords || colors
+        var migrated = false
+        if disk == .missing {
+            // All three run (each is one-time, behind its own flag).
+            let pocket = Self.migrateReadAloudToPocket(&loaded)
+            let fixWords = Self.addFixWords(&loaded)
+            let colors = Self.sundownColors(&loaded)
+            migrated = pocket || fixWords || colors
+        }
         let before = loaded
         ConfigFile.assignSlugs(&loaded)
         let changed = migrated || loaded != before
@@ -75,10 +89,16 @@ final class TrackStore {
         issues = found
         diskText = text
         createdFresh = fresh
-        // Write the file when there's none yet or a migration changed something, but never over a broken file.
-        if text == nil || (changed && !found.contains { $0.severity == .error }) { save() }
+        // Write the file when there's none yet, or a fix-up changed tracks in a file that checks out.
+        if disk == .missing || (changed && !found.contains { $0.severity == .error }) { save() }
         ConfigPaths.writeSchemas(in: configURL.deletingLastPathComponent())
         if watch { watcher = FileWatcher(configURL) { [weak self] in self?.reloadFromDisk() } }
+    }
+
+    private static func markLegacyMigrationsDone() {
+        for key in ["migration.readAloudPocket.v1", "migration.fixWords.v1", "migration.sundownColors.v1"] {
+            UserDefaults.standard.set(true, forKey: key)
+        }
     }
 
     /// Writes config.toml now (after a settings change such as Appearance).
@@ -86,7 +106,15 @@ final class TrackStore {
 
     /// Re-reads config.toml if it changed outside the app. `vp config reload` and the watcher call this.
     func reloadFromDisk() {
-        guard let text = try? String(contentsOf: configURL, encoding: .utf8), text != diskText else { return }
+        let text: String
+        switch DiskText.read(configURL) {
+        case .text(let t): text = t
+        case .unreadable:
+            setIssues([ConfigIssue(severity: .error, path: "", message: "isn't readable as UTF-8 text; fix or remove it (a copy goes to backups/ before the app writes it)")])
+            return
+        case .missing: return
+        }
+        guard text != diskText else { return }
         if let previous = diskText { ConfigBackups.save(previous, of: configURL, in: backupsURL) }
         diskText = text
         let result = ConfigFile.parse(text, existing: tracks)
@@ -217,8 +245,8 @@ final class TrackStore {
         guard text != diskText else { return }
         do {
             try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if let previous = diskText { ConfigBackups.save(previous, of: configURL, minimumGap: 60, in: backupsURL) }
-            try text.write(to: configURL, atomically: true, encoding: .utf8)
+            ConfigBackups.beforeWrite(configURL, ours: diskText, broken: issues.contains { $0.severity == .error }, in: backupsURL)
+            try writeConfigText(text, to: configURL)
             diskText = text
             watcher?.noteWrite(configURL)
             writeCache()

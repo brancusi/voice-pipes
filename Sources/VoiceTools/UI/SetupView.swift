@@ -12,6 +12,7 @@ struct SetupView: View {
             VStack(alignment: .leading, spacing: 22) {
                 checks
                 connections
+                VPSection("Command line and agents") { Card { CommandLineCard() } }
                 onThisMac
                 appearanceSection
                 updatesSection

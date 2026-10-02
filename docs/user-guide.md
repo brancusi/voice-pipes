@@ -174,17 +174,90 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
 - **Updates** — version and **Check now**.
 
+## The config file
+
+Everything you build lives in **`~/.config/voice-pipes/config.toml`** (tracks, hotkeys, settings) and
+**`vocabulary.toml`** beside it, readable and commented, with JSON Schemas (`config.schema.json`,
+`vocabulary.schema.json`) so editors such as VS Code with Even Better TOML check them as you type. The full block
+reference is at the end of `config.toml` (and `vp help config`).
+
+```toml
+[[track]]
+id = "fast-dictation"            # how `vp run` and agents name it
+name = "Fast dictation"
+color = "apricot"
+hotkeys = [{ keys = "option+space", mode = "hold" }]
+
+  [[track.step]]
+  type = "microphone"
+
+  [[track.step]]
+  type = "transcribe"
+  model = "parakeet"
+```
+
+- **Saves apply within a second.** A file that doesn't check out is not applied: the last good version keeps running,
+  and Setup → Checks (and the panel) say what's wrong, with the line and a "did you mean" where it can.
+  `vp config check` checks without applying.
+- **Edits in the window write the file back** in the same layout and comments. Comments you add yourself aren't kept.
+- **Backups:** every change keeps the previous version in `backups/` (the newest 50 of each file);
+  `vp config backups` and `vp config restore <n>`.
+- **Secrets never go in the file.** Provider keys: `vp auth`. Your own tokens for http blocks:
+  `vp secret set <name>`, then `${secret:<name>}` in a url, header or body (`${env:NAME}` reads the app's own environment, which is launchd's, not your shell's: set it with `launchctl setenv` or use a secret).
+- Upgrading from 1.5 moves your tracks and vocabulary into these files once; the old JSON files stay as last-good copies.
+
+## The command line: `vp`
+
+**Setup → Command line and agents → Install command-line tool** (also a step in the setup window) links `vp` (and
+`voicepipes`) into `/usr/local/bin` (macOS asks for your password once) or, if you decline, `~/.local/bin`; from a
+terminal, `vp install` does the same without a password. It's the app's own binary, so it's always the same version.
+
+Run `vp` alone for live state. Output is TOON by default (compact, for agents; `--json` for JSON), long text is
+truncated unless `--full`, errors print on stdout with a code and a hint, and exit codes are 0 (ok), 1 (error),
+2 (bad usage). Nothing prompts. Commands that only read or edit files work without the app; the rest start it in
+the background.
+
+| Command | Does |
+|---|---|
+| `vp` | Live state: the app, config health, tracks, what to run next |
+| `vp status` | Permissions, on-device models, keys (masked), problems |
+| `vp tracks` · `tracks show <id>` · `tracks enable/disable <id>` | List, inspect, switch tracks on or off |
+| `vp run <id> [--text "…"]` | Run a track. Text (or piped text) starts at its first block that takes text; a microphone track without text records until you stop talking. Prints the final text |
+| `vp say "…" [--model --voice --speed]` | Speak (default Pocket TTS on this Mac) |
+| `vp listen` · `vp ask "<question>"` | Record until you stop talking and print the transcript; `ask` speaks the question first |
+| `vp transcribe <file>` | Transcribe an audio file on this Mac (or `--model <openrouter-id>`) |
+| `vp stop` · `pause` · `resume` | Control speech and recording |
+| `vp history [--limit --track --search --since]` · `history show <n>` | Recent runs with timings |
+| `vp vocab [add/remove/test/train]` | The Fix words list |
+| `vp config [check/schema/backups/restore/reload/open/path]` | The config file |
+| `vp models --capability text\|transcription\|speech` · `vp voices --model <m>` | What you can pick |
+| `vp auth [login openrouter / set <provider> / remove <provider>]` | Keys (Keychain). `login openrouter` signs in through the browser; `--headless` then `--code <code>` without one |
+| `vp secret [set/remove]` | Your own secrets for http blocks |
+| `vp watch` | Stream run events as they happen |
+| `vp open <window>` · `vp update` | Open a window; check for updates |
+| `vp install` · `vp agents install [--hook]` | Put vp on your PATH; install the agent skill |
+
+## Agents
+
+`vp agents install` (also done by **Install command-line tool**) writes a skill for coding agents into each agent's
+folder that exists: `~/.claude/skills/voice-pipes/` (Claude Code), `~/.codex/skills/voice-pipes/` (Codex) and
+`~/.agents/skills/voice-pipes/`. It teaches them to speak to you (`vp say`), ask you something out loud and use your
+answer (`vp ask`), run your tracks, and edit `config.toml` safely (always `vp config check`, never keys in the file).
+The app keeps installed skills up to date. `vp agents install --hook` also adds a Claude Code session hook that
+shows Voice Pipes' state at the start of each session (your `~/.claude/settings.json` is backed up first);
+`vp agents uninstall` removes both.
+
 ## Your data
 
-All under `~/Library/Application Support/VoiceTools/` and safe to edit while the app is **quit**:
-
-| File | Contents |
+| Where | Contents |
 |---|---|
-| `tracks.json` | Tracks, triggers and steps. If it can't be read it's moved aside as `tracks.unreadable-<time>.json`, never overwritten. |
-| `vocabulary.json` | The Vocabulary list. |
-| `history.json` | History: the last 1,000 runs' text, what was heard, timings. Plain text on your disk; **Clear history…** empties it. |
-| `models-cache.json` | OpenRouter's model list (refreshed daily). |
-| `supertonic-voices/` | Downloaded Supertonic voice styles. |
+| `~/.config/voice-pipes/config.toml` | Tracks, hotkeys, settings (see above) |
+| `~/.config/voice-pipes/vocabulary.toml` | The Vocabulary list |
+| `~/.config/voice-pipes/backups/` | Earlier versions of both |
+| `~/Library/Application Support/VoiceTools/history.json` | History: the last 1,000 runs' text, what was heard, timings. **Clear history…** empties it |
+| `~/Library/Application Support/VoiceTools/tracks.json`, `vocabulary.json` | Last-good copies the app falls back on |
+| `~/Library/Application Support/VoiceTools/models-cache.json` | OpenRouter's model list (refreshed daily) |
+| `~/Library/Application Support/VoiceTools/control.sock` | How `vp` talks to the app (only you can open it) |
 
-On-device models are cached by FluidAudio in `~/Library/Application Support/FluidAudio/Models/`. API keys are in
-the login Keychain under `io.github.brancusi.voice-tools` (accounts `openrouter`, `typesafe`).
+On-device models are cached by FluidAudio in `~/Library/Application Support/FluidAudio/Models/`. API keys and your
+secrets are in the login Keychain under `io.github.brancusi.voice-tools`.
