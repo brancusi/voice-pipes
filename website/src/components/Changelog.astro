@@ -1,0 +1,29 @@
+---
+import { latestReleases } from '../lib/releases';
+
+// Read from the app's RELEASE_NOTES.md at build time, so the site lists whatever was released last.
+const releases = latestReleases(4);
+---
+
+<section id="changelog" class="sec">
+  <div class="wrap split split--top">
+    <div class="stack">
+      <span class="eyebrow">Changelog</span>
+      <h2 class="display h2">new tricks every release</h2>
+      <p class="lede">
+        Voice Pipes checks for updates every few minutes and offers Install… when one is out. Your permissions and keys
+        carry over.
+      </p>
+    </div>
+    <div class="card list list--versions">
+      {
+        releases.map(({ version, summary }) => (
+          <div>
+            <span class="list__version">{version}</span>
+            <span class="row-text">{summary}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,24 @@
+---
+// The Wrangler in boots and spurs (supplied art), at 5× (whole pixels only). No booted singing pose exists yet.
+import wranglerSvg from '../assets/brand/wrangler-busk-boots.svg?raw';
+import { DOWNLOAD_URL } from '../site';
+import { svgParts } from '../lib/svg';
+
+const wrangler = svgParts(wranglerSvg);
+---
+
+<section class="sec sec--flush band">
+  <div class="wrap cta">
+    <div class="cta__pitch">
+      <svg width="100" height="150" viewBox={wrangler.viewBox} shape-rendering="crispEdges" role="img" aria-label="The Wrangler, in boots and spurs, with his harmonica" set:html={wrangler.inner} />
+      <div class="cta__words">
+        <h2 class="display h2 cta__title">saddle up<span class="c-pink">.</span></h2>
+        <span class="cta__how">Download, drag to Applications, hold <span class="key">⌥Space</span> and say something.</span>
+      </div>
+    </div>
+    <div class="cta__get">
+      <a class="btn btn-p" href={DOWNLOAD_URL}>Download for Mac</a>
+      <span>Apple silicon · macOS 14 or later</span>
+    </div>
+  </div>
+</section>

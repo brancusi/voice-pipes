@@ -1,0 +1,13 @@
+---
+// The primary mark (Sundown, 32 × 32 grid), drawn at whole-pixel sizes only: 32, 64, 96…
+import mark from '../assets/brand/voicepipes-mark-sundown.svg?raw';
+import { svgParts } from '../lib/svg';
+
+interface Props {
+  size: 32 | 64 | 96;
+}
+const { size } = Astro.props;
+const { viewBox, inner } = svgParts(mark);
+---
+
+<svg width={size} height={size} viewBox={viewBox} shape-rendering="crispEdges" aria-hidden="true" set:html={inner} />

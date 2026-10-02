@@ -1,0 +1,28 @@
+---
+import Logo from './Logo.astro';
+import { DOWNLOAD_URL } from '../site';
+
+// Absolute, so they work from /setup too (on the home page they stay same-page jumps).
+const sections = [
+  ['/#tracks', 'Tracks'],
+  ['/#blocks', 'Building blocks'],
+  ['/#routing', 'Routing'],
+  ['/#local', 'On your Mac'],
+  ['/#changelog', 'Changelog'],
+  ['/setup', 'Setup'],
+];
+---
+
+<header class="band">
+  <div class="wrap site-header__bar">
+    <a class="brand" href="/#top" aria-label="Voice Pipes home">
+      <Logo size={32} />
+      <span class="wordmark">voice <span class="c-pink">|</span> pipes</span>
+    </a>
+    <nav class="navlinks" aria-label="Sections">
+      {sections.map(([href, label]) => <a class="nav-a" href={href}>{label}</a>)}
+    </nav>
+    <span class="spacer"></span>
+    <a class="btn btn-p btn-sm" href={DOWNLOAD_URL}>Download</a>
+  </div>
+</header>

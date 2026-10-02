@@ -1,0 +1,48 @@
+---
+// Each block: its name and, dimmer, what it takes or where it runs.
+const groups = [
+  { title: 'Input', accent: 'var(--fg-muted)', blocks: [['Microphone', '— → audio'], ['Text', 'selection, page, clipboard']] },
+  { title: 'Transcribe', accent: 'var(--cyan)', blocks: [['Parakeet v3', 'on your Mac'], ['Any OpenRouter transcription model']] },
+  {
+    title: 'Transform',
+    accent: 'var(--purple)',
+    blocks: [['LLM', 'your instructions'], ['Route · Jev', 'picks the model'], ['Fix words', 'your vocabulary'], ['HTTP request · Template']],
+  },
+  {
+    title: 'Output',
+    accent: 'var(--green)',
+    blocks: [['Paste at cursor'], ['Copy to clipboard'], ['Speak', 'local or cloud voices'], ['Show in HUD']],
+  },
+];
+---
+
+<section id="blocks" class="sec">
+  <div class="wrap stack stack--40">
+    <div class="stack stack--16">
+      <span class="eyebrow">Building blocks</span>
+      <h2 class="display h2">snap the pipes together</h2>
+      <p class="lede">
+        Each block says what it takes and what it gives, and the editor won't let you connect two that don't fit.
+        Every model is a choice in one picker: on your Mac first, then anything on OpenRouter.
+      </p>
+    </div>
+    <div class="g4">
+      {
+        groups.map((group) => (
+          <div class="card block" style={`--accent: ${group.accent}`}>
+            <span class="eyebrow">{group.title}</span>
+            <div class="block__items">
+              {group.blocks.map(([name, note]) => (
+                <span>
+                  {name}
+                  {note && ' '}
+                  {note && <span class="c-muted">{note}</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

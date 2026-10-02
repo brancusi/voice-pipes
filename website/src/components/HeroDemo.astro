@@ -1,0 +1,200 @@
+---
+// An illustrative demo, not a recording: five sample takes, each shown capturing → processing → done, with made-up
+// timings in the range the app measures. Nothing here touches the microphone, clipboard, network or speakers.
+// Without JavaScript (or with reduced motion) the first take shows finished; the script below only sequences it.
+
+type Kind = 'terminal' | 'email' | 'read' | 'ask' | 'note';
+interface Take {
+  label: string;
+  kind: Kind;
+  track: string;
+  color: string;
+  key: string;
+  // Each step: name, colour class, illustrative milliseconds.
+  steps: [string, string, number][];
+  said: string;
+  // The HUD tag at each stage: capture, processing, done.
+  hud: [string, string, string][];
+}
+
+const takes: Take[] = [
+  {
+    label: 'Terminal',
+    kind: 'terminal',
+    track: 'Shell (a track you build)',
+    color: 'var(--pink)',
+    key: '⌃⌥T hold',
+    steps: [['parakeet', 'c-cyan', 96], ['llm · claude-haiku-4.5', 'c-purple', 488], ['paste', 'c-green', 21]],
+    said: 'show me what changed in git',
+    hud: [['REC', 'var(--red)', '00:02'], ['PROC', 'var(--yellow)', '584ms'], ['OK', 'var(--green)', '605ms']],
+  },
+  {
+    label: 'Email',
+    kind: 'email',
+    track: 'Clean dictation',
+    color: 'var(--cyan)',
+    key: '⇧⌥Space toggle',
+    steps: [['mai-transcribe-2', 'c-cyan', 540], ['fix-words', 'c-purple', 1], ['claude-haiku-4.5', 'c-purple', 640], ['paste', 'c-green', 22]],
+    said: 'uh hey sam so um the plan is we ship friday and I’ll send the notes tonight',
+    hud: [['REC', 'var(--red)', '00:06'], ['PROC', 'var(--yellow)', '1,181ms'], ['OK', 'var(--green)', '1,203ms']],
+  },
+  {
+    label: 'Read aloud',
+    kind: 'read',
+    track: 'Read aloud',
+    color: 'var(--purple)',
+    key: '⌥R toggle',
+    steps: [['selection', 'c-muted', 2], ['speak · pocket tts', 'c-green', 25]],
+    said: 'the selected paragraph',
+    hud: [['VOICE', 'var(--purple)', '···'], ['READ', 'var(--purple)', '12%'], ['READ', 'var(--purple)', '42%']],
+  },
+  {
+    label: 'Ask',
+    kind: 'ask',
+    track: 'Quick answer (recipe)',
+    color: 'var(--green)',
+    key: 'your hotkey',
+    steps: [['parakeet', 'c-cyan', 88], ['jev route', 'c-purple', 262], ['claude-haiku-4.5', 'c-purple', 610], ['speak', 'c-green', 25]],
+    said: 'how many ounces in a cup',
+    hud: [['REC', 'var(--red)', '00:02'], ['PROC', 'var(--yellow)', '960ms'], ['READ', 'var(--purple)', '30%']],
+  },
+  {
+    label: 'Notes',
+    kind: 'note',
+    track: 'Note (a track you build)',
+    color: 'var(--yellow)',
+    key: '⌃⌥N hold',
+    steps: [['parakeet', 'c-cyan', 92], ['fix-words', 'c-purple', 1], ['http request', 'c-purple', 140]],
+    said: 'remember to renew the domain before march',
+    hud: [['REC', 'var(--red)', '00:03'], ['PROC', 'var(--yellow)', '93ms'], ['OK', 'var(--green)', '233ms']],
+  },
+];
+
+const total = (take: Take) => take.steps.reduce((sum, [, , ms]) => sum + ms, 0).toLocaleString('en-US');
+const stages = ['rec', 'proc', 'ok'] as const;
+---
+
+<section class="demo term" data-demo data-stage="ok" aria-labelledby="demo-title">
+  <div class="term-bar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <h2 id="demo-title" class="term-title demo__title">Illustrative demo: five takes</h2>
+  </div>
+  <div class="demo__takes">
+    {
+      takes.map((take, n) => (
+        <article class="take" data-take data-active={n === 0 ? '' : undefined} aria-label={`Take ${n + 1}: ${take.label}`}>
+          <div class="take__head">
+            <span class="track__name"><span class="sq" style={`background: ${take.color}`} />{take.track}</span>
+            <span class="key">{take.key}</span>
+          </div>
+          <div class="take__hud">
+            {take.hud.map(([code, color, detail], s) => (
+              <span class={`hud take__stage take__stage--${stages[s]}`}>
+                <span class="sq" style={`background: ${color}`} />
+                {code} <span class="c-muted">{detail}</span>
+              </span>
+            ))}
+            <span class="take__level" aria-hidden="true"><span /><span /><span /><span /><span /></span>
+          </div>
+          <p class="take__said">
+            <span class="sep">›</span> {take.kind === 'read' ? <span class="c-muted">reads {take.said}</span> : <span>“{take.said}”</span>}
+          </p>
+          <div class={`take__out out out--${take.kind}`}>
+            {take.kind === 'terminal' && (
+              <>
+                <span><span class="c-muted">~/voice-tools</span> <span class="c-green">$</span> git status<span class="blink c-green">▌</span></span>
+                <span class="out__note">pasted at the prompt; Return is yours to press</span>
+              </>
+            )}
+            {take.kind === 'email' && (
+              <>
+                <span class="out__note">To: Sam · Re: launch</span>
+                <span>Hi Sam, the plan is to ship on Friday. I’ll send the notes tonight.</span>
+              </>
+            )}
+            {take.kind === 'read' && (
+              <>
+                <span><mark>Pipelines you play from the keyboard.</mark> Hold a hotkey, talk, let go.</span>
+                <span class="out__note">read in a voice on your Mac; the first sound comes in about 25 ms</span>
+              </>
+            )}
+            {take.kind === 'ask' && (
+              <>
+                <span class="out__note">quick → claude-haiku-4.5 · Jev 262 ms 100%</span>
+                <span>A US cup is 8 fluid ounces.</span>
+              </>
+            )}
+            {take.kind === 'note' && (
+              <>
+                <span class="out__note">Notes · new note</span>
+                <span>Renew the domain before March.</span>
+              </>
+            )}
+          </div>
+          <p class="take__time">
+            {take.steps.map(([name, color, ms], i) => (
+              <>
+                {i > 0 && <span class="sep"> › </span>}
+                <span class={color}>{name} {ms} ms</span>
+              </>
+            ))}
+            <span class="c-muted"> · {total(take)} ms</span>
+          </p>
+        </article>
+      ))
+    }
+  </div>
+  <p class="demo__fine">Sample text and illustrative timings, not a recording or a benchmark.</p>
+  <div class="demo__controls" data-js hidden>
+    <div class="demo__chips" role="group" aria-label="Choose a take">
+      {takes.map((take, n) => <button type="button" class="chip" data-chip aria-pressed={n === 0 ? 'true' : 'false'}>{take.label}</button>)}
+    </div>
+    <div class="demo__play">
+      <button type="button" class="chip" data-pause aria-pressed="false">Pause</button>
+      <button type="button" class="chip" data-replay>Replay</button>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const demo = document.querySelector('[data-demo]');
+    if (!demo) return;
+    const hero = demo.closest('.hero');
+    const takes = [...demo.querySelectorAll('[data-take]')];
+    const chips = [...demo.querySelectorAll('[data-chip]')];
+    const pause = demo.querySelector('[data-pause]');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+    const STAGES = [['rec', 1800], ['proc', 900], ['ok', 3600]];
+    let take = 0, stage = 2, timer = 0, held = false, inView = true;
+
+    const playing = () => !held && inView && !document.hidden && !reduce.matches;
+    const show = (t, s) => {
+      take = t; stage = s;
+      demo.dataset.stage = STAGES[s][0];
+      takes.forEach((el, i) => el.toggleAttribute('data-active', i === t));
+      chips.forEach((el, i) => el.setAttribute('aria-pressed', String(i === t)));
+    };
+    const run = () => {
+      clearTimeout(timer);
+      hero?.toggleAttribute('data-paused', !playing());
+      if (playing()) timer = setTimeout(() => { stage < 2 ? show(take, stage + 1) : show((take + 1) % takes.length, 0); run(); }, STAGES[stage][1]);
+    };
+    const start = (t) => { show(t, reduce.matches ? 2 : 0); run(); };
+
+    demo.querySelector('[data-js]').hidden = false;
+    pause.hidden = reduce.matches;
+    chips.forEach((el, i) => el.addEventListener('click', () => start(i)));
+    demo.querySelector('[data-replay]').addEventListener('click', () => start(take));
+    pause.addEventListener('click', () => {
+      held = !held;
+      pause.setAttribute('aria-pressed', String(held));
+      pause.textContent = held ? 'Play' : 'Pause';
+      run();
+    });
+    reduce.addEventListener('change', () => { pause.hidden = reduce.matches; start(take); });
+    document.addEventListener('visibilitychange', run);
+    new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; run(); }).observe(hero ?? demo);
+    start(0);
+  })();
+</script>

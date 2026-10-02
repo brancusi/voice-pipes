@@ -1,0 +1,40 @@
+---
+// The document shell every page renders into: head, fonts (served from this site; the two above the fold are
+// preloaded, the pixel accent face is not) and a skip link to the page's <main id="main">.
+import { Font } from 'astro:assets';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Keep the page out of search results (and give it no canonical URL). */
+  noindex?: boolean;
+}
+
+const { title, description, noindex = false } = Astro.props;
+// Pages build to files (features/speed.html), but Cloudflare serves them at /features/speed.
+const path = Astro.url.pathname.replace(/(\/index)?\.html$/, '') || '/';
+const canonical = !noindex && Astro.site && new URL(path, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#2a2140" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <Font cssVariable="--font-mono" preload />
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-pixel" />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip btn btn-p" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>

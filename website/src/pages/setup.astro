@@ -1,0 +1,161 @@
+---
+// The key setup guide. The app links here: /setup#openrouter and /setup#jev are stable anchors; keep them.
+// Provider steps follow their official docs (checked 2026-10-02); app labels are SetupView.swift's own.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+
+const OR = {
+  signUp: 'https://openrouter.ai/sign-up',
+  credits: 'https://openrouter.ai/settings/credits',
+  keys: 'https://openrouter.ai/settings/keys',
+  faq: 'https://openrouter.ai/docs/faq',
+};
+const TS = {
+  console: 'https://console.typesafe.ai/',
+  keys: 'https://console.typesafe.ai/keys',
+  models: 'https://docs.typesafe.ai/models',
+};
+---
+
+<Base
+  title="Set up your keys · Voice Pipes"
+  description="Which Voice Pipes features need an OpenRouter or TypeSafe (Jev) key, how to get each key, and where to paste it in the app. The fast path needs neither."
+>
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="band">
+      <div class="wrap guide__intro">
+        <span class="eyebrow c-purple">Setup</span>
+        <h1 class="display hero__title">set up your keys<span class="c-pink">.</span></h1>
+        <p class="lede hero__lede">
+          Voice Pipes runs its fast path on your Mac with no account at all. Two optional keys open up the cloud blocks:
+          OpenRouter for cloud transcription, language and speech models, and TypeSafe for Jev, which picks routes and
+          judges the words you train. You paste each key into the app, never into this website.
+        </p>
+        <nav class="actions" aria-label="On this page">
+          <a class="btn btn-s" href="#openrouter">OpenRouter key</a>
+          <a class="btn btn-s" href="#jev">TypeSafe (Jev) key</a>
+          <a class="btn btn-s" href="#keys-safe">Keeping keys safe</a>
+        </nav>
+      </div>
+    </section>
+
+    <section id="what-needs-a-key" class="sec sec--flush">
+      <div class="wrap stack stack--40">
+        <div class="stack stack--16">
+          <span class="eyebrow">What needs a key</span>
+          <h2 class="display h2">ride without one</h2>
+          <p class="lede">Start with no keys; add one when a track you want uses a cloud block.</p>
+        </div>
+        <div class="g3">
+          <div class="card block" style="--accent: var(--green)">
+            <span class="eyebrow">No key</span>
+            <ul class="guide__list">
+              <li>Fast dictation: Parakeet on your Mac, Fix words, Paste</li>
+              <li>Read aloud with Pocket TTS, Supertonic-3 or macOS voices</li>
+              <li>Train a word (without Jev, likely mishearings are pre-ticked by a simpler rule)</li>
+              <li>History, Vocabulary, the HUD, Template, HTTP request, Copy</li>
+            </ul>
+          </div>
+          <div class="card block" style="--accent: var(--cyan)">
+            <span class="eyebrow">OpenRouter key</span>
+            <ul class="guide__list">
+              <li>Clean dictation (MAI-Transcribe-2, then a Claude Haiku 4.5 cleanup)</li>
+              <li>Any LLM step, and the models Route · Jev sends a question to</li>
+              <li>Cloud transcription models and OpenRouter voices</li>
+            </ul>
+          </div>
+          <div class="card block" style="--accent: var(--purple)">
+            <span class="eyebrow">TypeSafe (Jev) key</span>
+            <ul class="guide__list">
+              <li>Route · Jev picking the route for each question (without it, the first route answers)</li>
+              <li>Judging which mishearings are safe to replace when you train a word</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="openrouter" class="sec">
+      <div class="wrap split split--top">
+        <div class="stack">
+          <span class="eyebrow">OpenRouter</span>
+          <h2 class="display h2">get an OpenRouter key</h2>
+          <p class="lede">
+            OpenRouter is prepaid: you add credits, and each request's cost is taken from them. Prices differ by model.
+            New accounts get a small free allowance, but the cloud models Voice Pipes uses by default are paid ones.
+          </p>
+          <p class="guide__source">Fees, the free allowance and limits: <a href={OR.faq}>OpenRouter's FAQ</a>.</p>
+        </div>
+        <ol class="card guide__steps">
+          <li><a href={OR.signUp}>Create an OpenRouter account</a>.</li>
+          <li>Add credits on the <a href={OR.credits}>Credits page</a>.</li>
+          <li>Create a key on the <a href={OR.keys}>Keys page</a> and copy it. OpenRouter keys start with <code>sk-or-</code>.</li>
+          <li>In the menu bar, open Voice Pipes and choose <strong>Open Voice Pipes…</strong>, then <strong>Setup</strong>. On a new install, the first-run <strong>Set up Voice Pipes</strong> window has the same field in its <strong>API keys (optional)</strong> step; <strong>Setup → Run setup again…</strong> reopens it.</li>
+          <li>Under <strong>Connections → OpenRouter</strong>, click the field and paste. It's saved to your Mac's Keychain at once; there's no Save button.</li>
+          <li>Check the status beside OpenRouter: <span class="c-green">key valid</span> means you're set. <span class="c-orange">OpenRouter rejected it</span> means the key wasn't accepted (mistyped or revoked); <span class="c-orange">can't reach openrouter.ai</span> means the app couldn't connect, so check your network. <strong>↻ Reload models</strong> refreshes the model list.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="jev" class="sec">
+      <div class="wrap split split--top">
+        <div class="stack">
+          <span class="eyebrow">TypeSafe · Jev</span>
+          <h2 class="display h2">get a TypeSafe key for Jev</h2>
+          <p class="lede">
+            Jev is charged per input token; output tokens are free. A route pick sends about 450 input tokens (our
+            measurement), so routing costs very little.
+          </p>
+          <p class="guide__source">Current price and limits: <a href={TS.models}>TypeSafe's Models page</a>.</p>
+        </div>
+        <ol class="card guide__steps">
+          <li>Sign in to the <a href={TS.console}>TypeSafe console</a>, or create an account there.</li>
+          <li>Create a key on the console's <a href={TS.keys}>Keys page</a> and copy it.</li>
+          <li>In Voice Pipes, open <strong>Open Voice Pipes…</strong> → <strong>Setup</strong> (or use the first-run window's <strong>API keys (optional)</strong> step).</li>
+          <li>Under <strong>Connections → TypeSafe · Jev</strong>, click the field and paste. The status changes from <span class="c-muted">not set</span> to <span class="c-green">saved</span>.</li>
+          <li>The app doesn't test this key when you save it. Run a track with a Route · Jev step: the line under the HUD shows Jev's pick, for example <code>quick → claude-haiku-4.5 · Jev 262 ms 100%</code>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap stack stack--16">
+        <span class="eyebrow">Where the keys go</span>
+        <figure class="guide__figure">
+          <div class="card diagram" aria-hidden="true">
+            <div class="diagram__row">
+              <div class="diagram__head"><strong>OpenRouter</strong><span class="c-muted">Cloud transcription, LLM and speech models</span><span class="diagram__status"><span class="sq" style="background: var(--green)"></span>key valid</span></div>
+              <div class="diagram__field">sk-or-v1-••••••••••••</div>
+              <div class="diagram__meta"><span class="c-muted">language · transcription · speech models</span><span class="c-purple">↻ Reload models</span><span class="c-muted">Remove key</span></div>
+            </div>
+            <div class="diagram__row">
+              <div class="diagram__head"><strong>TypeSafe · Jev</strong><span class="c-muted">Picks the model in Route steps; judges mishearings when you train a word</span><span class="diagram__status"><span class="sq" style="background: var(--fg-muted)"></span>not set</span></div>
+              <div class="diagram__field c-muted">Paste your TypeSafe key</div>
+            </div>
+          </div>
+          <figcaption class="guide__source">
+            A diagram of <strong>Setup → Connections</strong>, drawn from the app's own labels. Not a screenshot.
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="keys-safe" class="sec">
+      <div class="wrap split split--top">
+        <div class="stack">
+          <span class="eyebrow">Keeping keys safe</span>
+          <h2 class="display h2">keys stay in the Keychain</h2>
+        </div>
+        <ul class="card guide__steps guide__steps--plain">
+          <li>Voice Pipes keeps both keys in your Mac's login Keychain, not in a file, and shows a saved key masked: its first characters and its last four.</li>
+          <li>This website never asks for a key. Paste keys only into the app.</li>
+          <li><strong>Remove key</strong> deletes a key from the Keychain.</li>
+          <li>If a key may have leaked, create a new one in the provider's dashboard, paste it into the app, and remove the old one there.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>

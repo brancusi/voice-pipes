@@ -1,0 +1,41 @@
+---
+import Hud from './Hud.astro';
+---
+
+<section class="sec sec--flush">
+  <div class="wrap split">
+    <div class="stack">
+      <span class="eyebrow">How it runs</span>
+      <h2 class="display h2">one hotkey, one pipeline</h2>
+      <p class="lede">
+        Every track is a row of blocks. Your take goes in one end, text or speech comes out the other, and the HUD at the
+        bottom of your screen says what's happening in one line. Nothing to click, nothing to switch to.
+      </p>
+      <div class="hud-row">
+        <Hud color="var(--red)" status="REC" detail="00:04" />
+        <span class="sep">›</span>
+        <Hud color="var(--yellow)" status="PROC" detail="118ms" />
+        <span class="sep">›</span>
+        <Hud color="var(--green)" status="OK" detail="142ms" />
+      </div>
+    </div>
+    <div class="term" role="img" aria-label="Three example runs, as log lines">
+      <div class="term-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">history</span>
+      </div>
+      <div class="term-body">
+        <div><span class="c-muted">09:41</span> <span class="c-fg">fast-dictation</span> <span class="key">⌥Space</span></div>
+        <div class="term-in"><span class="c-muted">mic</span> <span class="sep">›</span> <span class="c-cyan">parakeet 118ms</span> <span class="sep">›</span> <span class="c-purple">fix-words 1ms</span> <span class="sep">›</span> <span class="c-green">paste 23ms</span> <span class="c-green">■ OK 142ms</span></div>
+        <div class="term-in c-muted">"Let's ship the HUD changes in the next release."</div>
+        <div class="term-gap"></div>
+        <div><span class="c-muted">09:44</span> <span class="c-fg">quick-answer</span> <span class="key">⇧⌘Q</span></div>
+        <div class="term-in"><span class="c-muted">mic</span> <span class="sep">›</span> <span class="c-cyan">parakeet 96ms</span> <span class="sep">›</span> <span class="c-purple">jev 239ms → web 98% · sonar</span> <span class="sep">›</span> <span class="c-green">speak</span></div>
+        <div class="term-in c-muted">"What's the weather tomorrow in Lisbon?"</div>
+        <div class="term-gap"></div>
+        <div><span class="c-muted">09:47</span> <span class="c-fg">clean-dictation</span> <span class="key">⇧⌥Space</span></div>
+        <div class="term-in"><span class="c-muted">mic</span> <span class="sep">›</span> <span class="c-cyan">mai-transcribe-2</span> <span class="sep">›</span> <span class="c-purple">fix-words</span> <span class="sep">›</span> <span class="c-purple">claude-haiku-4.5</span> <span class="sep">›</span> <span class="c-green">paste</span></div>
+        <div class="term-in c-fg">› <span class="blink c-green">▌</span></div>
+      </div>
+    </div>
+  </div>
+</section>

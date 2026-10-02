@@ -1,0 +1,86 @@
+---
+// The app's three default tracks (Track.swift, Track.defaults), then a recipe built from the same blocks.
+// Step colours follow the app: input muted, transcription cyan, transforms purple, outputs green.
+const tracks: {
+  name: string;
+  recipe?: boolean;
+  color: string;
+  steps: string[][];
+  about: string;
+  key: string;
+  note: string[];
+}[] = [
+  {
+    name: 'Fast dictation',
+    color: 'var(--orange)',
+    steps: [['Mic', 'c-muted'], ['Parakeet', 'c-cyan'], ['Fix words', 'c-purple'], ['Paste', 'c-green']],
+    about: 'Talk anywhere, text appears at the cursor. Runs entirely on your Mac.',
+    key: '⌥Space hold',
+    note: ['~140 ms', 'c-green'],
+  },
+  {
+    name: 'Clean dictation',
+    color: 'var(--cyan)',
+    steps: [['Mic', 'c-muted'], ['MAI', 'c-cyan'], ['Fix words', 'c-purple'], ['Haiku', 'c-purple'], ['Paste', 'c-green']],
+    about: 'Rambling in, clean prose out: filler and false starts gone, your wording kept.',
+    key: '⇧⌥Space toggle',
+    note: ['cloud', 'c-muted'],
+  },
+  {
+    name: 'Read aloud',
+    color: 'var(--purple)',
+    steps: [['Selection', 'c-muted'], ['Speak · Pocket TTS', 'c-green']],
+    about: 'Select text, press the key, listen. Press again to pause. Voices run on your Mac.',
+    key: '⌥R toggle',
+    note: ['~25 ms to sound', 'c-green'],
+  },
+  {
+    name: 'Quick answer',
+    recipe: true,
+    color: 'var(--green)',
+    steps: [['Mic', 'c-muted'], ['Parakeet', 'c-cyan'], ['Jev route', 'c-purple'], ['Speak', 'c-green']],
+    about: 'Ask out loud, hear the answer. Jev picks a fast, web or deep model for each question.',
+    key: 'your hotkey',
+    note: ['cloud', 'c-muted'],
+  },
+];
+---
+
+<section id="tracks" class="sec">
+  <div class="wrap stack stack--40">
+    <div class="stack stack--16">
+      <span class="eyebrow">Tracks</span>
+      <h2 class="display h2">three to start, build your own</h2>
+      <p class="lede">
+        A track is a hotkey plus a pipeline. Hold or toggle. Three come set up; change any block, or drag them into a
+        new order. Quick answer is a recipe: build it from the same blocks and give it a hotkey.
+      </p>
+    </div>
+    <div class="g4">
+      {
+        tracks.map((track) => (
+          <article class="card track">
+            <div class="track__name">
+              <span class="sq" style={`background: ${track.color}`} />
+              <span>{track.name}</span>
+              {track.recipe && <span class="key track__tag">recipe</span>}
+            </div>
+            <div class="chain">
+              {track.steps.map(([step, color], i) => (
+                <>
+                  {i > 0 && <span class="sep">›</span>}
+                  <span class={color}>{step}</span>
+                </>
+              ))}
+            </div>
+            <p class="small">{track.about}</p>
+            <div class="track__foot">
+              <span class="key">{track.key}</span>
+              <span class={track.note[1]}>{track.note[0]}</span>
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>

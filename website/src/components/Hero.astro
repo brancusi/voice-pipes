@@ -1,0 +1,58 @@
+---
+import wranglerSvg from '../assets/brand/wrangler-busk-boots.svg?raw';
+import HeroDemo from './HeroDemo.astro';
+import { DOWNLOAD_URL } from '../site';
+import { svgParts } from '../lib/svg';
+
+const wrangler = svgParts(wranglerSvg);
+// Notes leave the harmonica (its right end is at x 51, y 11 in the scene) one after another and drift up and right
+// over the organ pipes; with reduced motion they hold still as a trail (--at, in scene pixels).
+const notes = [
+  { fill: '#f0e4cc', delay: '0s', at: 0 },
+  { fill: '#c3a3d4', delay: '-0.8s', at: 5 },
+  { fill: '#e8c26a', delay: '-1.6s', at: 10 },
+];
+---
+
+<section id="top" class="band hero">
+  <div class="wrap hero__grid">
+    <div class="hero__body">
+      <span class="eyebrow c-purple">Voice pipelines for macOS</span>
+      <h1 class="display hero__title">your voice, piped<span class="c-pink">.</span></h1>
+      <p class="lede hero__lede">
+        Hold a hotkey, talk, let go. Voice Pipes runs every take through a pipeline you built: transcribe on your Mac,
+        fix your words, ask a model, paste at the cursor or read it back.
+      </p>
+      <div class="actions">
+        <a class="btn btn-p" href={DOWNLOAD_URL}>Download for Mac</a>
+        <a class="btn btn-s" href="#tracks">See a pipeline</a>
+      </div>
+      <span class="hero__small">Apple silicon · macOS 14 or later · signed, notarized, updates itself</span>
+    </div>
+    <HeroDemo />
+  </div>
+  {/* A 96 × 30 pixel sundown, cropped at the sides on narrow screens: a saguaro, the Wrangler (supplied art) playing
+      his harmonica, and the organ pipes. Notes and his 1 px bob are stepped CSS animations, still under reduced motion. */}
+  <svg class="scene" viewBox="0 0 96 30" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges" role="img" aria-label="The Wrangler, in boots and spurs, playing his harmonica beside a saguaro and five organ pipes at sundown, notes drifting up">
+    <rect width="96" height="4" fill="#2a2140"></rect><rect y="4" width="96" height="4" fill="#43294a"></rect><rect y="8" width="96" height="4" fill="#6b3a52"></rect><rect y="12" width="96" height="3" fill="#9a4e55"></rect><rect y="15" width="96" height="3" fill="#c96a57"></rect><rect y="18" width="96" height="3" fill="#e8915f"></rect><rect y="21" width="96" height="2" fill="#f2b46a"></rect><rect y="23" width="96" height="7" fill="#1f1a15"></rect>
+    <rect x="6" y="1" width="1" height="1" fill="#f0e4cc"></rect><rect x="17" y="3" width="1" height="1" fill="#f0e4cc"></rect><rect x="66" y="1" width="1" height="1" fill="#c3a3d4"></rect><rect x="78" y="2" width="1" height="1" fill="#f0e4cc"></rect><rect x="90" y="5" width="1" height="1" fill="#f0e4cc"></rect>
+    <rect x="84" y="13" width="4" height="1" fill="#f6d58a"></rect><rect x="83" y="14" width="6" height="4" fill="#f6d58a"></rect><rect x="84" y="18" width="4" height="1" fill="#f6d58a"></rect>
+    <rect x="5" y="19" width="10" height="1" fill="#2b1f24"></rect><rect x="2" y="20" width="18" height="3" fill="#2b1f24"></rect>
+    <rect x="79" y="18" width="14" height="1" fill="#2b1f24"></rect><rect x="75" y="19" width="21" height="4" fill="#2b1f24"></rect>
+    <rect x="30" y="11" width="2" height="13" fill="#18140f"></rect><rect x="28" y="13" width="1" height="4" fill="#18140f"></rect><rect x="28" y="17" width="2" height="2" fill="#18140f"></rect><rect x="33" y="12" width="1" height="3" fill="#18140f"></rect><rect x="32" y="15" width="2" height="2" fill="#18140f"></rect>
+    <rect x="60" y="13" width="3" height="11" fill="#18140f"></rect><rect x="64" y="9" width="3" height="15" fill="#18140f"></rect><rect x="68" y="5" width="3" height="19" fill="#18140f"></rect><rect x="72" y="10" width="3" height="14" fill="#18140f"></rect><rect x="76" y="14" width="3" height="10" fill="#18140f"></rect>
+    <rect x="61" y="16" width="1" height="1" fill="#c96a57"></rect><rect x="65" y="16" width="1" height="1" fill="#c96a57"></rect><rect x="69" y="16" width="1" height="1" fill="#c96a57"></rect><rect x="73" y="16" width="1" height="1" fill="#c96a57"></rect><rect x="77" y="16" width="1" height="1" fill="#c96a57"></rect>
+    <rect x="59" y="24" width="21" height="1" fill="#f0e4cc"></rect>
+    <rect x="55" y="22" width="1" height="1" fill="#f0e4cc"></rect><rect x="56" y="23" width="1" height="1" fill="#f0e4cc"></rect><rect x="57" y="24" width="1" height="1" fill="#f0e4cc"></rect><rect x="56" y="25" width="1" height="1" fill="#f0e4cc"></rect><rect x="55" y="26" width="1" height="1" fill="#f0e4cc"></rect>
+    <g class="wrangler"><svg x="36" y="0" width="20" height="30" viewBox={wrangler.viewBox} set:html={wrangler.inner} /></g>
+    {
+      notes.map((note) => (
+        <g class="note" style={`animation-delay: ${note.delay}; --at: ${note.at}px`}>
+          <g transform="translate(55 10)" fill={note.fill}>
+            <rect x="2" width="1" height="4" /><rect y="3" width="2" height="2" /><rect x="3" y="1" width="1" height="1" />
+          </g>
+        </g>
+      ))
+    }
+  </svg>
+</section>

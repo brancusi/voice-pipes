@@ -1,0 +1,11 @@
+---
+// A HUD status tag as the app draws it at the bottom of the screen: a coloured square, the status, a detail.
+interface Props {
+  color: string;
+  status: string;
+  detail: string;
+}
+const { color, status, detail } = Astro.props;
+---
+
+<span class="hud"><span class="sq" style={`background: ${color}`}></span>{status} <span class="c-muted">{detail}</span></span>

@@ -1,0 +1,38 @@
+---
+import Hud from './Hud.astro';
+
+// The app's starting routes (Track.swift, Route.answerRoutes), each with a question it would get.
+const routes = [
+  { name: 'quick', color: 'c-green', model: 'claude-haiku-4.5', ask: '"How many ounces in a cup?"' },
+  { name: 'web', color: 'c-cyan', model: 'perplexity/sonar', ask: '"Who won the Champions League final this year?"' },
+  { name: 'deep', color: 'c-pink', model: 'claude-sonnet-5.5', ask: '"Postgres or SQLite for a local-first app that syncs?"' },
+];
+---
+
+<section id="routing" class="sec">
+  <div class="wrap split">
+    <div class="stack">
+      <span class="eyebrow">Route · Jev</span>
+      <h2 class="display h2">the right horse for the trail</h2>
+      <p class="lede">
+        A spelling question shouldn't wait on a big model, and a hard one shouldn't get a small one. Jev reads what you
+        asked and picks a route in about a quarter of a second. You write the routes; the HUD shows which one won.
+      </p>
+    </div>
+    <div class="routes">
+      {
+        routes.map((route) => (
+          <div class="card route">
+            <span class={`route__name ${route.color}`}>{route.name}</span>
+            <span class="route__model">{route.model}</span>
+            <span class="route__ask">{route.ask}</span>
+          </div>
+        ))
+      }
+      <div class="route-hud">
+        <Hud color="var(--purple)" status="READ" detail="42%" />
+        <span class="hud-line">quick → claude-haiku-4.5 · Jev 262 ms 100%</span>
+      </div>
+    </div>
+  </div>
+</section>

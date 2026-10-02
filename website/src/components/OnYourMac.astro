@@ -1,0 +1,42 @@
+---
+const rows = [
+  [
+    'LOCAL',
+    'c-green',
+    'Parakeet v3 transcription, Pocket TTS and Supertonic-3 voices, Fix words, the HUD. Downloaded once, then run offline.',
+  ],
+  [
+    'KEYS',
+    'c-cyan',
+    'OpenRouter and Jev keys live in your login Keychain, under your Developer ID-signed app. Nothing to sign up for here.',
+  ],
+  ['DATA', 'c-purple', 'Tracks, vocabulary and history are plain JSON in Application Support. Edit them, back them up, clear them.'],
+  ['CLOUD', 'c-yellow', 'Only the blocks you choose: an OpenRouter model, a Jev route, an HTTP request you wrote.'],
+];
+---
+
+<section id="local" class="sec">
+  <div class="wrap split">
+    <div class="stack">
+      <span class="eyebrow">On your Mac</span>
+      <h2 class="display h2">home on the range</h2>
+      <p class="lede">
+        The fast path never leaves your machine. Cloud models are there when you pick them, with your own keys.
+      </p>
+    </div>
+    <div class="card list list--rows">
+      {
+        rows.map(([label, color, text]) => (
+          <div>
+            <span class={`row-label ${color}`}>{label}</span>
+            <span class="row-text">
+              {text}
+              {label === 'KEYS' && ' '}
+              {label === 'KEYS' && <a href="/setup">Where to get each key →</a>}
+            </span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,36 @@
+---
+// The home page, from the "Home · voicepipes" artboard of the Voice Pipes Website design.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import Hero from '../components/Hero.astro';
+import HowItRuns from '../components/HowItRuns.astro';
+import Tracks from '../components/Tracks.astro';
+import Blocks from '../components/Blocks.astro';
+import Routing from '../components/Routing.astro';
+import Stats from '../components/Stats.astro';
+import OnYourMac from '../components/OnYourMac.astro';
+import Features from '../components/Features.astro';
+import Changelog from '../components/Changelog.astro';
+import ClosingCta from '../components/ClosingCta.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+
+<Base
+  title="Voice Pipes · pipelines you play from the keyboard"
+  description="Hold a hotkey, talk, let go. Voice Pipes runs what you said through a pipeline you built: transcribe on your Mac, fix your words, ask a model, paste at the cursor or read it back."
+>
+  <SiteHeader />
+  <main id="main">
+    <Hero />
+    <HowItRuns />
+    <Tracks />
+    <Blocks />
+    <Routing />
+    <Stats />
+    <OnYourMac />
+    <Features />
+    <Changelog />
+    <ClosingCta />
+  </main>
+  <SiteFooter />
+</Base>
