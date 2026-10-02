@@ -4,29 +4,22 @@ struct MenuView: View {
     @Bindable var app: AppState
     @EnvironmentObject var updates: Updates
     @Environment(\.openWindow) private var openWindow
-    @State private var contentHeight: CGFloat = 400
 
-    /// A menu bar window taller than the screen gets misplaced by macOS; longer content scrolls instead.
-    private var maxHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 800) - 40 }
-
+    /// The panel is as tall as its content (no scrolling): one compact line per track, three recent runs.
     var body: some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                if let version = updates.available { updateCard(version) }
-                section("Tracks") { tracks }
-                if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
-                if !app.history.isEmpty { section("Recent runs") { recent } }
-                if app.worstCheck >= .warning { issuesCard }
-                Divider()
-                footer
-            }
-            .padding(14)
-            .frame(width: 400)
-            .background(GeometryReader { g in Color.clear.preference(key: HeightKey.self, value: g.size.height) })
+        VStack(alignment: .leading, spacing: 14) {
+            header
+            if let version = updates.available { updateCard(version) }
+            section("Tracks") { tracks }
+            if app.speaker.state != .idle { section("Now playing") { nowPlaying } }
+            if !app.history.isEmpty { section("Recent runs") { recent } }
+            if app.worstCheck >= .warning { issuesCard }
+            Divider()
+            footer
         }
-        .frame(width: 400, height: min(contentHeight, maxHeight))
-        .onPreferenceChange(HeightKey.self) { contentHeight = $0 }
+        .padding(14)
+        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             updates.poll()
             app.refreshChecks()
@@ -181,7 +174,7 @@ struct MenuView: View {
                         .buttonStyle(.borderless)
                         .help("Copy")
                 }
-                .padding(.horizontal, 12).padding(.vertical, 9)
+                .padding(.horizontal, 10).padding(.vertical, 7)
             }
         }
         .card()
@@ -203,53 +196,27 @@ struct MenuView: View {
     }
 }
 
-private struct HeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 400
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 private struct TrackRow: View {
     let track: Track
 
+    /// One line: color, name, hotkeys. The pipeline is in the tooltip and the main window.
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Circle().fill(Color(hex: track.colorHex)).frame(width: 8, height: 8)
-                Text(track.name).font(.system(size: 14, weight: .semibold))
-                Spacer()
-                ForEach(track.triggers) { trigger in
-                    HStack(spacing: 4) {
-                        Text(trigger.combo.display)
-                        Text(trigger.mode == .hold ? "hold" : "toggle").foregroundStyle(.secondary)
-                    }
-                    .font(.system(size: 11))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.07)))
-                }
+        HStack(spacing: 8) {
+            Circle().fill(Color(hex: track.colorHex)).frame(width: 7, height: 7)
+            Text(track.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+            Spacer(minLength: 8)
+            ForEach(track.triggers) { trigger in
+                Text(trigger.combo.display)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.07)))
             }
-            HStack(spacing: 4) {
-                ForEach(Array(track.steps.enumerated()), id: \.element.id) { index, step in
-                    if index > 0 { Text("›").font(.system(size: 11)).foregroundStyle(.tertiary) }
-                    StepChip(kind: step.kind)
-                }
-            }
-            .padding(.leading, 16)
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .padding(.horizontal, 10).frame(height: 30)
         .contentShape(Rectangle())
-    }
-}
-
-struct StepChip: View {
-    let kind: StepKind
-
-    var body: some View {
-        Text(kind.chip)
-            .font(.system(size: 11))
-            .lineLimit(1)
-            .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(Capsule().fill(kind.tint.opacity(0.16)))
-            .foregroundStyle(kind.tint)
+        .help(track.steps.map(\.kind.chip).joined(separator: " › ")
+              + track.triggers.map { "\n\($0.combo.display): \($0.mode == .hold ? "hold" : "press to start and stop")" }.joined())
     }
 }
 

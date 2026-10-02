@@ -1,5 +1,9 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.9.4**
+- **A tidier menu bar panel.** Each track is now one line: its color, name and hotkey. Hover a track to see its steps; the full pipeline is in the Voice Tools window.
+- **No more scrolling.** The panel grows to fit everything (tracks, what's playing, recent runs) instead of cutting off at a fixed height.
+
 **0.9.3**
 - **See which model is answering.** A line under the HUD names the model, and for Route · Jev the route Jev picked, how long it took and how sure it was, e.g. "quick → claude-haiku-4.5 · Jev 262 ms 100%".
 - **Pause and stop from the HUD.** While an answer is being read aloud, the HUD has pause/play and stop buttons. Clicking them doesn't take focus from the app you're working in. Pressing the track's hotkey again still pauses and resumes too.
