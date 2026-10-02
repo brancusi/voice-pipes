@@ -90,7 +90,14 @@ private struct WindowRequests: ViewModifier {
         content
             .onReceive(NotificationCenter.default.publisher(for: .voicePipesOpenWindow)) { note in
                 openWindow(id: note.object as? String ?? "main")
-                NSApp.activate(ignoringOtherApps: true)
+                if UINav.shared.quietOpen {
+                    // Shown, not focused: put it in front of other apps' windows without activating.
+                    DispatchQueue.main.async {
+                        NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(note.object as? String ?? "main") == true }?.orderFrontRegardless()
+                    }
+                } else {
+                    NSApp.activate(ignoringOtherApps: true)
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .voicePipesCheckForUpdates)) { _ in updates.check() }
     }

@@ -234,7 +234,9 @@ the background.
 | `vp auth [login openrouter / set <provider> / remove <provider>]` | Keys (Keychain). `login openrouter` signs in through the browser; `--headless` then `--code <code>` without one |
 | `vp secret [set/remove]` | Your own secrets for http blocks |
 | `vp watch` | Stream run events as they happen |
-| `vp open <window>` · `vp update` | Open a window; check for updates |
+| `vp open <target> [--step --route --field --section --track --search --run --word --add --background]` | Show any window, page, block or field: `main`, `menu` (the menu bar panel), `track <id>`, `history`, `vocabulary`, `setup`, `onboarding`, `about`, `config`. What it points at flashes; it answers with what's on screen |
+| `vp close <target>` · `vp ui` | Close `main`, `menu`, `about`, `onboarding`, an open `sheet`, or `all`; print what's on screen |
+| `vp update` | Check for updates |
 | `vp install` · `vp agents install [--hook]` | Put vp on your PATH; install the agent skill |
 
 ## Agents
@@ -246,6 +248,10 @@ answer (`vp ask`), run your tracks, and edit `config.toml` safely (always `vp co
 The app keeps installed skills up to date. `vp agents install --hook` also adds a Claude Code session hook that
 shows Voice Pipes' state at the start of each session (your `~/.claude/settings.json` is backed up first);
 `vp agents uninstall` removes both.
+
+Agents can show you what they're doing without screen access: `vp open track <id> --step 3 --field prompt` opens the
+editor at that block with the cursor in its instructions. When an agent edits `config.toml`, the open editor flashes
+what changed and opens a single new or changed block, so you can watch a track being built.
 
 ## Your data
 

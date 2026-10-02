@@ -8,17 +8,21 @@ struct SetupView: View {
     @AppStorage(AppearanceChoice.defaultsKey) private var appearance = AppearanceChoice.auto.rawValue
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                checks
-                connections
-                VPSection("Command line and agents") { Card { CommandLineCard() } }
-                onThisMac
-                appearanceSection
-                updatesSection
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    checks.vpSetupSection("checks")
+                    connections.vpSetupSection("connections")
+                    VPSection("Command line and agents") { Card { CommandLineCard() } }.vpSetupSection("cli")
+                    onThisMac.vpSetupSection("models")
+                    appearanceSection.vpSetupSection("appearance")
+                    updatesSection.vpSetupSection("updates")
+                }
+                .padding(.horizontal, 32).padding(.vertical, 24)
+                .frame(maxWidth: 900, alignment: .leading)
             }
-            .padding(.horizontal, 32).padding(.vertical, 24)
-            .frame(maxWidth: 900, alignment: .leading)
+            .onAppear { takeRequest(proxy) }
+            .onChange(of: UINav.shared.setupSection) { _, _ in takeRequest(proxy) }
         }
         .background(Palette.bg100)
         .toolbar {
@@ -26,6 +30,18 @@ struct SetupView: View {
             ToolbarItem { Button("Copy report") { app.copyReport() } }
         }
         .onAppear { if app.openRouterKeyState == nil { app.checkOpenRouterKey() } }
+    }
+
+    /// `vp open setup --section <name>`.
+    static let sections = ["checks", "connections", "cli", "models", "appearance", "updates"]
+
+    private func takeRequest(_ proxy: ScrollViewProxy) {
+        guard let section = UINav.shared.setupSection else { return }
+        UINav.shared.setupSection = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo("setup-\(section)", anchor: .top) }
+            UINav.shared.highlight("setup-\(section)")
+        }
     }
 
     // MARK: Sections
@@ -69,7 +85,7 @@ struct SetupView: View {
                     ConnectionHeader(name: "OpenRouter", purpose: "Cloud transcription, LLM and speech models",
                                      status: openRouterStatus)
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
-                             failed: app.openRouterKeyState == .rejected) { app.setOpenRouterKey($0) }
+                             failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key") { app.setOpenRouterKey($0) }
                     HStack(spacing: 10) {
                         if catalog.loading { ProgressView().controlSize(.small) }
                         Text(catalogLine).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
@@ -90,7 +106,7 @@ struct SetupView: View {
                     ConnectionHeader(name: "TypeSafe · Jev",
                                      purpose: "Picks the model in Route steps; judges mishearings when you train a word",
                                      status: app.hasJevKey ? (.ok, "saved") : (.info, "not set"))
-                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false) { app.setJevKey($0) }
+                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key") { app.setJevKey($0) }
                     if app.hasJevKey {
                         HStack {
                             Spacer()
@@ -268,6 +284,7 @@ struct KeyField: View {
     let hint: String?
     let placeholder: String
     let failed: Bool
+    var focusKey: String? = nil
     let save: (String) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
@@ -296,6 +313,7 @@ struct KeyField: View {
             .strokeBorder(focused ? Palette.pink : failed ? Palette.red : Palette.line, lineWidth: focused ? 2 : 1))
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
+        .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
         // A paste arrives as one big change; save it straight away. Typing waits for Return.
         .onChange(of: text) { old, new in if new.count - old.count >= 8 { commit() } }
     }
@@ -341,5 +359,11 @@ private struct ThemeSwatch: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(name) theme")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}
+
+private extension View {
+    func vpSetupSection(_ name: String) -> some View {
+        id("setup-\(name)").vpFlash("setup-\(name)")
     }
 }

@@ -178,6 +178,7 @@ private struct HistoryView: View {
                                    message: hotkey.map { "No runs yet. Hold \($0) and say something; every run lands here so you can copy it again." }
                                        ?? "No runs yet. Run a track and say something; every run lands here so you can copy it again.")
             } else {
+                ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
                         filters
@@ -190,7 +191,7 @@ private struct HistoryView: View {
                                 Card {
                                     ForEach(Array(day.1.enumerated()), id: \.element.id) { index, record in
                                         if index > 0 { Hairline() }
-                                        row(record)
+                                        row(record).id("run-\(record.id)").vpFlash("run-\(record.id)", cornerRadius: 0)
                                     }
                                 }
                             }
@@ -200,6 +201,9 @@ private struct HistoryView: View {
                     .frame(maxWidth: 900, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .onAppear { takeRequest(proxy) }
+                .onChange(of: UINav.shared.history) { _, _ in takeRequest(proxy) }
+                }
                 .toolbar {
                     ToolbarItem {
                         Button("Clear history…") { confirmingClear = true }
@@ -208,6 +212,9 @@ private struct HistoryView: View {
             }
         }
         .background(Palette.bg100)
+        .onAppear(perform: report)
+        .onChange(of: trackFilter) { _, _ in report() }
+        .onChange(of: query) { _, _ in report() }
         .confirmationDialog("Clear all \(app.history.count) runs from History?", isPresented: $confirmingClear) {
             Button("Clear history", role: .destructive) { app.historyStore.clear() }
         } message: {
@@ -215,9 +222,29 @@ private struct HistoryView: View {
         }
     }
 
+    /// `vp open history --track <id> --search <text> --run <n>`.
+    private func takeRequest(_ proxy: ScrollViewProxy) {
+        guard let request = UINav.shared.history else { return }
+        UINav.shared.history = nil
+        trackFilter = request.track
+        query = request.search ?? ""
+        guard let run = request.run else { return }
+        // A run outside the filter isn't shown: show everything so it is.
+        if !records.contains(where: { $0.id == run }) { trackFilter = nil; query = "" }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo("run-\(run)", anchor: .center) }
+            UINav.shared.highlight("run-\(run)")
+        }
+    }
+
+    private func report() {
+        UINav.shared.historyTrack = trackFilter
+        UINav.shared.historySearch = query
+    }
+
     private var filters: some View {
         HStack(spacing: 8) {
-            VPTextField("Search everything you've said", text: $query).frame(maxWidth: 300)
+            VPTextField("Search everything you've said", text: $query).focusKey("search").frame(maxWidth: 300)
             VPChip(title: "All", selected: trackFilter == nil) { trackFilter = nil }
             ForEach(trackNames.prefix(5), id: \.self) { name in
                 VPChip(title: name, selected: trackFilter == name) { trackFilter = trackFilter == name ? nil : name }
@@ -304,6 +331,7 @@ private struct VocabularyView: View {
     @State private var newWord = ""
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Words transcription keeps getting wrong. **Write** is the spelling you want; **Heard as** lists what comes out instead, separated by commas. Replacement is mechanical and instant: whole words only, any capitalization. Spellings with capitals are always written exactly; all-lowercase ones get a capital at the start of a sentence unless **Always exact** is on.")
@@ -333,6 +361,8 @@ private struct VocabularyView: View {
                                 GridRow {
                                     VPTextField("Spelling", text: $entry.write)
                                         .frame(minWidth: 120, maxWidth: 260)
+                                        .id("vocab-\(entry.id)")
+                                        .vpFlash("vocab-\(entry.id)")
                                     VPTextField("what comes out instead, comma-separated", text: heardAs($entry))
                                         .frame(minWidth: 160, maxWidth: .infinity)
                                     Toggle("Always exact", isOn: $entry.alwaysExact)
@@ -362,7 +392,7 @@ private struct VocabularyView: View {
                 VPSection("Try it") {
                     Card {
                         VStack(alignment: .leading, spacing: 8) {
-                            VPTextField("Type or paste a sentence", text: $sample, axis: .vertical)
+                            VPTextField("Type or paste a sentence", text: $sample, axis: .vertical).focusKey("try")
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text("Result").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                                 Text(FixWords.apply(sample, entries: store.entries))
@@ -377,6 +407,13 @@ private struct VocabularyView: View {
             .padding(.horizontal, 32).padding(.vertical, 24)
             .frame(maxWidth: 900, alignment: .leading)
         }
+        .onAppear { takeRequest(proxy) }
+        .onChange(of: UINav.shared.vocabulary) { _, _ in takeRequest(proxy) }
+        }
+        .onChange(of: UINav.shared.dismissSheets) { _, _ in askingWord = false; training = nil }
+        .onChange(of: askingWord) { _, _ in reportSheet() }
+        .onChange(of: training) { _, _ in reportSheet() }
+        .onDisappear { UINav.shared.sheet = nil }
         .onAppear(perform: takePendingTraining)
         .onChange(of: app.pendingTraining) { _, _ in takePendingTraining() }
         .sheet(isPresented: $askingWord) {
@@ -402,6 +439,23 @@ private struct VocabularyView: View {
                 TrainWordSheet(parakeet: parakeet, entry: $store.entries[index])
             }
         }
+    }
+
+    /// `vp open vocabulary --word <w>` scrolls to the word; `--add` asks for a new one.
+    private func takeRequest(_ proxy: ScrollViewProxy) {
+        guard let request = UINav.shared.vocabulary else { return }
+        UINav.shared.vocabulary = nil
+        if request.add { askingWord = true }
+        guard let word = request.word, let entry = store.entries.first(where: { $0.write.lowercased() == word.lowercased() }) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo("vocab-\(entry.id)", anchor: .center) }
+            UINav.shared.highlight("vocab-\(entry.id)")
+        }
+    }
+
+    private func reportSheet() {
+        UINav.shared.sheet = askingWord ? "add-word"
+            : training.flatMap { id in store.entries.first { $0.id == id } }.map { "train:\($0.write)" }
     }
 
     /// `vp vocab train <word>`: open that word's training.
@@ -452,7 +506,8 @@ extension View {
 struct WindowBehavior: NSViewRepresentable {
     static func opened() {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        // `vp open --background` shows the window without taking the keyboard from the app you're in.
+        if !UINav.shared.quietOpen { NSApp.activate(ignoringOtherApps: true) }
     }
 
     /// Back to menu-bar-only once the last of the main and About windows has closed.

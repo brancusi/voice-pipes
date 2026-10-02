@@ -101,8 +101,16 @@ extension AppState {
             Secrets.set(name, nil)
             reply.result(["name": name, "set": false])
         case "open":
-            openWindow(args)
-            reply.result(["opened": args["target"] as? String ?? "main"])
+            try openWindow(args)
+            // Answer with what's on screen once the windows have taken the request.
+            try await Task.sleep(nanoseconds: 600_000_000)
+            reply.result(uiState())
+        case "close":
+            try closeWindow(args["target"] as? String ?? "main")
+            try await Task.sleep(nanoseconds: 400_000_000)
+            reply.result(uiState())
+        case "ui":
+            reply.result(uiState())
         case "config.reload":
             store.reloadFromDisk()
             VocabularyStore.shared.reloadFromDisk()
@@ -115,7 +123,7 @@ extension AppState {
                 VocabularyStore.shared.entries.append(VocabularyEntry(write: word, heardAs: []))
             }
             pendingTraining = word
-            openWindow(["target": "vocabulary"])
+            try openWindow(["target": "vocabulary"])
             reply.result(["word": word, "opened": "training"])
         case "models":
             let capability: OpenRouterCatalog.Capability = switch args["capability"] as? String {
@@ -359,25 +367,196 @@ extension AppState {
         return samples
     }
 
-    private func openWindow(_ args: [String: Any]) {
-        switch args["target"] as? String {
-        case "setup": mainSection = .setup
-        case "history": mainSection = .activity
-        case "vocabulary": mainSection = .vocabulary
+    // MARK: Windows and what they show
+
+    private func openWindow(_ args: [String: Any]) throws {
+        let nav = UINav.shared
+        let target = args["target"] as? String ?? "main"
+        nav.quietOpen = args["background"] as? Bool ?? false
+        func int(_ name: String) throws -> Int? {
+            guard let raw = args[name] else { return nil }
+            guard let value = (raw as? Int) ?? (raw as? String).flatMap(Int.init), value >= 1 else {
+                throw AgentError("bad_value", "--\(name) is a number from 1.")
+            }
+            return value
+        }
+        switch target {
+        case "main":
+            break
+        case "menu":
+            MenuBarPanel.open()
+            return
+        case "setup":
+            mainSection = .setup
+            if let section = args["section"] as? String {
+                guard SetupView.sections.contains(section) else {
+                    throw AgentError("no_such_section", "Setup has no section '\(section)'.\(TableReader.suggestion(section, SetupView.sections))",
+                                     hint: "sections: " + SetupView.sections.joined(separator: ", "))
+                }
+                nav.setupSection = section
+            }
+            if let field = args["field"] as? String {
+                let fields = ["openrouter-key", "typesafe-key"]
+                guard fields.contains(field) else {
+                    throw AgentError("no_such_field", "Setup has no field '\(field)'.\(TableReader.suggestion(field, fields))", hint: "fields: " + fields.joined(separator: ", "))
+                }
+                nav.setupSection = "connections"
+                nav.focusField(field)
+            }
+        case "history":
+            mainSection = .activity
+            var request = UINav.HistoryRequest()
+            if args["track"] != nil { request.track = store.tracks[try trackIndex(args)].name }
+            request.search = args["search"] as? String
+            if let n = try int("run") {
+                guard history.indices.contains(n - 1) else { throw AgentError("no_such_run", "History has \(history.count) runs.", hint: "vp history") }
+                request.run = history[n - 1].id
+            }
+            nav.history = request
+            if args["field"] as? String == "search" { nav.focusField("search") }
+        case "vocabulary":
+            mainSection = .vocabulary
+            let word = args["word"] as? String
+            if let word, !VocabularyStore.shared.entries.contains(where: { $0.write.lowercased() == word.lowercased() }) {
+                throw AgentError("no_such_word", "'\(word)' isn't in Vocabulary.\(TableReader.suggestion(word, VocabularyStore.shared.entries.map(\.write)))",
+                                 hint: "vp vocab add \"\(word)\"")
+            }
+            nav.vocabulary = .init(word: word, add: args["add"] as? Bool ?? false)
+            if args["field"] as? String == "try" { nav.focusField("try") }
         case "track":
-            if let index = try? trackIndex(args) { mainSection = .track(store.tracks[index].id) }
+            let track = store.tracks[try trackIndex(args)]
+            let id = track.slug ?? track.name
+            mainSection = .track(track.id)
+            var request = UINav.EditorRequest(track: track.id)
+            if let n = try int("step") {
+                guard track.steps.indices.contains(n - 1) else {
+                    throw AgentError("no_such_step", "\(id) has \(track.steps.count) step\(track.steps.count == 1 ? "" : "s").", hint: "vp tracks show \(id)")
+                }
+                request.step = n
+            }
+            if let r = try int("route") {
+                guard let n = request.step, let routes = track.steps[n - 1].kind.routes else {
+                    throw AgentError("not_a_route", "--route needs --step pointing at a route step.", hint: "vp tracks show \(id)")
+                }
+                guard routes.indices.contains(r - 1) else { throw AgentError("no_such_route", "That step has \(routes.count) routes.", hint: "vp tracks show \(id)") }
+                request.route = r
+            }
+            if let section = args["section"] as? String {
+                let sections = ["title", "triggers", "pipeline"]
+                guard sections.contains(section) else {
+                    throw AgentError("no_such_section", "The editor has no section '\(section)'.", hint: "sections: " + sections.joined(separator: ", "))
+                }
+                request.section = section
+            }
+            if let field = args["field"] as? String {
+                let fields = Self.editorFields(track, step: request.step, route: request.route)
+                guard fields.contains(field) else {
+                    throw AgentError("no_such_field", "No field '\(field)' there.\(TableReader.suggestion(field, fields))",
+                                     hint: fields.isEmpty ? "this block has no text fields"
+                                         : "fields: " + fields.joined(separator: ", ") + (request.step == nil ? " (a block's fields need --step <n>)" : ""))
+                }
+                nav.focusField(request.route.map { "route\($0).\(field)" } ?? field)
+            }
+            nav.editor = request
         case "about":
             NotificationCenter.default.post(name: .voicePipesOpenWindow, object: "about")
             return
         case "onboarding":
+            if let name = args["step"] as? String {
+                guard let index = OnboardingView.stepNames.firstIndex(of: name) else {
+                    throw AgentError("no_such_step", "Setup has no step '\(name)'.", hint: "steps: " + OnboardingView.stepNames.joined(separator: ", "))
+                }
+                nav.onboardingStep = index
+            }
             OnboardingController.shared.show(self)
             return
         case "config":
             NSWorkspace.shared.open(store.configURL)
             return
-        default: break
+        default:
+            throw AgentError("no_such_target", "Can't open '\(target)'.\(TableReader.suggestion(target, Self.openTargets))",
+                             hint: "vp open " + Self.openTargets.joined(separator: "|"))
         }
         NotificationCenter.default.post(name: .voicePipesOpenWindow, object: "main")
+    }
+
+    static let openTargets = ["main", "menu", "track", "history", "vocabulary", "setup", "onboarding", "about", "config"]
+
+    /// The text fields `--field` can focus: the track's name, or the chosen block's (config file names).
+    static func editorFields(_ track: Track, step: Int?, route: Int?) -> [String] {
+        guard let step else { return ["name"] }
+        if route != nil { return ["name", "when", "prompt"] }
+        return switch track.steps[step - 1].kind {
+        case .llm: ["prompt"]
+        case .http: ["url", "headers", "body", "response_field"]
+        case .template: ["template"]
+        default: []
+        }
+    }
+
+    private func closeWindow(_ target: String) throws {
+        let targets = ["main", "menu", "about", "onboarding", "sheet", "all"]
+        guard targets.contains(target) else {
+            throw AgentError("no_such_target", "Can't close '\(target)'.\(TableReader.suggestion(target, targets))", hint: "vp close " + targets.joined(separator: "|"))
+        }
+        if target == "sheet" || target == "all" { UINav.shared.dismissSheets += 1 }
+        if target == "menu" || target == "all" { MenuBarPanel.close() }
+        if target == "onboarding" || target == "all" { OnboardingController.shared.close() }
+        for name in ["main", "about"] where target == name || target == "all" {
+            for window in NSApp.windows where window.identifier?.rawValue.hasPrefix(name) == true { window.close() }
+        }
+    }
+
+    /// What's on screen, for `vp ui` (and the answer to open/close).
+    func uiState() -> [String: Any] {
+        let nav = UINav.shared
+        func named(_ window: NSWindow) -> String? {
+            if let id = window.identifier?.rawValue, let name = ["main", "about"].first(where: { id.hasPrefix($0) }) { return name }
+            if window.title == OnboardingController.title { return "onboarding" }
+            return nil
+        }
+        var windows = NSApp.windows.filter(\.isVisible).compactMap(named)
+        if MenuBarPanel.isOpen { windows.append("menu") }
+        var state: [String: Any] = [
+            "windows": Array(Set(windows)).sorted(),
+            "front": NSApp.isActive ? (NSApp.keyWindow.flatMap(named) ?? (MenuBarPanel.isOpen ? "menu" : "other")) : "another app",
+        ]
+        if windows.contains("main") {
+            switch mainSection {
+            case .track(let id):
+                let track = store.tracks.first { $0.id == id }
+                state["page"] = "track"
+                state["track"] = track.map { $0.slug ?? $0.name } ?? NSNull()
+                state["step"] = nav.expandedStep ?? NSNull()
+                if !nav.editingRoutes.isEmpty { state["routes_open"] = nav.editingRoutes }
+            case .activity:
+                state["page"] = "history"
+                state["filter"] = nav.historyTrack ?? "all"
+                if !nav.historySearch.isEmpty { state["search"] = nav.historySearch }
+            case .vocabulary: state["page"] = "vocabulary"
+            case .setup, nil: state["page"] = "setup"
+            }
+        }
+        if let field = nav.focusedField { state["field"] = field }
+        if let sheet = nav.sheet { state["sheet"] = sheet }
+        if windows.contains("onboarding"), let step = nav.currentOnboardingStep { state["onboarding_step"] = OnboardingView.stepNames[step] }
+        return state
+    }
+
+    /// An outside edit to config.toml: flash what changed, and in the open editor scroll to it (opening a single
+    /// new or changed block), so you can watch an agent build a track.
+    func showExternalChanges(_ changes: [Track.ID: Track.Changes]) {
+        var keys = Set<String>()
+        for (id, change) in changes {
+            keys.formUnion(change.steps.map { "step-\($0)" })
+            if change.title { keys.insert("title-\(id)") }
+            if change.triggers { keys.insert("triggers-\(id)") }
+        }
+        if case .track(let open) = mainSection, let change = changes[open], let track = store.tracks.first(where: { $0.id == open }),
+           let first = change.steps.first, let index = track.steps.firstIndex(where: { $0.id == first }) {
+            UINav.shared.editor = .init(track: open, step: index + 1, expand: change.steps.count == 1)
+        }
+        UINav.shared.highlight(keys)
     }
 }
 

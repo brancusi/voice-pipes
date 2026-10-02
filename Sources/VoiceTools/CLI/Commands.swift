@@ -37,8 +37,13 @@ enum VPCommands {
         CommandSpec(name: "secret", usage: "vp secret [set <name> [--value <v> | piped] | remove <name>]",
                     summary: "Your own secrets for http blocks, used as ${secret:<name>}", values: ["value"], handler: secret),
         CommandSpec(name: "watch", usage: "vp watch", summary: "Stream run events (recording, processing, speaking, done, failed) until interrupted", handler: watch),
-        CommandSpec(name: "open", usage: "vp open [setup | history | vocabulary | about | onboarding | config | track <id>]",
-                    summary: "Open a window of the app", handler: open),
+        CommandSpec(name: "open", usage: "vp open [main | menu | track <id> [--step n [--route n]] [--section title|triggers|pipeline] | history [--track <id>] [--search <text>] [--run n] | vocabulary [--word <w>] [--add] | setup [--section <name>] | onboarding [--step <name>] | about | config] [--field <name>] [--background]",
+                    summary: "Show any window, page, block or field (it flashes); answers with what's on screen",
+                    values: ["step", "route", "section", "track", "search", "run", "word", "field"], switches: ["add", "background"], handler: open),
+        CommandSpec(name: "close", usage: "vp close [main | menu | about | onboarding | sheet | all]", summary: "Close a window, the menu bar panel or an open sheet",
+                    handler: { parsed, out in try uiReply("close", ["target": parsed.positionals.first ?? "main"], out) }),
+        CommandSpec(name: "ui", usage: "vp ui", summary: "What's on screen: windows, page, open block, focused field",
+                    handler: { _, out in try uiReply("ui", [:], out) }),
         CommandSpec(name: "update", usage: "vp update", summary: "Check for a new version", handler: { _, out in try simple("update.check", out) }),
         CommandSpec(name: "install", usage: "vp install [--dir <path>]", summary: "Link vp and voicepipes onto your PATH", values: ["dir"], handler: install),
         CommandSpec(name: "agents", usage: "vp agents [install [--hook] | uninstall | context]",
@@ -516,9 +521,31 @@ enum VPCommands {
     // MARK: Windows
 
     static func open(_ parsed: Parsed, _ out: Output) throws {
-        var args: [String: Any] = ["target": parsed.positionals.first ?? "main"]
-        if args["target"] as? String == "track" { args["track"] = try parsed.positional(1, "id", usage: "vp open track <id>") }
-        out.emit(Out(any: try AppClient.request("open", args)))
+        let target = parsed.positionals.first ?? "main"
+        var args: [String: Any] = ["target": target]
+        if target == "track" { args["track"] = try parsed.positional(1, "id", usage: "vp open track <id> [--step n]") }
+        for name in ["step", "route", "section", "search", "run", "word", "field"] { if let value = parsed[name] { args[name] = value } }
+        if let track = parsed["track"] { args["track"] = track }
+        for name in ["add", "background"] where parsed.has(name) { args[name] = true }
+        try uiReply("open", args, out)
+    }
+
+    /// open / close / ui answer with the screen's state; the hints say what else can be shown from here.
+    static func uiReply(_ command: String, _ args: [String: Any], _ out: Output) throws {
+        let state = try AppClient.request(command, args)
+        var help: [String] = []
+        switch state["page"] as? String {
+        case "track":
+            let id = state["track"] as? String ?? "<id>"
+            help = state["step"] is Int
+                ? ["vp open track \(id) --step <n> --field <name>   (focus a block's field)", "vp close main"]
+                : ["vp open track \(id) --step <n>   (open a block)", "vp open track \(id) --field name"]
+        case "history": help = ["vp open history --track <id> --search \"…\"", "vp open history --run <n>   (n from vp history)"]
+        case "vocabulary": help = ["vp open vocabulary --word \"<w>\"", "vp vocab train \"<w>\""]
+        case "setup": help = ["vp open setup --section " + SetupView.sections.joined(separator: "|")]
+        default: help = ["vp open track <id>", "vp open menu"]
+        }
+        out.emit(Out(any: state), help: help)
     }
 
     // MARK: Config files (offline)

@@ -16,6 +16,8 @@ final class TrackStore {
     private(set) var issues: [ConfigIssue] = []
     /// Called when `issues` changes (AppState re-runs its checks).
     @ObservationIgnored var onIssuesChanged: () -> Void = {}
+    /// After an outside edit to config.toml applies: what changed in each track that was already there.
+    @ObservationIgnored var onExternalChanges: ([Track.ID: Track.Changes]) -> Void = { _ in }
 
     let fileURL: URL
     let configURL: URL
@@ -119,11 +121,19 @@ final class TrackStore {
         diskText = text
         let result = ConfigFile.parse(text, existing: tracks)
         if let config = result.config {
+            var updated = config.tracks
+            var changes: [Track.ID: Track.Changes] = [:]
+            for i in updated.indices {
+                guard let old = tracks.first(where: { $0.id == updated[i].id }) else { continue }
+                let changed = updated[i].adoptIdentities(from: old)
+                if !changed.isEmpty { changes[updated[i].id] = changed }
+            }
             applyingFile = true
-            tracks = config.tracks
+            tracks = updated
             applyingFile = false
             AppearanceChoice.store(config.appearance)
             writeCache()
+            if !changes.isEmpty { onExternalChanges(changes) }
         }
         setIssues(result.errors + result.warnings)
     }

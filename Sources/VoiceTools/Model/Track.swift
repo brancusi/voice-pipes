@@ -340,3 +340,76 @@ enum LocalVoiceEngine: String, Codable, CaseIterable, Identifiable {
         }
     }
 }
+
+extension StepKind {
+    /// A Route step's routes, else nil.
+    var routes: [Route]? {
+        if case .route(let routes) = self { routes } else { nil }
+    }
+
+    /// The case without its settings ("llm", "route", "copy"): two steps of the same block.
+    var caseName: String {
+        Mirror(reflecting: self).children.first?.label ?? String(describing: self)
+    }
+
+    /// Equal settings, ignoring the routes' in-app identities (which the config file doesn't carry).
+    func sameSettings(as other: StepKind) -> Bool {
+        guard let mine = routes, let theirs = other.routes else { return self == other }
+        return mine.map { [$0.name, $0.when, $0.model, $0.prompt] } == theirs.map { [$0.name, $0.when, $0.model, $0.prompt] }
+    }
+}
+
+extension Track {
+    /// What an outside edit (config.toml) changed in a track, for the open editor to point at.
+    struct Changes {
+        var steps: [Step.ID] = []
+        var title = false
+        var triggers = false
+        var isEmpty: Bool { steps.isEmpty && !title && !triggers }
+    }
+
+    /// Takes over step, route and trigger identities from the version of this track before a reload (the file
+    /// doesn't store them), so an open editor keeps its expanded step; returns what changed.
+    mutating func adoptIdentities(from old: Track) -> Changes {
+        var changes = Changes()
+        changes.title = name != old.name || colorHex != old.colorHex || enabled != old.enabled
+        var unused = old.steps
+        var matched = Set<Int>()
+        // Unchanged steps first, wherever they moved.
+        for i in steps.indices {
+            if let j = unused.firstIndex(where: { $0.kind.sameSettings(as: steps[i].kind) }) {
+                adopt(old: unused.remove(at: j), into: i)
+                matched.insert(i)
+            }
+        }
+        // Then a changed step keeps the identity of the same block in the same place.
+        for i in steps.indices where !matched.contains(i) {
+            if old.steps.indices.contains(i), let j = unused.firstIndex(where: { $0.id == old.steps[i].id }),
+               unused[j].kind.caseName == steps[i].kind.caseName {
+                adopt(old: unused.remove(at: j), into: i)
+            }
+            changes.steps.append(steps[i].id)
+        }
+        var oldTriggers = old.triggers
+        for i in triggers.indices {
+            if let j = oldTriggers.firstIndex(where: { $0.combo == triggers[i].combo && $0.mode == triggers[i].mode }) {
+                triggers[i].id = oldTriggers.remove(at: j).id
+            } else {
+                changes.triggers = true
+            }
+        }
+        if !oldTriggers.isEmpty { changes.triggers = true }
+        return changes
+    }
+
+    private mutating func adopt(old: Step, into i: Int) {
+        steps[i].id = old.id
+        guard var routes = steps[i].kind.routes, let oldRoutes = old.kind.routes else { return }
+        var unused = oldRoutes
+        for r in routes.indices {
+            let j = unused.firstIndex { $0.name == routes[r].name } ?? (unused.isEmpty ? nil : 0)
+            if let j { routes[r].id = unused.remove(at: j).id }
+        }
+        steps[i].kind = .route(routes: routes)
+    }
+}

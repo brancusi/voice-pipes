@@ -94,7 +94,22 @@ struct OnboardingView: View {
         .vpWindow()
         .onReceive(tick) { _ in refresh() }
         .onAppear(perform: refresh)
-        .onChange(of: step) { _, new in if new == .tryIt { tryStarted = Date() } }
+        .onChange(of: step) { _, new in
+            if new == .tryIt { tryStarted = Date() }
+            UINav.shared.currentOnboardingStep = new.rawValue
+        }
+        .onAppear { UINav.shared.currentOnboardingStep = step.rawValue; takeStep() }
+        .onDisappear { UINav.shared.currentOnboardingStep = nil }
+        .onChange(of: UINav.shared.onboardingStep) { _, _ in takeStep() }
+    }
+
+    /// `vp open onboarding --step <name>`.
+    static let stepNames = ["welcome", "permissions", "models", "keys", "agents", "try"]
+
+    private func takeStep() {
+        guard let raw = UINav.shared.onboardingStep else { return }
+        UINav.shared.onboardingStep = nil
+        if let new = Step(rawValue: raw) { step = new }
     }
 
     /// Five segments: done in sage, the current step in lavender, the rest a hairline.
@@ -169,7 +184,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     keyHeader("OpenRouter", "Clean dictation, Quick answer, cloud voices")
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
-                             failed: app.openRouterKeyState == .rejected) { app.setOpenRouterKey($0) }
+                             failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key") { app.setOpenRouterKey($0) }
                     Link("Get a key at openrouter.ai →", destination: URL(string: "https://openrouter.ai/keys")!)
                         .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.purple)
                 }
@@ -177,7 +192,7 @@ struct OnboardingView: View {
                 Hairline()
                 VStack(alignment: .leading, spacing: 8) {
                     keyHeader("TypeSafe · Jev", "picks the model in Route steps; judges trained words")
-                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false) { app.setJevKey($0) }
+                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key") { app.setJevKey($0) }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }

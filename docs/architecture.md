@@ -159,3 +159,14 @@ local FluidAudio checkout for model benchmarks. Views can be checked by renderin
 
 The UI follows the Voice Pipes design system; [brand](brand.md) maps its tokens, icons and mascot to the files
 that implement them.
+
+## Driving the UI from vp
+
+`UI/UINav.swift` holds one-shot requests (`editor`, `history`, `vocabulary`, `setupSection`, `onboardingStep`,
+`openRoute`, `focus`) and a `flash`. `vp open` (AgentAPI `openWindow`) validates against the model, sets a request
+and opens the window; the page that owns the state takes the request on appear or when it changes, scrolls with a
+`ScrollViewReader`, and the element's `.vpFlash(key)` outlines it. Fields opt in with `.focusKey(name)` (config
+names). Pages report back (expanded step, open routes, focused field, filter, sheet) for `vp ui`. The menu bar panel
+is opened by clicking the status item's button (`MenuBarPanel`). A config reload keeps step/route/trigger identities
+(`Track.adoptIdentities`) and reports what changed, which `showExternalChanges` turns into flashes and an editor
+request.

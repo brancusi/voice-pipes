@@ -145,7 +145,11 @@ struct VPTextField: View {
     var color: Color = Palette.fg
     var minHeight: CGFloat = 28
     var onSubmit: () -> Void = {}
+    private var focusKey: String?
     @FocusState private var focused: Bool
+
+    /// Names the field for `vp open … --field`.
+    func focusKey(_ key: String) -> Self { var copy = self; copy.focusKey = key; return copy }
 
     init(_ prompt: String, text: Binding<String>, axis: Axis = .horizontal, font: Font = VPFont.body,
          color: Color = Palette.fg, minHeight: CGFloat = 28, onSubmit: @escaping () -> Void = {}) {
@@ -181,6 +185,7 @@ struct VPTextField: View {
             .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg000))
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.line, lineWidth: 1))
             .vpFocusRing(focused)
+            .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
     }
 }
 
@@ -188,7 +193,15 @@ struct VPTextField: View {
 struct VPTextEditor: View {
     @Binding var text: String
     var minHeight: CGFloat = 64
+    private var focusKey: String?
     @FocusState private var focused: Bool
+
+    init(text: Binding<String>, minHeight: CGFloat = 64) {
+        _text = text
+        self.minHeight = minHeight
+    }
+
+    func focusKey(_ key: String) -> Self { var copy = self; copy.focusKey = key; return copy }
 
     var body: some View {
         TextEditor(text: $text)
@@ -203,6 +216,7 @@ struct VPTextEditor: View {
             .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg000))
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.line, lineWidth: 1))
             .vpFocusRing(focused)
+            .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
     }
 }
 

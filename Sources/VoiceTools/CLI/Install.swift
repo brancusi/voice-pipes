@@ -253,6 +253,25 @@ enum AgentsInstaller {
         - Ask the user before changing or removing their hotkeys or tracks; adding a new track is fine.
         - Vocabulary: `vp vocab add "Kubernetes" --heard "cuban eighties, cube or netties"`; `vp vocab test "…"`.
 
+        ## Show the user (no screen access needed)
+
+        The app's windows are driven from `vp`; you never need screenshots or clicks. Each of these answers with
+        what's on screen (`vp ui` alone prints it), and whatever it points at flashes rose for a moment.
+
+        - `vp open track <id>` opens a track in the editor; `--step <n>` opens that block's settings, `--route <n>`
+          a Route block's route card, `--field <name>` puts the cursor in a field (`name`; a block's `prompt`,
+          `url`, `headers`, `body`, `response_field`, `template`; a route's `name`, `when`, `prompt`).
+          `--section title|triggers|pipeline` scrolls to a part.
+        - `vp open history [--track <id>] [--search "…"] [--run <n>]`, `vp open vocabulary [--word "…"] [--add]`,
+          `vp open setup [--section checks|connections|cli|models|appearance|updates] [--field openrouter-key]`,
+          `vp open onboarding [--step welcome|permissions|models|keys|agents|try]`, `vp open menu` (the menu bar
+          panel), `vp open about`.
+        - `--background` shows a window without taking the keyboard from the user's current app.
+        - `vp close main|menu|about|onboarding|sheet|all`.
+        - Building a track for the user: `vp open track <id>` first, then edit config.toml. Each save flashes what
+          changed in the open editor and opens a single new or changed block, so they watch it take shape. Finish
+          with `vp run <id> --text "…"` to demo it, or `vp say` to explain it.
+
         ## Keys and status
 
         - `vp status` shows permissions, on-device models, keys (masked) and problems.

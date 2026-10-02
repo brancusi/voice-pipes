@@ -151,6 +151,7 @@ final class AppState {
         guard startServices else { return }
         self.store.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         VocabularyStore.shared.onIssuesChanged = { [weak self] in self?.refreshChecks() }
+        self.store.onExternalChanges = { [weak self] in self?.showExternalChanges($0) }
         hud.attach(self)
         observeTracks()
         // `vp` talks to the app through this socket.

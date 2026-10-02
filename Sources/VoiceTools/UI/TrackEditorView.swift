@@ -8,6 +8,7 @@ struct TrackDetailView: View {
     @State private var expandedStep: Step.ID?
     @State private var draggingStep: Step.ID?
     @State private var confirmingDelete = false
+    @FocusState private var nameFocused: Bool
 
     init(app: AppState, track: Binding<Track>, expanded: Step.ID? = nil, onDelete: @escaping () -> Void) {
         self.app = app
@@ -17,13 +18,14 @@ struct TrackDetailView: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                titleRow
-                VPSection("Triggers") { triggers }
+                titleRow.id("title").vpFlash("title-\(track.id)")
+                VPSection("Triggers") { triggers }.id("triggers").vpFlash("triggers-\(track.id)")
                 VPSection("Pipeline", accessory: {
                     Text("drag ⋮⋮ to reorder").font(VPFont.caption).foregroundStyle(Palette.comment)
-                }) { pipeline }
+                }) { pipeline }.id("pipeline")
                 VStack(spacing: 12) {
                     Hairline()
                     HStack(spacing: 10) {
@@ -39,12 +41,49 @@ struct TrackDetailView: View {
             .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear { takeRequest(proxy) }
+        .onChange(of: UINav.shared.editor) { _, _ in takeRequest(proxy) }
+        }
+        .onAppear { report() }
+        .onChange(of: expandedStep) { _, _ in report() }
+        .onDisappear { UINav.shared.expandedStep = nil; UINav.shared.editingRoutes = [] }
         .background(Palette.bg100)
         .confirmationDialog("Delete “\(track.name)”?", isPresented: $confirmingDelete) {
             Button("Delete track", role: .destructive, action: onDelete)
         } message: {
             Text("Its hotkeys stop working. Its runs stay in History.")
         }
+    }
+
+    /// `vp open track <id> --step n --route n --section triggers|pipeline` (and outside edits): expand, scroll, flash.
+    private func takeRequest(_ proxy: ScrollViewProxy) {
+        guard let request = UINav.shared.editor, request.track == track.id else { return }
+        UINav.shared.editor = nil
+        var target = request.section
+        var flash: String?
+        if let n = request.step, track.steps.indices.contains(n - 1) {
+            let step = track.steps[n - 1]
+            if request.expand { expandedStep = step.id }
+            target = "step-\(step.id)"
+            flash = target
+            if let r = request.route, let routes = step.kind.routes, routes.indices.contains(r - 1) {
+                UINav.shared.openRoute = .init(step: step.id, index: r - 1)
+                target = "route-\(routes[r - 1].id)"
+                flash = target
+            }
+        } else if let section = request.section {
+            flash = section == "triggers" ? "triggers-\(track.id)" : section == "title" ? "title-\(track.id)" : nil
+        }
+        guard let target else { return }
+        // Once the expanded step has laid out.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(target, anchor: .center) }
+            if let flash { UINav.shared.highlight(flash) }
+        }
+    }
+
+    private func report() {
+        UINav.shared.expandedStep = track.steps.firstIndex { $0.id == expandedStep }.map { $0 + 1 }
     }
 
     /// Colour, name, Enabled and Run now.
@@ -55,6 +94,8 @@ struct TrackDetailView: View {
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .font(VPFont.display)
+                .focused($nameFocused)
+                .modifier(FocusKeyModifier(key: "name", focused: $nameFocused))
                 .frame(minWidth: 40)
                 // The name gives way first in a narrow window; the controls keep their size.
                 .layoutPriority(-1)
@@ -131,6 +172,8 @@ struct TrackDetailView: View {
                         draggingStep = step.id
                     }
                     .onDrop(of: [.text], delegate: StepDropDelegate(target: step.id, steps: $track.steps, dragging: $draggingStep))
+                    .id("step-\(step.id)")
+                    .vpFlash("step-\(step.id)")
                 }
             }
             HStack(spacing: 12) {
@@ -278,7 +321,7 @@ private struct StepRow: View {
             }
             if expanded {
                 VStack(alignment: .leading, spacing: 10) {
-                    StepConfigView(kind: $step.kind, speaker: speaker)
+                    StepConfigView(kind: $step.kind, stepID: step.id, speaker: speaker)
                 }
                 .padding(.leading, 66).padding(.bottom, 4)
             }
@@ -334,6 +377,7 @@ private struct StepDropDelegate: DropDelegate {
 /// Edits the associated values of a step kind in place.
 private struct StepConfigView: View {
     @Binding var kind: StepKind
+    let stepID: Step.ID
     let speaker: Speaker
 
     var body: some View {
@@ -391,13 +435,14 @@ private struct StepConfigView: View {
             }
             FieldLabel("Instructions", help: "{{input}} places the text; otherwise it's sent as the user message.") {
                 VPTextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) })
+                    .focusKey("prompt")
             }
 
         case .route(let routes):
             Text("Jev reads the text and picks the route whose description fits best (about 0.3 s); that route's model answers with its instructions. Without a Jev key, the first route is used.")
                 .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
-                RouteEditor(index: index, route: Binding {
+                RouteEditor(stepID: stepID, index: index, route: Binding {
                     routes[index]
                 } set: { updated in
                     var all = routes
@@ -422,7 +467,7 @@ private struct StepConfigView: View {
                             options: ["GET", "POST", "PUT", "PATCH"].map { ($0, $0) })
             }
             FieldLabel("URL", help: "{{input}} here is URL-encoded.") {
-                VPTextField("https://…", text: Binding { url } set: { set($0, method, headers, body, field) })
+                VPTextField("https://…", text: Binding { url } set: { set($0, method, headers, body, field) }).focusKey("url")
             }
             FieldLabel("Headers", help: "Name: value, one per line.") {
               VPTextField("Authorization: Bearer …", text: Binding {
@@ -433,20 +478,21 @@ private struct StepConfigView: View {
                     if parts.count == 2 { dict[parts[0].trimmingCharacters(in: .whitespaces)] = parts[1].trimmingCharacters(in: .whitespaces) }
                 }
                 set(url, method, parsed, body, field)
-              }, axis: .vertical)
+              }, axis: .vertical).focusKey("headers")
             }
             FieldLabel("Body", help: "{{input}} or {{input_json}} (a JSON string).") {
                 VPTextField("{\"text\": {{input_json}}}", text: Binding { body } set: { set(url, method, headers, $0, field) },
-                            axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64)
+                            axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64).focusKey("body")
             }
             FieldLabel("Response field", help: "A dotted path into the JSON response, e.g. data.text; empty uses the whole body.") {
-                VPTextField("data.text", text: Binding { field } set: { set(url, method, headers, body, $0) })
+                VPTextField("data.text", text: Binding { field } set: { set(url, method, headers, body, $0) }).focusKey("response_field")
             }
 
         case .template(let template):
             FieldLabel("Template", help: "{{input}} or {{input_json}} places the text.") {
                 VPTextField("{{input}}", text: Binding { template } set: { kind = .template($0) }, axis: .vertical,
                             font: .system(size: 12, design: .monospaced), minHeight: 64)
+                    .focusKey("template")
             }
 
         case .fixWords:
@@ -652,6 +698,7 @@ private struct LocalPreviewButton: View {
 /// One route of a Route step, as a card: its name (in the route's colour) and model; then what Jev chooses by
 /// ("use when ›"). Click it to edit: the card is outlined in rose and shows the fields.
 private struct RouteEditor: View {
+    let stepID: Step.ID
     let index: Int
     @Binding var route: Route
     let onDelete: (() -> Void)?
@@ -664,7 +711,8 @@ private struct RouteEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 if editing {
-                    VPTextField("Name", text: $route.name, font: VPFont.bodyStrong, color: Palette.pink).frame(width: 160)
+                    VPTextField("Name", text: $route.name, font: VPFont.bodyStrong, color: Palette.pink)
+                        .focusKey("route\(index + 1).name").frame(width: 160)
                 } else {
                     Text(route.name.isEmpty ? "unnamed" : route.name).font(VPFont.bodyStrong).foregroundStyle(color)
                 }
@@ -679,9 +727,11 @@ private struct RouteEditor: View {
             if editing {
                 FieldLabel("Use when", help: "Jev reads this to choose the route.") {
                     VPTextField("Use when…", text: $route.when, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 38)
+                        .focusKey("route\(index + 1).when")
                 }
                 FieldLabel("Instructions", help: "{{input}} places the text.") {
                     VPTextField("Instructions", text: $route.prompt, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64)
+                        .focusKey("route\(index + 1).prompt")
                 }
             } else {
                 (Text("use when › ").foregroundColor(Palette.comment) + Text(route.when.isEmpty ? "(no description: Jev can't pick it)" : route.when))
@@ -693,6 +743,24 @@ private struct RouteEditor: View {
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg100))
         .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(editing ? Palette.pink : Palette.line, lineWidth: 1))
+        .id("route-\(route.id)")
+        .vpFlash("route-\(route.id)")
+        .onAppear { takeRequest(); report() }
+        .onChange(of: UINav.shared.openRoute) { _, _ in takeRequest() }
+        .onChange(of: editing) { _, _ in report() }
+        .onDisappear { UINav.shared.editingRoutes.removeAll { $0 == index + 1 } }
+    }
+
+    private func takeRequest() {
+        guard let request = UINav.shared.openRoute, request.step == stepID, request.index == index else { return }
+        UINav.shared.openRoute = nil
+        editing = true
+    }
+
+    private func report() {
+        var routes = UINav.shared.editingRoutes.filter { $0 != index + 1 }
+        if editing { routes.append(index + 1) }
+        UINav.shared.editingRoutes = routes.sorted()
     }
 }
 
