@@ -75,19 +75,55 @@ struct SectionLabel: View {
     }
 }
 
-/// A keycap for a hotkey.
+/// A keycap for a hotkey: SF Mono 12 bold in bone on leather with a hairline, 22 tall. `small` is for a hotkey
+/// mentioned inside a sentence.
 struct Keycap: View {
     let text: String
     var mode: String?
+    var small = false
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(text).foregroundStyle(Palette.fgMuted)
-            if let mode { Text(mode).foregroundStyle(Palette.comment) }
+            Text(text).foregroundStyle(small ? Palette.fgMuted : Palette.fg)
+            if let mode { Text(mode).fontWeight(.regular).foregroundStyle(Palette.comment) }
         }
-        .font(VPFont.caption)
-        .padding(.horizontal, 5).frame(height: 18)
+        .font(.system(size: small ? 11 : 12, weight: small ? .regular : .bold, design: .monospaced))
+        .tracking(small ? 0 : 0.7)
+        .padding(.horizontal, small ? 5 : 8).frame(height: small ? 18 : 22)
         .background(RoundedRectangle(cornerRadius: 2).fill(Palette.bg300))
+        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(small ? .clear : Palette.line, lineWidth: 1))
+        .fixedSize()
+    }
+}
+
+/// The one-colour Voice Pipes mark for app chrome (the panel header): the › prompt, three pipes with their slits,
+/// and the base pipe, on an 18 × 18 grid, in bone on Sundown and ink on Daylight. The full-colour sundown mark is
+/// for the app icon, About and marketing only.
+struct MonoMark: View {
+    var scale: CGFloat = 2
+
+    private static let pixels: [(Int, Int, Int, Int)] = {
+        var rects: [(Int, Int, Int, Int)] = [(1, 11, 1, 1), (2, 12, 1, 1), (3, 13, 1, 1), (2, 14, 1, 1), (1, 15, 1, 1)]
+        // Pipes: x, top row, 3 wide down to row 13, with a 1-px slit at row 10 in the middle column.
+        for (x, top) in [(6, 7), (10, 3), (14, 6)] {
+            rects.append((x, top, 3, 10 - top))           // above the slit
+            rects.append((x, 10, 1, 1))
+            rects.append((x + 2, 10, 1, 1))               // either side of the slit
+            rects.append((x, 11, 3, 3))                   // rows 11–13
+        }
+        rects.append((5, 15, 13, 1))                      // the base pipe
+        return rects
+    }()
+
+    var body: some View {
+        Canvas(rendersAsynchronously: false) { context, _ in
+            for (x, y, w, h) in Self.pixels {
+                context.fill(Path(CGRect(x: CGFloat(x) * scale, y: CGFloat(y) * scale, width: CGFloat(w) * scale, height: CGFloat(h) * scale)),
+                             with: .color(Palette.fg))
+            }
+        }
+        .frame(width: 18 * scale, height: 18 * scale)
+        .accessibilityHidden(true)
     }
 }
 

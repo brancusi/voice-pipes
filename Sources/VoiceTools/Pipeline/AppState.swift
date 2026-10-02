@@ -87,9 +87,15 @@ final class AppState {
 
     /// `startServices: false` builds the state without hotkeys, the HUD, the microphone or models (for rendering
     /// screens offscreen in a scratch harness).
+    /// Parakeet's first download, 0…1 (nil when it isn't downloading).
+    private(set) var parakeetProgress: Double?
+    /// Show the setup window: a first launch, or a permission is missing and setup was never finished.
+    let needsOnboarding: Bool
+
     init(store: TrackStore? = nil, history: HistoryStore? = nil, startServices: Bool = true) {
         self.store = store ?? TrackStore()
         historyStore = history ?? HistoryStore()
+        needsOnboarding = startServices && Onboarding.shouldShow(freshInstall: self.store.createdFresh)
         guard startServices else { return }
         hud.attach(self)
         observeTracks()
@@ -115,12 +121,19 @@ final class AppState {
             if case .localSpeech(let engine, _, _) = step.kind { engine } else { nil }
         })
         for engine in engines { Task { try? await LocalVoices.shared.prepare(engine) } }
-        _ = await AVCaptureDevice.requestAccess(for: .audio)
-        if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
+        // The setup window asks for permissions itself, with an explanation; otherwise ask straight away.
+        if !needsOnboarding {
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
+            if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
+        }
         if store.tracks.contains(where: { $0.steps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
             parakeetState = .loading
             refreshChecks()
+            await parakeet.setProgressHandler { fraction in
+                Task { @MainActor [weak self] in self?.parakeetProgress = fraction < 1 ? fraction : nil }
+            }
             await parakeet.load()
+            parakeetProgress = nil
             parakeetState = await parakeet.state
         }
         refreshChecks()

@@ -55,29 +55,53 @@ struct TrackDetailView: View {
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .font(VPFont.display)
-                .frame(minWidth: 120)
+                .frame(minWidth: 40)
+                // The name gives way first in a narrow window; the controls keep their size.
+                .layoutPriority(-1)
             Spacer(minLength: 8)
-            Text("Enabled").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
-            Toggle("Enabled", isOn: $track.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            // The caption is dropped, never wrapped, when there's no room; the switch keeps its label for VoiceOver.
+            ViewThatFits(in: .horizontal) {
+                enabledCaption.fixedSize()
+                Color.clear.frame(width: 0, height: 0)
+            }
+            enabledSwitch
             Button("▶ Run now") { app.start(track) }.buttonStyle(.vpPrimary)
         }
+    }
+
+    @ViewBuilder private func triggerWarning(_ combo: KeyCombo) -> some View {
+        if app.store.conflicts.contains(combo) {
+            Text("WARN · also used by another trigger").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
+        } else if app.unavailableCombos.contains(combo) {
+            Text("WARN · taken by another app").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
+        }
+    }
+
+    private var enabledCaption: some View {
+        Text("Enabled").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+    }
+
+    private var enabledSwitch: some View {
+        Toggle("Enabled", isOn: $track.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
     }
 
     private var triggers: some View {
         Card {
             ForEach($track.triggers) { $trigger in
                 if trigger.id != track.triggers.first?.id { Hairline() }
-                HStack(spacing: 12) {
-                    KeyRecorder(combo: $trigger.combo, app: app)
-                    VPSegmented(selection: $trigger.mode, options: [(.toggle, "Toggle"), (.hold, "Press & hold")])
-                    if app.store.conflicts.contains(trigger.combo) {
-                        Text("WARN · also used by another trigger").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
-                    } else if app.unavailableCombos.contains(trigger.combo) {
-                        Text("WARN · taken by another app").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
+                let recorder = KeyRecorder(combo: $trigger.combo, app: app)
+                let mode = VPSegmented(selection: $trigger.mode, options: [(.toggle, "Toggle"), (.hold, "Press & hold")])
+                let remove = Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.vpIcon).help("Remove this trigger")
+                let warning = triggerWarning(trigger.combo)
+                // One line when there's room; the mode switch goes under the key in a narrow window.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { recorder; mode; warning; Spacer(minLength: 0); remove }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) { recorder; Spacer(minLength: 0); remove }
+                        mode
+                        warning
                     }
-                    Spacer(minLength: 0)
-                    Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.vpIcon).help("Remove this trigger")
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
             }
@@ -240,12 +264,14 @@ private struct StepRow: View {
                     .foregroundStyle(step.kind.tint)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(step.kind.category.uppercased()).font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .tracking(0.8).foregroundStyle(step.kind.tint)
+                        .tracking(0.8).foregroundStyle(step.kind.tint).lineLimit(1).fixedSize()
                     Text(step.kind.title).font(VPFont.bodyStrong).lineLimit(1)
                 }
+                .layoutPriority(1)
                 Spacer(minLength: 8)
+                // The types give way first in a narrow window.
                 Text("\(step.kind.input.rawValue == "none" ? "—" : step.kind.input.rawValue) → \(step.kind.output.rawValue == "none" ? "—" : step.kind.output.rawValue)")
-                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1).fixedSize()
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
                 Button(action: onToggle) { Image(systemName: expanded ? "chevron.up" : "chevron.down") }
                     .buttonStyle(.vpIcon).help(expanded ? "Hide settings" : "Settings")
                 Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.vpIcon).help("Remove this step")
@@ -563,7 +589,7 @@ private struct KeyRecorder: View {
             Text(recording ? "Press keys…" : combo.display)
                 .font(VPFont.bodyStrong)
                 .foregroundStyle(recording ? Palette.pink : Palette.fg)
-                .padding(.horizontal, 10).frame(minWidth: 110, minHeight: 24)
+                .padding(.horizontal, 10).frame(minWidth: 80, minHeight: 24)
                 .background(RoundedRectangle(cornerRadius: 2).fill(recording ? Color.clear : Palette.bg300))
                 .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(recording ? Palette.pink : Palette.line, lineWidth: 1))
                 .contentShape(Rectangle())

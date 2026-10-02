@@ -11,6 +11,11 @@ actor ParakeetService {
     private var loadTask: Task<Void, Never>?
     private(set) var state: State = .notLoaded
 
+    /// Download progress (0…1) while the model is fetched the first time.
+    private var onProgress: (@Sendable (Double) -> Void)?
+
+    func setProgressHandler(_ handler: @escaping @Sendable (Double) -> Void) { onProgress = handler }
+
     /// Downloads (first run only) and loads the model. Concurrent callers share one load.
     func load() async {
         if loadTask == nil {
@@ -21,8 +26,11 @@ actor ParakeetService {
 
     private func performLoad() async {
         state = .loading
+        let report = onProgress
         do {
-            let models = try await AsrModels.downloadAndLoad(version: .v3)
+            let models = try await AsrModels.downloadAndLoad(version: .v3, progressHandler: { progress in
+                report?(progress.fractionCompleted)
+            })
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
             self.manager = manager

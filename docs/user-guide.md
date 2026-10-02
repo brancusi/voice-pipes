@@ -1,5 +1,21 @@
 # User guide
 
+## First launch
+
+**Set up Voice Pipes** opens the first time (and whenever a permission is missing until it's finished):
+
+1. **Welcome.**
+2. **Permissions:** Microphone (records while you hold or toggle a hotkey) and Accessibility (pastes at the cursor,
+   reads the selection), each with a live status. **Open Settings…** opens the right Privacy & Security page and a
+   small helper beside it; if Voice Pipes isn't in the Accessibility list, drag the helper's icon into the list, then
+   switch it on. The helper closes itself once access is granted.
+3. **Models:** Parakeet (with download progress) and Pocket TTS, downloading in the background from the moment the
+   app starts; closing the window doesn't stop them.
+4. **Keys (optional):** OpenRouter and TypeSafe Jev, pasted the same way as in Setup.
+5. **Try it:** your hotkeys, and a box to dictate into.
+
+**Setup → Run setup again…** reopens it any time.
+
 ## Tracks
 
 A **track** is a pipeline: an input, any number of steps, and an output, started by one or more hotkeys. You

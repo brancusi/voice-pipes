@@ -9,7 +9,7 @@ feed published to a public releases repo → installed copies update themselves.
 DEV=1 ./build.sh                                   # build/Voice Pipes.app — rebuilds over itself
 SIGN_IDENTITY="Developer ID Application: Aram Zadikian (7F3RGY9LG8)" DEV=1 ./build.sh   # signed like releases (shares their permissions)
 # add NOTARY_KEY_PATH=~/keys/AuthKey_<KEYID>.p8 NOTARY_KEY_ID=… NOTARY_ISSUER_ID=… to notarize too
-./build.sh                                         # dist/Voice-Pipes-<VERSION>-arm64.zip (+ .sha256); never overwrites
+./build.sh                                         # dist/Voice-Pipes-<VERSION>-arm64.zip and dist/Voice-Pipes-<VERSION>.dmg (+ .sha256s); never overwrites
 ```
 
 `build.sh`:
@@ -23,7 +23,12 @@ SIGN_IDENTITY="Developer ID Application: Aram Zadikian (7F3RGY9LG8)" DEV=1 ./bui
 4. Signs with `SIGN_IDENTITY` (ad hoc if unset) and, for a real identity, fails unless the designated requirement
    names the certificate. `REQUIRE_SIGNING=1` / `REQUIRE_UPDATES=1` turn a missing identity / key into errors (CI
    sets both for tags).
-5. Zips with `ditto` and writes the SHA-256.
+5. Zips with `ditto` and writes the SHA-256 (the zip is what Sparkle installs updates from).
+6. Builds the installer DMG: `Tools/make_dmg_background.swift` paints the pixel-sundown window (1× and 2×, joined
+   into a Retina TIFF with `tiffutil`), and [dmgbuild](https://github.com/dmgbuild/dmgbuild) (pinned, installed
+   into a venv in `.cache/` on first use) lays out the app, an Applications link and the background from
+   `Tools/dmg_settings.py`, without driving Finder, so it works headless on CI. With a Developer ID identity the DMG
+   is signed, and with a notary key it's notarized and stapled too.
 
 FluidAudio's resource bundle is deliberately not copied: only its TTS lexicons use it and SwiftPM's accessor
 wouldn't find it inside an app bundle anyway (see [Gotchas](gotchas.md)).
@@ -42,7 +47,9 @@ wouldn't find it inside an app bundle anyway (see [Gotchas](gotchas.md)).
 The workflow (`.github/workflows/release.yml`, `macos-15` runner) checks the tag matches `VERSION`, imports the
 Developer ID certificate into a temporary keychain, builds, signs (hardened runtime) and notarizes, signs the zip with the update key (refusing if the key
 doesn't match `UPDATE_PUBLIC_KEY`), writes `appcast.xml` (`Tools/appcast.py`) and creates the release
-`vx.y.z` in `brancusi/voice-tools-releases`. A manual run (`workflow_dispatch` with a version like `0.0.0-ci`)
+`vx.y.z` in `brancusi/voice-tools-releases` with the DMG, the zip, their SHA-256s, the feed, and a fixed-name copy
+`Voice-Pipes.dmg`: `https://github.com/brancusi/voice-tools-releases/releases/latest/download/Voice-Pipes.dmg` is
+the stable "download the latest" link for the website and README. A manual run (`workflow_dispatch` with a version like `0.0.0-ci`)
 builds and uploads an artifact without publishing — useful to check CI changes.
 
 Verify a release from outside:

@@ -9,9 +9,13 @@ struct VoiceToolsApp: App {
         // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
         BundleRename.migrateIfNeeded()
         VPFont.registerBundledFonts()
-        _app = State(initialValue: AppState())
-        // Light, dark or Auto, as chosen in Setup → Appearance.
-        DispatchQueue.main.async { AppearanceChoice.apply() }
+        let state = AppState()
+        _app = State(initialValue: state)
+        // Light, dark or Auto, as chosen in Setup → Appearance; then the setup window on a first launch.
+        DispatchQueue.main.async {
+            AppearanceChoice.apply()
+            if state.needsOnboarding { OnboardingController.shared.show(state) }
+        }
     }
 
     var body: some Scene {

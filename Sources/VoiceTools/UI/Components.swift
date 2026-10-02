@@ -310,3 +310,37 @@ extension Palette {
         }
     }
 }
+
+/// An empty page: the Wrangler busking, a flavour headline in the pixel face, then a plain sentence that says what
+/// to do (and, optionally, the button that does it). The headline can tip its hat; the sentence gets to the point.
+struct WranglerEmptyState: View {
+    let headline: String
+    var scale = 6
+    let message: String
+    var action: (String, () -> Void)?
+
+    init(headline: String, scale: Int = 6, message: String, action: (String, () -> Void)? = nil) {
+        self.headline = headline
+        self.scale = scale
+        self.message = message
+        self.action = action
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Wrangler(pose: .busk, scale: scale)
+            PixelHeadline(headline)
+            // No vertical fixedSize here: measured at its narrowest it would demand a tall window and stop the
+            // window shrinking to its tile (the window's minimum size comes from its content).
+            Text(message)
+                .font(VPFont.body).lineSpacing(4).foregroundStyle(Palette.fgMuted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+            if let action {
+                Button(action.0, action: action.1).buttonStyle(.vpPrimary)
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

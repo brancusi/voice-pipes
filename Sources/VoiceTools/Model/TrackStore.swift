@@ -10,6 +10,8 @@ final class TrackStore {
     }
 
     let fileURL: URL
+    /// True when there was no tracks file yet: a first launch on this Mac.
+    private(set) var createdFresh = false
 
     init(fileURL: URL = TrackStore.defaultURL) {
         self.fileURL = fileURL
@@ -31,6 +33,7 @@ final class TrackStore {
             }
         } else {
             tracks = Track.defaults
+            createdFresh = true
             save()
         }
     }

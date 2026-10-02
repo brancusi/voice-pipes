@@ -21,6 +21,7 @@ struct SetupView: View {
         }
         .background(Palette.bg100)
         .toolbar {
+            ToolbarItem { Button("Run setup again…") { OnboardingController.shared.show(app) } }
             ToolbarItem { Button("Copy report") { app.copyReport() } }
         }
         .onAppear { if app.openRouterKeyState == nil { app.checkOpenRouterKey() } }
@@ -125,16 +126,19 @@ struct SetupView: View {
         return VStack(alignment: .leading, spacing: 6) {
             SectionLabel("Appearance")
             Card {
-                HStack(alignment: .center, spacing: 28) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        VPSegmented(selection: choice, options: AppearanceChoice.allCases.map { ($0, $0.label) })
-                        Text(choice.wrappedValue.detail + " The HUD stays dark.")
-                            .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
+                let picker = VStack(alignment: .leading, spacing: 10) {
+                    VPSegmented(selection: choice, options: AppearanceChoice.allCases.map { ($0, $0.label) })
+                    Text(choice.wrappedValue.detail + " The HUD stays dark.")
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                }
+                let swatches = HStack(spacing: 28) {
                     ThemeSwatch(name: "Daylight", dark: false, selected: choice.wrappedValue == .daylight) { choice.wrappedValue = .daylight }
                     ThemeSwatch(name: "Sundown", dark: true, selected: choice.wrappedValue == .sundown) { choice.wrappedValue = .sundown }
+                }
+                // Side by side when there's room; the swatches go underneath in a narrow window.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 28) { picker.frame(minWidth: 300, alignment: .leading); Spacer(minLength: 0); swatches }
+                    VStack(alignment: .leading, spacing: 16) { picker; swatches }
                 }
                 .padding(16)
             }
@@ -222,11 +226,13 @@ private struct ConnectionHeader: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(name).font(VPFont.bodyStrong)
+            Text(name).font(VPFont.bodyStrong).lineLimit(1).fixedSize()
+            // The purpose gives way first in a narrow window; the name and status never wrap.
             Text(purpose).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1).truncationMode(.tail)
+                .layoutPriority(-1)
             Spacer(minLength: 12)
-            Text(SetupView.code(status.0)).font(VPFont.label).tracking(0.9).foregroundStyle(MenuView.color(status.0))
-            Text(status.1).font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize()
+            Text(SetupView.code(status.0)).font(VPFont.label).tracking(0.9).foregroundStyle(MenuView.color(status.0)).fixedSize()
+            Text(status.1).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
         }
     }
 }
@@ -240,9 +246,11 @@ private struct ModelRow: View {
     var body: some View {
         HStack(spacing: 12) {
             StatusCode(level: state.0)
-            Text(name).frame(width: 150, alignment: .leading)
-            Text(detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-            Spacer()
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                Text(detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            }
+            Spacer(minLength: 8)
             Text(state.1).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
             if let load { Button("Load now", action: load).buttonStyle(.vpGhost) }
         }
@@ -252,7 +260,7 @@ private struct ModelRow: View {
 
 /// An API key field with no Save button. It shows the saved key masked; pasting a new key (or typing one and
 /// pressing Return) replaces it in the Keychain at once. Esc leaves it as it was.
-private struct KeyField: View {
+struct KeyField: View {
     let hint: String?
     let placeholder: String
     let failed: Bool

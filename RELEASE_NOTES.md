@@ -1,5 +1,12 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.5.0**
+- **A guided first launch.** New installs open **Set up Voice Pipes**: it explains and asks for Microphone and Accessibility one at a time, shows each one's status live, and opens a small helper beside System Settings. If Voice Pipes isn't in the Accessibility list, drag the helper's icon into it. The on-device models start downloading in the background straight away, with progress, then you can add API keys and try a hotkey. **Setup → Run setup again…** reopens it.
+- **Install from a DMG.** Download Voice-Pipes.dmg, open it, and drag Voice Pipes onto Applications.
+- **Hotkeys you can read.** Keycaps in the menu bar panel, the sidebar and the editor are bigger and bolder, and the panel's header shows the Voice Pipes mark in one colour.
+- **The Wrangler on every empty page.** No words in Vocabulary, or no tracks left: he's there with what to do next and a button that does it.
+- **Narrow windows, take two.** Every page now fits the narrowest tile: the editor's trigger and title rows and Setup's Appearance card rearrange instead of holding the window wide, and names and status codes never break mid-word.
+
 **1.4.0**
 - **Every screen in the Sundown look.** The editor, History, Vocabulary, Setup, word training and the menu bar panel now match the new design in both Daylight and Sundown: cards, log-style status codes, lavender selections, rose focus rings.
 - **A cleaner track editor.** The title row has the track's colour, its name, Enabled and **▶ Run now**. Each step is its own row, outlined when open. Route · Jev shows each route as a card with its model and price (e.g. `$1/$5`) and what Jev chooses it by; click a route to edit it. Deleting a track now asks first.

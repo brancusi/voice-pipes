@@ -16,18 +16,17 @@ Apple silicon, macOS 14 or later. Self-updating.
 
 ## Install
 
-1. Download `Voice-Pipes-<version>-arm64.zip` from the
-   [releases](https://github.com/brancusi/voice-tools-releases/releases/latest), unzip it, and move
-   **Voice Pipes.app** to Applications.
-2. Open it. It's signed with a Developer ID and notarized by Apple, so it opens like any other app.
-3. Allow **Microphone** and **Accessibility** when asked (Accessibility is needed to paste and to read selected
-   text). The panel's **Checks** list shows anything missing, with a **Fix…** button for each.
-4. Add your **OpenRouter** key (and optionally a **TypeSafe Jev** key) in **Open Voice Pipes… → Setup**. Keys are
-   stored in the Keychain.
-5. Optional: System Settings → General → Login Items → add Voice Pipes.
+1. Download **[Voice-Pipes.dmg](https://github.com/brancusi/voice-tools-releases/releases/latest/download/Voice-Pipes.dmg)**
+   (always the latest), open it, and drag **Voice Pipes** onto **Applications**.
+2. Open it. It's signed with a Developer ID and notarized by Apple, so it opens like any other app, and lives in the
+   menu bar.
+3. The first time, **Set up Voice Pipes** walks you through it: Microphone and Accessibility (with a helper you can
+   drag into Privacy & Security if the app isn't listed), the on-device models downloading in the background, and
+   optional **OpenRouter** / **TypeSafe Jev** keys (stored in the Keychain). **Setup → Run setup again…** reopens it.
+4. Optional: System Settings → General → Login Items → add Voice Pipes.
 
-It checks for updates every 5 minutes; when one is out the menu bar icon becomes a download arrow and the panel
-offers **Install…**. Permissions carry over between versions.
+It checks for updates every 5 minutes; when one is out the panel offers **Install…**. Permissions carry over
+between versions.
 
 ## A quick tour
 

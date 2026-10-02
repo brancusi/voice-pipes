@@ -95,12 +95,18 @@ struct MainWindowView: View {
             if let index = app.store.tracks.firstIndex(where: { $0.id == id }) {
                 TrackDetailView(app: app, track: Bindable(app.store).tracks[index]) {
                     app.store.tracks.remove(at: index)
-                    app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .setup
+                    // With no tracks left, stay here: the page below offers to lay a new one.
+                    app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .track(id)
                 }
                 .id(id)
                 .navigationTitle(app.store.tracks[index].name)
             } else {
-                Text("Select a track").foregroundStyle(.secondary)
+                WranglerEmptyState(headline: "no pipes laid",
+                                   message: app.store.tracks.isEmpty
+                                       ? "No tracks yet. A track is a pipeline you play with a hotkey: microphone in, text or speech out."
+                                       : "Pick a track in the sidebar, or lay a new one.",
+                                   action: ("+ New track", newTrack))
+                    .background(Palette.bg100)
             }
         case .activity:
             HistoryView(app: app).navigationTitle("History").background(Palette.bg100)
@@ -161,7 +167,10 @@ private struct HistoryView: View {
     var body: some View {
         Group {
             if app.history.isEmpty {
-                EmptyHistory(hotkey: app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty }?.triggers.first?.combo.display)
+                let hotkey = app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty }?.triggers.first?.combo.display
+                WranglerEmptyState(headline: "quiet on the range",
+                                   message: hotkey.map { "No runs yet. Hold \($0) and say something; every run lands here so you can copy it again." }
+                                       ?? "No runs yet. Run a track and say something; every run lands here so you can copy it again.")
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
@@ -277,25 +286,6 @@ private struct StepChain: View {
     }
 }
 
-/// First launch: the Wrangler busking, a flavour headline, then plain instructions.
-private struct EmptyHistory: View {
-    let hotkey: String?
-
-    var body: some View {
-        VStack(spacing: 18) {
-            Wrangler(pose: .busk, scale: 6)
-            PixelHeadline("quiet on the range")
-            (Text("No runs yet. ") + (hotkey.map { Text("Hold ") + Text($0).foregroundColor(Palette.fg) + Text(" and say something; ") }
-                ?? Text("Run a track and say something; ")) + Text("every run lands here so you can copy it again."))
-                .font(VPFont.body).lineSpacing(4).foregroundStyle(Palette.fgMuted)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 330)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
 /// The shared word list used by Fix words steps (and given to LLM steps as a glossary).
 /// A plain table rather than a Form: Form shows a text field's title as a label beside it.
 private struct VocabularyView: View {
@@ -311,6 +301,13 @@ private struct VocabularyView: View {
                     .font(VPFont.caption).lineSpacing(3).foregroundStyle(Palette.fgMuted)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if store.entries.isEmpty {
+                    WranglerEmptyState(headline: "nothing to rope yet", scale: 4,
+                                       message: "No words yet. Add a name or term transcription keeps getting wrong, then Train… it to catch every way it's misheard.",
+                                       action: ("+ Add word", { store.entries.append(VocabularyEntry(write: "", heardAs: [])) }))
+                        .frame(minHeight: 360)
+                        .vpCard()
+                } else {
                 VPSection("Words") {
                     Card {
                         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
@@ -349,6 +346,7 @@ private struct VocabularyView: View {
                             .buttonStyle(.vpGhost)
                             .padding(6)
                     }
+                }
                 }
 
                 VPSection("Try it") {
@@ -413,7 +411,8 @@ struct WindowBehavior: NSViewRepresentable {
     static func closed() {
         DispatchQueue.main.async {
             let open = NSApp.windows.contains { window in
-                window.isVisible && ["main", "about"].contains { window.identifier?.rawValue.hasPrefix($0) ?? false }
+                window.isVisible && (["main", "about"].contains { window.identifier?.rawValue.hasPrefix($0) ?? false }
+                    || window.title == "Set up Voice Pipes")
             }
             if !open { NSApp.setActivationPolicy(.accessory) }
         }

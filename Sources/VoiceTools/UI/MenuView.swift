@@ -31,7 +31,7 @@ struct MenuView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
+            MonoMark(scale: 2)
             VStack(alignment: .leading, spacing: 2) {
                 Wordmark(size: 15, weight: .bold)
                 HStack(spacing: 6) {
@@ -239,7 +239,7 @@ private struct TrackRow: View {
             }
             ForEach(track.triggers) { trigger in Keycap(text: trigger.combo.display) }
         }
-        .padding(.horizontal, 12).frame(height: 30)
+        .padding(.horizontal, 12).frame(height: 34)
         .background(hovering || state != nil ? Palette.bg300 : .clear)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }

@@ -2,7 +2,9 @@
 # Build "Voice Pipes.app" for Apple silicon (macOS 14+) and zip it into dist/.
 #   ./build.sh                 # version from ./VERSION → dist/Voice-Pipes-<VERSION>-arm64.zip
 #   VERSION=1.2.0 ./build.sh
-#   DEV=1 ./build.sh           # local iteration: build/Voice Pipes.app only, no zip, can rebuild over itself
+#   DEV=1 ./build.sh           # local iteration: build/Voice Pipes.app only, no zip or DMG, can rebuild over itself
+# Releases produce dist/Voice-Pipes-<VERSION>-arm64.zip (Sparkle updates) and dist/Voice-Pipes-<VERSION>.dmg (the
+# installer people download; dmgbuild is pinned and installed into .cache/ on first use).
 # Needs Xcode or the Command Line Tools (swift, codesign). Never overwrites an existing dist/ file.
 #
 # Self-updating (Sparkle): Sparkle comes in through SwiftPM (pinned in Package.swift). The release tarball of the
@@ -161,3 +163,27 @@ mkdir -p "$DIST"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 shasum -a 256 "$ZIP" | tee "$ZIP.sha256"
 echo "built $ZIP"
+
+# The installer people download: a DMG with the app, an Applications link and a pixel-sundown window telling them
+# to drag one onto the other. (The zip above is what Sparkle installs updates from.)
+echo "==> dmg"
+DMG="$DIST/Voice-Pipes-$VERSION.dmg"
+DMGBUILD_VERSION="1.6.5"
+VENV=".cache/dmgbuild-$DMGBUILD_VERSION"
+[[ -x "$VENV/bin/dmgbuild" ]] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install -q "dmgbuild==$DMGBUILD_VERSION"; }
+swiftc "${CACHE[@]}" Tools/make_dmg_background.swift -o "$WORK/make_dmg_background"
+"$WORK/make_dmg_background" "$WORK/dmg-bg" >/dev/null
+tiffutil -cathidpicheck "$WORK/dmg-bg/background.png" "$WORK/dmg-bg/background@2x.png" -out "$WORK/dmg-bg/background.tiff" 2>/dev/null
+"$VENV/bin/dmgbuild" -s Tools/dmg_settings.py -D app="$APP" -D background="$WORK/dmg-bg/background.tiff" "$NAME" "$DMG" >/dev/null
+if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
+  codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+  if [[ -n "${NOTARY_KEY_PATH:-}" ]]; then
+    xcrun notarytool submit "$DMG" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" \
+      --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m | tee "$WORK/notary-dmg.log"
+    grep -q "status: Accepted" "$WORK/notary-dmg.log" || { echo "DMG notarization failed." >&2; exit 1; }
+    xcrun stapler staple "$DMG"
+    spctl --assess --type open --context context:primary-signature --verbose "$DMG"
+  fi
+fi
+shasum -a 256 "$DMG" | tee "$DMG.sha256"
+echo "built $DMG"
