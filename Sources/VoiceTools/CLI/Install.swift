@@ -231,7 +231,7 @@ enum AgentsInstaller {
     static let skill = """
         ---
         name: voice-pipes
-        description: Use the user's Voice Pipes app through the `vp` CLI. Speak to the user aloud (`vp say`), ask them a question by voice and get their spoken answer (`vp ask`), record and transcribe them (`vp listen`) or an audio file (`vp transcribe`), run their voice pipelines ("tracks") with text in (`vp run <id> --text`), and read or change their tracks, hotkeys, vocabulary and keys (config.toml, `vp config`, `vp vocab`, `vp auth`). Use when the user mentions Voice Pipes, tracks, dictation, reading aloud, voice notes, or wants to be told or asked something out loud.
+        description: Use the user's Voice Pipes app through the `vp` CLI. Speak to the user aloud (`vp say`), ask them a question by voice and get their spoken answer (`vp ask`), record and transcribe them (`vp listen`) or an audio file (`vp transcribe`), run their voice pipelines ("tracks") with text in (`vp run <id> --text`), and read or change their tracks, hotkeys, vocabulary and keys (config.toml, `vp config`, `vp vocab`, `vp auth`). Also reads long text to the user (a summary, a report, an answer) in a HUD they can follow and steer: jump to any sentence, change speed, pause. Use when the user mentions Voice Pipes, tracks, dictation, reading aloud, voice notes, says "read this to me" or "read me the summary", or wants to be told or asked something out loud.
         ---
 
         # Voice Pipes (`vp`)
@@ -252,8 +252,22 @@ enum AgentsInstaller {
           talking, and prints `answer:`. Use it when you need a decision and the user may not be at the screen.
           `--max 30` caps the recording; `--silence 1.2` is how long a pause ends it.
         - `vp listen` records and transcribes without speaking first. `vp stop` stops speech or recording.
-        - For long readings: `vp open reading` shows the text in the HUD as it's read (the user can follow and look
-          ahead); `vp speed 1.4` changes the speed of what's playing; `vp close reading` hides the text.
+        - `vp speed 1.4` changes the speed of what's playing.
+
+        ## Read long text to the user
+
+        Voice Pipes can read a long summary, report or answer aloud while the user sits back and listens. The HUD
+        at the bottom of their screen shows the text with the sentence being read lit up and a cursor under the
+        word, and they steer it themselves: click any sentence to jump there, − / + for speed, pause, stop.
+
+        When the user says "read this to me", "read me the summary", or wants to listen instead of read:
+        1. Write it for listening: plain spoken sentences and short paragraphs. No markdown, bullets, tables, code,
+           file paths or URLs (they're read out literally); say "three things" and then the three things.
+        2. `vp open reading` (shows the follow-along card), then pipe the text in: `printf '%s' "$TEXT" | vp say`.
+           `vp say` returns when the reading ends, whether it finished, was stopped or the user jumped around.
+        3. Don't talk over it: wait for `vp say` to return before speaking or asking anything else.
+        - The user controls it from the HUD; you can too: `vp speed <0.6–2.0>`, `vp pause`, `vp resume`, `vp stop`.
+        - `vp close reading` hides the card for later readings (the user's choice is remembered either way).
         - Keep spoken text short and plain: no markdown, code or URLs; they are read out literally.
 
         ## Run the user's pipelines

@@ -13,9 +13,7 @@ final class Speaker: NSObject {
     private(set) var sourceLabel = ""
     private(set) var voiceLabel = ""
     /// 0...1 through the whole text.
-    private(set) var progress: Double = 0 {
-        didSet { if engine != .system { position = Int(progress * Double(textLength)) } }
-    }
+    private(set) var progress: Double = 0
 
     // Read-along (the HUD's expanded card): what's being read, by sentence, and where the voice is.
     struct Sentence: Identifiable, Equatable {
@@ -71,6 +69,12 @@ final class Speaker: NSObject {
     @ObservationIgnored private var finished: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var segmentDone: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var generation = 0
+    /// Cloud and on-device voices read in passes: the whole text, or from a sentence the user jumped to.
+    @ObservationIgnored private var pass = 0
+    @ObservationIgnored private var base = 0
+    @ObservationIgnored private var seekTarget: Int?
+    @ObservationIgnored private var sampleRate: Double = 24_000
+    @ObservationIgnored private var completedSamples: Int64 = 0
 
     override init() {
         super.init()
@@ -94,7 +98,8 @@ final class Speaker: NSObject {
 
     // MARK: - OpenRouter voice
 
-    /// Fetches and plays speech segment by segment. Throws if the first segment can't be synthesized.
+    /// Fetches and plays speech segment by segment. Throws if the first segment can't be synthesized. Returns when
+    /// the text is finished or cleared; a jump (`seek`) carries on from that sentence within the same call.
     func speakCloud(_ text: String, model: String, voice: String, rate: Float, label: String) async throws {
         clear()
         begin(text, rate: rate, engine: .cloud)
@@ -102,17 +107,31 @@ final class Speaker: NSObject {
         let run = generation
         sourceLabel = label
         voiceLabel = OpenRouterCatalog.Model.voiceLabel(voice)
-        segments = Self.segments(of: text)
         playbackRate = rate
-        state = .loading
+        startProgressTimer()
+        var from = 0
+        while true {
+            try await playCloud(from: from, model: model, voice: voice, run: run, pass: pass)
+            guard generation == run else { return }
+            guard let target = seekTarget else { break }
+            seekTarget = nil
+            from = target
+        }
+        finishPlayback()
+    }
 
+    /// One pass, from a UTF-16 offset to the end (or until a jump starts another).
+    private func playCloud(from offset: Int, model: String, voice: String, run: Int, pass: Int) async throws {
+        base = offset
+        segments = Self.segments(of: suffix(from: offset))
+        segmentIndex = 0
+        state = .loading
         let fetch: (Int) -> Task<Data, Error> = { index in
             let piece = self.segments[index]
             return Task { try await OpenRouterClient.shared.speech(model: model, voice: voice, text: piece) }
         }
-
         for index in segments.indices {
-            guard generation == run else { return }
+            guard isCurrent(run, pass) else { return }
             segmentIndex = index
             let current = fetches[index] ?? fetch(index)
             fetches[index] = current
@@ -123,11 +142,11 @@ final class Speaker: NSObject {
             do {
                 audio = try await current.value
             } catch {
-                guard generation == run else { return }
+                guard isCurrent(run, pass) else { return }  // cancelled by a jump
                 clear()
                 throw error
             }
-            guard generation == run else { return }
+            guard isCurrent(run, pass) else { return }
 
             let player = try AVAudioPlayer(data: audio)
             player.delegate = self
@@ -135,11 +154,16 @@ final class Speaker: NSObject {
             player.rate = playbackRate
             self.player = player
             if state != .paused { state = .speaking; player.play() }
-            startProgressTimer()
             await withCheckedContinuation { segmentDone = $0 }
             fetches[index] = nil
         }
-        if generation == run { finishPlayback() }
+    }
+
+    private func isCurrent(_ run: Int, _ pass: Int) -> Bool { generation == run && self.pass == pass }
+
+    private func suffix(from offset: Int) -> String {
+        let all = text as NSString
+        return all.substring(from: min(max(0, offset), all.length))
     }
 
     // MARK: - On-device voice
@@ -154,13 +178,9 @@ final class Speaker: NSObject {
         sourceLabel = label
         voiceLabel = "\(kind.voiceLabel(voice)) · \(kind.label)"
         state = .loading
-        let passages = Self.segments(of: text)
-        totalChars = passages.reduce(0) { $0 + $1.count }
-        scheduledChars = 0
-        scheduledSamples = 0
-        pendingBuffers = 0
 
-        let format = AVAudioFormat(standardFormatWithSampleRate: LocalVoices.sampleRate(kind), channels: 1)!
+        sampleRate = LocalVoices.sampleRate(kind)
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
         let engine = AVAudioEngine()
         let node = AVAudioPlayerNode()
         let timePitch = AVAudioUnitTimePitch()
@@ -175,33 +195,53 @@ final class Speaker: NSObject {
         self.timePitch = timePitch
         startLocalProgressTimer()
 
-        do {
-            for passage in passages {
-                for try await samples in try await LocalVoices.shared.stream(kind, text: passage, voice: voice) {
-                    guard generation == run else { return }
-                    schedule(samples, format: format, on: node, run: run)
-                    if state == .loading {
-                        state = .speaking
-                        node.play()
-                    }
-                }
-                guard generation == run else { return }
-                scheduledChars += passage.count
+        var from = 0
+        while true {
+            do {
+                try await playLocal(from: from, kind: kind, voice: voice, format: format, node: node, run: run, pass: pass)
+            } catch {
+                guard isCurrent(run, pass) else { return }
+                clear()
+                throw error
             }
-        } catch {
             guard generation == run else { return }
-            clear()
-            throw error
+            guard let target = seekTarget else { break }
+            seekTarget = nil
+            from = target
         }
-        // Everything is generated; wait for the last buffer to finish playing.
-        if pendingBuffers > 0 { await withCheckedContinuation { drained = $0 } }
-        if generation == run {
-            teardownLocal()
-            finishPlayback()
-        }
+        teardownLocal()
+        finishPlayback()
     }
 
-    private func schedule(_ samples: [Float], format: AVAudioFormat, on node: AVAudioPlayerNode, run: Int) {
+    /// One pass, from a UTF-16 offset to the end (or until a jump starts another). Returns once it has played out.
+    private func playLocal(from offset: Int, kind: LocalVoiceEngine, voice: String, format: AVAudioFormat,
+                           node: AVAudioPlayerNode, run: Int, pass: Int) async throws {
+        base = offset
+        let passages = Self.segments(of: suffix(from: offset))
+        totalChars = passages.reduce(0) { $0 + $1.count }
+        scheduledChars = 0
+        scheduledSamples = 0
+        completedSamples = 0
+        pendingBuffers = 0
+        state = .loading
+        for passage in passages {
+            for try await samples in try await LocalVoices.shared.stream(kind, text: passage, voice: voice) {
+                guard isCurrent(run, pass) else { return }
+                schedule(samples, format: format, on: node, run: run, pass: pass)
+                if state == .loading {
+                    state = .speaking
+                    node.play()
+                }
+            }
+            guard isCurrent(run, pass) else { return }
+            scheduledChars += passage.count
+            completedSamples = scheduledSamples
+        }
+        // Everything is generated; wait for the last buffer to finish playing (a jump ends the wait).
+        if pendingBuffers > 0 { await withCheckedContinuation { drained = $0 } }
+    }
+
+    private func schedule(_ samples: [Float], format: AVAudioFormat, on node: AVAudioPlayerNode, run: Int, pass: Int) {
         guard !samples.isEmpty,
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
         buffer.frameLength = AVAudioFrameCount(samples.count)
@@ -210,7 +250,7 @@ final class Speaker: NSObject {
         scheduledSamples += Int64(samples.count)
         node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.generation == run else { return }
+                guard let self, self.isCurrent(run, pass) else { return }
                 self.pendingBuffers -= 1
                 if self.pendingBuffers == 0 {
                     self.drained?.resume()
@@ -222,18 +262,29 @@ final class Speaker: NSObject {
 
     private func startLocalProgressTimer() {
         progressTimer?.invalidate()
-        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             MainActor.assumeIsolated { self.updateLocalProgress() }
         }
     }
 
+    /// Characters played so far, from samples played: the rate measured on finished passages, or about 14
+    /// characters a second until one has finished. (Sample time is before the speed change, so speed doesn't skew it.)
     private func updateLocalProgress() {
-        guard let node = playerNode, let nodeTime = node.lastRenderTime,
-              let playerTime = node.playerTime(forNodeTime: nodeTime), scheduledSamples > 0, totalChars > 0 else { return }
-        // Estimate the whole text's length in samples from what's been generated so far.
-        let charsSoFar = max(scheduledChars, 1)
-        let estimatedTotal = Double(scheduledSamples) * Double(totalChars) / Double(charsSoFar)
-        progress = min(1, Double(playerTime.sampleTime) / max(estimatedTotal, 1))
+        guard state == .speaking, let node = playerNode, let nodeTime = node.lastRenderTime,
+              let playerTime = node.playerTime(forNodeTime: nodeTime), totalChars > 0 else { return }
+        let samplesPerChar = scheduledChars > 0 && completedSamples > 0
+            ? Double(completedSamples) / Double(scheduledChars) : sampleRate / 14
+        let chars = Double(max(0, playerTime.sampleTime)) / samplesPerChar
+        setPassFraction(min(1, chars / Double(totalChars)))
+    }
+
+    /// Where the voice is within the current pass (0…1) → its offset in the whole text, and overall progress.
+    private func setPassFraction(_ fraction: Double) {
+        let remaining = max(0, textLength - base)
+        let new = base + Int(fraction * Double(remaining))
+        // Never backwards within a pass: estimates wobble.
+        if new > position || position < base { position = new }
+        progress = Double(position) / Double(max(textLength, 1))
     }
 
     private func teardownLocal() {
@@ -276,10 +327,40 @@ final class Speaker: NSObject {
     #if SNAPSHOTS
     func setPreview(text: String, at sentence: Int, rate: Float) {
         begin(text, rate: rate, engine: .none)
-        position = sentences[safe: sentence]?.start ?? 0
+        position = (sentences[safe: sentence]?.start ?? 0) + 30  // mid-sentence, for the word cursor
         voiceLabel = "Alba · Pocket TTS"
     }
     #endif
+
+    /// Jumps to a sentence (a click in the read-along card); reading carries on from there, unpaused.
+    func seek(toSentence index: Int) {
+        guard let sentence = sentences[safe: index], state != .idle else { return }
+        position = sentence.start
+        progress = Double(position) / Double(max(textLength, 1))
+        switch engine {
+        case .system:
+            systemRestartPending = false
+            state = .speaking
+            speakSystem(from: sentence.start)
+        case .cloud, .local:
+            // End this pass; the speak call's loop starts the next one at the target.
+            seekTarget = sentence.start
+            pass += 1
+            player?.stop()
+            player = nil
+            fetches.values.forEach { $0.cancel() }
+            fetches.removeAll()
+            segmentDone?.resume()
+            segmentDone = nil
+            playerNode?.stop()
+            pendingBuffers = 0
+            drained?.resume()
+            drained = nil
+            state = .loading
+        case .none:
+            break
+        }
+    }
 
     /// Changes the speed of what's playing now (0.6–2×, in tenths). Not saved to the track.
     func setRate(_ value: Float) {
@@ -369,6 +450,7 @@ final class Speaker: NSObject {
 
     func clear() {
         generation += 1
+        seekTarget = nil
         currentUtterance = nil
         engine = .none
         synthesizer.stopSpeaking(at: .immediate)
@@ -396,17 +478,17 @@ final class Speaker: NSObject {
 
     private func startProgressTimer() {
         progressTimer?.invalidate()
-        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             MainActor.assumeIsolated { self.updateCloudProgress() }
         }
     }
 
     private func updateCloudProgress() {
-        guard !segments.isEmpty else { return }
+        guard state == .speaking, segments.indices.contains(segmentIndex), let player else { return }
         let total = segments.reduce(0) { $0 + $1.count }
         let done = segments.prefix(segmentIndex).reduce(0) { $0 + $1.count }
-        let fraction = player.map { $0.duration > 0 ? $0.currentTime / $0.duration : 0 } ?? 0
-        progress = (Double(done) + fraction * Double(segments[segmentIndex].count)) / Double(max(total, 1))
+        let fraction = player.duration > 0 ? player.currentTime / player.duration : 0
+        setPassFraction((Double(done) + fraction * Double(segments[segmentIndex].count)) / Double(max(total, 1)))
     }
 
     /// Splits text into sentence groups: a short first segment so audio starts quickly, longer ones after.

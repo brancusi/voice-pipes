@@ -154,7 +154,9 @@ its read-aloud buttons.
 
 **Follow along.** While anything is read aloud, the tag's third button (☰) opens a card above it with the whole
 text, a sentence per line: the one being read is lit with a lavender bar, finished ones dim, and the card scrolls
-with the voice. Hold the pointer over the card to scroll ahead; it follows the voice again when the pointer leaves.
+with the voice, with a thin underline running under the word being spoken (exact with macOS voices, estimated with
+the others). Click any sentence to read from there. Hold the pointer over the card to scroll ahead; it follows the
+voice again when the pointer leaves.
 **−** and **+** change the speed live (0.6–2×, for this reading only; the track's speed stays as set). The card
 stays open for later readings until you close it (˅). From a terminal: `vp open reading`, `vp close reading`,
 `vp speed 1.4`.

@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.6.5**
+- **Click a sentence to jump there.** In the HUD's follow-along card, click any sentence and reading carries on from it, with any voice. Handy when an agent reads you a long summary: skip ahead to the part you care about, or go back over something you missed.
+- **A running word cursor.** A thin underline moves along under the word being spoken, and the part of the sentence already read is a touch brighter. It's exact with macOS voices and closely estimated with the others.
+- **Agents know they can read to you.** Ask Claude Code or another agent to read you its summary: the skill now tells it to write for listening, open the follow-along card and read it with Voice Pipes, then wait while you listen and steer.
+
 **1.6.4**
 - **Follow along with anything read aloud.** The HUD has a new button while it's reading: it opens a card above it with the whole text, one sentence per line, the one being read lit up and the card scrolling with the voice. Hover over it to look ahead; it picks up the voice again when you move away. Handy for long answers you didn't select yourself.
 - **Speed it up or slow it down as it reads.** **−** and **+** on the card change the speed on the spot, from 0.6× to 2×, with every kind of voice. The card stays open for the next reading until you close it.

@@ -321,17 +321,10 @@ struct ReadAlongCard: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(speaker.sentences) { sentence in
-                            HStack(alignment: .top, spacing: 8) {
-                                Rectangle().fill(sentence.id == current ? Self.lavender : .clear).frame(width: 2)
-                                Text(sentence.text)
-                                    .foregroundStyle(sentence.id == current ? Palette.hudFG
-                                                     : sentence.id < current ? Palette.hudMuted.opacity(0.45) : Palette.hudFG.opacity(0.7))
-                                    .lineSpacing(3)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(.top, sentence.opensParagraph ? 7 : 0)
-                            .id(sentence.id)
+                            SentenceRow(sentence: sentence, current: current, position: speaker.position,
+                                        tint: Self.lavender) { speaker.seek(toSentence: sentence.id) }
+                                .padding(.top, sentence.opensParagraph ? 7 : 0)
+                                .id(sentence.id)
                         }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 10)
@@ -344,7 +337,7 @@ struct ReadAlongCard: View {
             }
             Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
             HStack(spacing: 8) {
-                Text(hovering ? "looking ahead · follows again when the pointer leaves" : speaker.voiceLabel)
+                Text(hovering ? "click a sentence to read from there" : speaker.voiceLabel)
                     .foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
                 speedButton("minus", help: "Slower") { speaker.setRate(speaker.rate - 0.1) }
@@ -383,5 +376,59 @@ struct ReadAlongCard: View {
         .buttonStyle(.plain)
         .foregroundStyle(Palette.hudFG)
         .help(help)
+    }
+}
+
+/// One sentence in the read-along card; click to read from it. The one being read is lit with a bar; inside it,
+/// what's been read is full brightness and the word being spoken has a thin underline that runs along with the voice.
+private struct SentenceRow: View {
+    let sentence: Speaker.Sentence
+    let current: Int
+    let position: Int
+    let tint: Color
+    let onTap: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Rectangle().fill(sentence.id == current ? tint : .clear).frame(width: 2)
+            text
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 1)
+        .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudFG.opacity(hovering ? 0.07 : 0)))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onTap)
+        .help("Read from here")
+    }
+
+    private var text: Text {
+        if sentence.id < current { return Text(sentence.text).foregroundColor(Palette.hudMuted.opacity(0.45)) }
+        guard sentence.id == current else { return Text(sentence.text).foregroundColor(Palette.hudFG.opacity(0.7)) }
+        return Text(Self.marked(sentence.text, at: position - sentence.start, tint: tint))
+    }
+
+    /// Read part bright, the rest a little softer, the word at `offset` (UTF-16, within the sentence) underlined.
+    static func marked(_ text: String, at offset: Int, tint: Color) -> AttributedString {
+        var out = AttributedString(text)
+        out.foregroundColor = Palette.hudFG.opacity(0.82)
+        let utf16 = text.utf16
+        let clamped = min(max(0, offset), utf16.count)
+        // On a character boundary (an offset inside an emoji or accent falls back to the character it's in).
+        guard let cursor = String.Index(utf16.index(utf16.startIndex, offsetBy: clamped), within: text)
+                ?? text.indices.last(where: { $0.utf16Offset(in: text) <= clamped }) else { return out }
+        // The word around the cursor: back to the last space, on to the next.
+        var wordStart = cursor
+        while wordStart > text.startIndex, !text[text.index(before: wordStart)].isWhitespace { wordStart = text.index(before: wordStart) }
+        var wordEnd = cursor
+        while wordEnd < text.endIndex, !text[wordEnd].isWhitespace { wordEnd = text.index(after: wordEnd) }
+        if let read = Range(text.startIndex..<wordEnd, in: out) { out[read].foregroundColor = Palette.hudFG }
+        if wordStart < wordEnd, let word = Range(wordStart..<wordEnd, in: out) {
+            out[word].underlineStyle = Text.LineStyle(pattern: .solid, color: tint.opacity(0.85))
+        }
+        return out
     }
 }
