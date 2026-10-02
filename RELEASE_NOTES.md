@@ -1,5 +1,9 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.9.3**
+- **See which model is answering.** A line under the HUD names the model, and for Route · Jev the route Jev picked, how long it took and how sure it was, e.g. "quick → claude-haiku-4.5 · Jev 262 ms 100%".
+- **Pause and stop from the HUD.** While an answer is being read aloud, the HUD has pause/play and stop buttons. Clicking them doesn't take focus from the app you're working in. Pressing the track's hotkey again still pauses and resumes too.
+
 **0.9.2**
 - **No more Keychain password after updates.** Voice Tools is now signed with an Apple Developer ID and notarized by Apple. Until now, every update made macOS ask for your login password before the app could read your OpenRouter and Jev keys. From the next update on, it won't.
 - **One-time setup for this update:** macOS sees a newly signed app, so:

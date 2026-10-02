@@ -1,13 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// A small, translucent status tag at the bottom of the screen. It ignores the mouse, so it never gets in the way,
-/// and fades out as soon as a run is done.
+/// A small, translucent status tag at the bottom of the screen, with the answering model on a line under it. It
+/// ignores the mouse except while reading aloud (for its pause and stop buttons), never takes focus from the app
+/// you're in, and fades out as soon as a run is done.
 @MainActor
 final class HUDController {
     private var panel: NSPanel?
     private weak var app: AppState?
-    static let size = NSSize(width: 520, height: 44)
+    static let size = NSSize(width: 520, height: 66)
 
     func attach(_ app: AppState) {
         self.app = app
@@ -16,10 +17,14 @@ final class HUDController {
 
     private func observe() {
         guard let app else { return }
-        let visible = withObservationTracking { app.run != nil } onChange: { [weak self] in
+        let (visible, speaking) = withObservationTracking {
+            (app.run != nil, app.run?.phase == .speaking)
+        } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
         visible ? show() : hide()
+        // Clickable only while its buttons are showing; otherwise clicks go straight through.
+        panel?.ignoresMouseEvents = !speaking
     }
 
     private func show() {
@@ -49,17 +54,29 @@ final class HUDController {
     }
 
     private func makePanel(_ app: AppState) -> NSPanel {
-        let panel = NSPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless],
-                            backing: .buffered, defer: false)
+        let panel = HUDPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless],
+                             backing: .buffered, defer: false)
+        panel.becomesKeyOnlyIfNeeded = true
         panel.level = .statusBar
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: HUDView(app: app))
+        panel.contentView = FirstClickHostingView(rootView: HUDView(app: app))
         return panel
     }
+}
+
+/// Never key or main, so clicking the HUD leaves the keyboard focus in the app you were using.
+private final class HUDPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+/// Buttons respond to the first click even though the HUD is never the active window.
+private final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 struct HUDView: View {
@@ -69,7 +86,11 @@ struct HUDView: View {
         VStack {
             Spacer(minLength: 0)
             if let run = app.run {
-                content(run).transition(.opacity)
+                VStack(spacing: 3) {
+                    content(run)
+                    if let info = run.modelInfo, run.phase != .recording { ModelLine(text: info) }
+                }
+                .transition(.opacity)
             }
         }
         .frame(width: HUDController.size.width, height: HUDController.size.height)
@@ -88,10 +109,13 @@ struct HUDView: View {
                 HUDTag(state: .processing, label: "PROC", detail: HUDTag.ms(context.date.timeIntervalSince(run.processingStarted)))
             }
         case .speaking:
-            switch app.speaker.state {
-            case .loading: HUDTag(state: .speaking, label: "VOICE", detail: "···")
-            case .paused: HUDTag(state: .paused, label: "PAUSED", detail: "\(Int(app.speaker.progress * 100))%")
-            default: HUDTag(state: .speaking, label: "READ", detail: "\(Int(app.speaker.progress * 100))%")
+            let speaker = app.speaker
+            let controls = PlaybackControls(paused: speaker.state == .paused, canPause: speaker.state != .loading,
+                                            onToggle: speaker.togglePause, onStop: speaker.clear)
+            switch speaker.state {
+            case .loading: HUDTag(state: .speaking, label: "VOICE", detail: "···", controls: controls)
+            case .paused: HUDTag(state: .paused, label: "PAUSED", detail: "\(Int(speaker.progress * 100))%", controls: controls)
+            default: HUDTag(state: .speaking, label: "READ", detail: "\(Int(speaker.progress * 100))%", controls: controls)
             }
         case .done:
             HUDTag(state: .done, label: "OK", detail: run.totalMs.map { HUDTag.ms(Double($0) / 1000) })
@@ -109,6 +133,7 @@ struct HUDTag: View {
     let label: String
     var detail: String?
     var level: Float?
+    var controls: PlaybackControls?
 
     var body: some View {
         HStack(spacing: 7) {
@@ -116,6 +141,7 @@ struct HUDTag: View {
             Text(label).foregroundStyle(.white.opacity(0.92))
             if let detail { Text(detail).foregroundStyle(.white.opacity(0.6)).truncationMode(.tail) }
             if let level { Meter(level: level) }
+            if let controls { controls.padding(.leading, 2) }
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
         .tracking(0.4)
@@ -150,6 +176,53 @@ struct HUDTag: View {
 
     static func ms(_ seconds: TimeInterval) -> String {
         seconds < 10 ? "\(Int(seconds * 1000))ms" : String(format: "%.1fs", seconds)
+    }
+}
+
+/// Pause/resume and stop for read-aloud, inside the HUD tag.
+struct PlaybackControls: View {
+    let paused: Bool
+    let canPause: Bool
+    let onToggle: () -> Void
+    let onStop: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            button(paused ? "play.fill" : "pause.fill", help: paused ? "Resume" : "Pause", action: onToggle)
+                .disabled(!canPause)
+            button("stop.fill", help: "Stop", action: onStop)
+        }
+    }
+
+    private func button(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .frame(width: 20, height: 16)
+                .background(RoundedRectangle(cornerRadius: 2).fill(.white.opacity(0.14)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white.opacity(0.9))
+        .help(help)
+    }
+}
+
+/// The model answering this run (and the route Jev picked), on a quieter line under the tag.
+private struct ModelLine: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10, weight: .regular, design: .monospaced))
+            .foregroundStyle(.white.opacity(0.75))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 7)
+            .frame(height: 17)
+            .background(RoundedRectangle(cornerRadius: 2.5, style: .continuous).fill(.black.opacity(0.4)))
+            .environment(\.colorScheme, .dark)
+            .frame(maxWidth: HUDController.size.width - 20)
     }
 }
 

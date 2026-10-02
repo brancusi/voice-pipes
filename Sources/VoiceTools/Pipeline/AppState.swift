@@ -28,6 +28,8 @@ struct ActiveRun {
     var currentStep: Int
     var stepMs: [Int?]
     var liveText = ""
+    /// Which model is answering (and, for a Route step, the route Jev picked), shown under the HUD tag.
+    var modelInfo: String?
     var level: Float = 0
     var recordingStarted = Date()
     /// When processing began (on release, or at once for tracks without a microphone).
@@ -380,6 +382,7 @@ final class AppState {
             return .text(try await OpenRouterClient.shared.transcribe(wav: WAV.encode(samples), model: model))
 
         case .llm(let model, let prompt, _):
+            if run?.trackID == track.id { run?.modelInfo = String(model.split(separator: "/").last ?? "") }
             return .text(try await complete(model: model, prompt: prompt, input: try text(of: payload)))
 
         case .route(let routes):
@@ -388,10 +391,14 @@ final class AppState {
             let t0 = Date()
             let chosen: Int
             let label: String
+            var jevMs: Int?
+            var confidence = 0.0
             do {
                 let pick = try await JevClient.shared.chooseRoute(input: input, routes: routes)
                 chosen = pick.index
-                label = "Jev \(Int(Date().timeIntervalSince(t0) * 1000)) ms → \(routes[chosen].name) \(Int(pick.probability * 100))%"
+                jevMs = Int(Date().timeIntervalSince(t0) * 1000)
+                confidence = pick.probability
+                label = "Jev \(jevMs!) ms → \(routes[chosen].name) \(Int(pick.probability * 100))%"
             } catch {
                 // Without Jev the first route still answers, so the track keeps working.
                 NSLog("VoiceTools: Jev routing failed, using the first route: \(error)")
@@ -399,8 +406,10 @@ final class AppState {
                 label = "Jev failed → \(routes[0].name)"
             }
             let route = routes[chosen]
+            let model = route.model.split(separator: "/").last ?? ""
             if let index = run?.currentStep, run?.trackID == track.id {
-                run?.stepTitles[index] = "\(label) · \(route.model.split(separator: "/").last ?? "")"
+                run?.stepTitles[index] = "\(label) · \(model)"
+                run?.modelInfo = "\(route.name) → \(model) · " + (jevMs.map { "Jev \($0) ms \(Int(confidence * 100))%" } ?? "Jev failed")
             }
             return .text(try await complete(model: route.model, prompt: route.prompt, input: input))
 

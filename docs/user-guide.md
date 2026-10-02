@@ -102,15 +102,19 @@ Tip: if your first name comes out right and the surname doesn't, add and train t
 
 ## The HUD
 
-A slim tag at the bottom of the screen; it never takes clicks.
+A slim tag at the bottom of the screen. It never takes focus from the app you're in, and ignores clicks except for
+its read-aloud buttons.
 
 | Tag | Meaning |
 |---|---|
 | `■ REC 00:04` + level bars | Recording |
 | `PROC 312ms` | Processing since you let go |
 | `OK 186ms` | Done — total processing time; fades in under a second |
-| `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice |
+| `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice, with **⏸/▶** and **⏹** buttons (pressing the track's hotkey again also pauses and resumes) |
 | `ERR …` | What went wrong (stays a few seconds) |
+
+Under the tag, a second line names the model answering, once an LLM or Route step has run: for Route · Jev, the
+route, its model, and Jev's time and confidence, e.g. `quick → claude-haiku-4.5 · Jev 262 ms 100%`.
 
 The full text and per-step timings of every run are in **Activity**.
 
