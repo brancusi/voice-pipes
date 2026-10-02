@@ -29,7 +29,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | System I/O | `IO/Clipboard.swift` | Clipboard history, paste (⌘V) and selection copy (⌘C) via synthetic keystrokes. |
 | | `IO/TextCapture.swift` | Selected text and page text via the Accessibility API. |
 | | `IO/Speaker.swift` | Read-aloud playback for all three engine families, with pause/resume/progress. |
-| UI | `UI/Theme.swift` | The design system in code: `Palette` (Dracula / Alucard, follows the system appearance; the HUD stays dark), `VPFont` (SF Mono scale), button styles, `Keycap`, `SectionLabel`, `vpCard()`, `vpWindow()`, pipeline category colours. Source of truth: the Voice Pipes design system artifact. |
+| UI | `UI/Theme.swift` | The design system in code: `Palette` (Sundown / Daylight, follows the system appearance; the HUD stays dark), `VPFont` (SF Mono scale), button styles, `Keycap`, `SectionLabel`, `vpCard()`, `vpWindow()`, pipeline category colours. Source of truth: the Voice Pipes design system artifact. |
 | | `UI/MenuView.swift` | The panel (launcher). |
 | | `UI/MainWindow.swift` | Main window: Tracks / History / Vocabulary / Setup; activation-policy switching. |
 | | `UI/TrackEditorView.swift` | Track editor, step rows, per-block configuration, key recorder. |
@@ -38,7 +38,8 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `UI/HUD.swift` | The floating status tag (`NSPanel`, click-through). |
 | Updates | `Updates/Updates.swift` | Sparkle controller + 5-minute feed poll + notifications. |
 | | `Updates/Diagnostics.swift` | The Checks list, one-click permission fixes, the copyable report. |
-| Tools | `Tools/` | Icon renderer, update-key generator, appcast writer, `jev.sh` (Jev from the shell). |
+| | `UI/MenuBarGlyph.swift` | The menu bar icon: the pixel mark as an 18 × 18 template image (idle, recording, update). |
+| Tools | `Tools/` | Icon renderer (`make_icon.swift` paints the 32-px pixel mark into every iconset size), update-key generator, appcast writer, `jev.sh` (Jev from the shell). |
 
 ## How a track runs
 
@@ -146,3 +147,8 @@ There's no XCTest with the Command Line Tools alone, so logic is tested with thr
 the relevant source files with a `main.swift` (e.g. `FixWords` cases, `PauseChunker` on synthetic audio,
 `TrackStore` migrations on a *copy* of the real `tracks.json`), or a scratch SwiftPM package that depends on the
 local FluidAudio checkout for model benchmarks. Views can be checked by rendering an `NSHostingView` off-screen.
+
+## Look
+
+The UI follows the Voice Pipes design system; [brand](brand.md) maps its tokens, icons and mascot to the files
+that implement them.

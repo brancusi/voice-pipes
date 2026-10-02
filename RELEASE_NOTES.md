@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.2.0**
+- **Sundown.** Voice Pipes now wears its own colours: desert-earth backgrounds with sunset accents (dusk blue, cloud lavender, sunset rose, marigold, sage), or warm bone paper and ink in light mode. Colours still mean the same things: transcription blue, transforms lavender, outputs green, recording red.
+- **A new icon.** Four organ pipes, slits and all, standing against a pixel sundown. Drawn pixel by pixel, so it stays sharp at every size. (Finder and the Dock can take a moment, or a restart, to pick it up.)
+- **A new menu bar icon.** Three little pipes behind a `›` prompt. They jump while you're recording, and a dot appears when an update is waiting.
+
 **1.1.3**
 - **The window fits any tile.** The Voice Pipes window used to refuse to get narrower than about 900 points, so in yabai, Stage Manager or split screen it pushed past its space into the next window. It now shrinks to whatever space it's given and its pages squeeze to fit. In a very narrow space, a page scrolls left and right rather than spilling over. You can also hide the sidebar for more room.
 

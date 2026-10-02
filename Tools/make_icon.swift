@@ -5,6 +5,30 @@ import AppKit
 let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "AppIcon.iconset"
 try? FileManager.default.createDirectory(atPath: out, withIntermediateDirectories: true)
 
+// The Voice Pipes mark (design system → Assets → Logos): four organ pipes against a pixel sundown, drawn on a
+// 32 × 32 grid and only ever scaled by whole pixels. 16 px has its own three-pipe drawing.
+typealias Px = (x: Int, y: Int, w: Int, h: Int, rgb: UInt32)
+let sundown32: [Px] = [
+    (0, 0, 32, 5, 0x2A2140), (0, 5, 32, 4, 0x43294A), (0, 9, 32, 4, 0x6B3A52), (0, 13, 32, 3, 0x9A4E55),
+    (0, 16, 32, 3, 0xC96A57), (0, 19, 32, 3, 0xE8915F), (0, 22, 32, 2, 0xF2B46A), (0, 24, 32, 8, 0x1F1A15),
+    (28, 17, 2, 1, 0xF6D58A), (27, 18, 4, 3, 0xF6D58A), (28, 21, 2, 1, 0xF6D58A),
+    (9, 12, 4, 14, 0x18140F), (14, 8, 4, 18, 0x18140F), (19, 5, 4, 21, 0x18140F), (24, 10, 4, 16, 0x18140F),
+    (10, 18, 2, 1, 0xC96A57), (15, 18, 2, 1, 0xC96A57), (20, 18, 2, 1, 0xC96A57), (25, 18, 2, 1, 0xC96A57),
+    (8, 26, 21, 1, 0xF0E4CC),
+    (3, 24, 1, 1, 0xF0E4CC), (4, 25, 1, 1, 0xF0E4CC), (5, 26, 1, 1, 0xF0E4CC), (4, 27, 1, 1, 0xF0E4CC), (3, 28, 1, 1, 0xF0E4CC),
+]
+let sundown16: [Px] = [
+    (0, 0, 16, 3, 0x2A2140), (0, 3, 16, 3, 0x6B3A52), (0, 6, 16, 3, 0xC96A57), (0, 9, 16, 3, 0xE8915F), (0, 12, 16, 4, 0x1F1A15),
+    (14, 8, 2, 2, 0xF6D58A),
+    (5, 6, 2, 7, 0x18140F), (8, 3, 2, 10, 0x18140F), (11, 5, 2, 8, 0x18140F),
+    (4, 13, 11, 1, 0xF0E4CC), (1, 12, 1, 1, 0xF0E4CC), (2, 13, 1, 1, 0xF0E4CC), (1, 14, 1, 1, 0xF0E4CC),
+]
+
+func color(_ rgb: UInt32) -> CGColor {
+    CGColor(srgbRed: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255,
+            blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+}
+
 func render(_ px: Int) -> Data {
     let size = CGFloat(px)
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8,
@@ -14,45 +38,37 @@ func render(_ px: Int) -> Data {
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let ctx = NSGraphicsContext.current!.cgContext
 
-    // macOS icon grid: the tile sits inside a margin, with a continuous-corner rounded rectangle.
-    let inset = size * 0.1
-    let tile = CGRect(x: inset, y: inset, width: size - 2 * inset, height: size - 2 * inset)
-    let path = NSBezierPath(roundedRect: tile, xRadius: tile.width * 0.225, yRadius: tile.width * 0.225)
+    // 64 px and below: the art fills the canvas. Larger: a tile on the macOS icon grid (about 80% of the canvas),
+    // sized to a whole multiple of the art so every pixel stays square and sharp.
+    let art = px <= 16 ? sundown16 : sundown32
+    let grid = px <= 16 ? 16 : 32
+    let scale = px <= 64 ? px / grid : Int(size * 0.805) / grid
+    let side = CGFloat(grid * scale)
+    let tile = CGRect(x: ((size - side) / 2).rounded(.down), y: ((size - side) / 2).rounded(.down), width: side, height: side)
+    let shape = CGPath(roundedRect: tile, cornerWidth: side * 0.225, cornerHeight: side * 0.225, transform: nil)
 
-    // Soft drop shadow
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -size * 0.012), blur: size * 0.03,
-                  color: NSColor.black.withAlphaComponent(0.35).cgColor)
-    NSColor.black.setFill()
-    path.fill()
-    ctx.restoreGState()
-
-    // Violet → blue gradient
-    path.addClip()
-    NSGradient(colors: [NSColor(calibratedRed: 0.30, green: 0.16, blue: 0.62, alpha: 1),
-                        NSColor(calibratedRed: 0.26, green: 0.36, blue: 0.86, alpha: 1),
-                        NSColor(calibratedRed: 0.20, green: 0.58, blue: 0.96, alpha: 1)])!
-        .draw(in: tile, angle: -60)
-
-    // Top highlight
-    NSGradient(colors: [NSColor.white.withAlphaComponent(0.22), NSColor.white.withAlphaComponent(0)])!
-        .draw(in: CGRect(x: tile.minX, y: tile.midY, width: tile.width, height: tile.height / 2), angle: -90)
-
-    // Glyph: microphone over a waveform
-    let glyphSize = tile.width * 0.62
-    let config = NSImage.SymbolConfiguration(pointSize: glyphSize, weight: .semibold)
-        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-    if let symbol = NSImage(systemSymbolName: "waveform.and.mic", accessibilityDescription: nil)?
-        .withSymbolConfiguration(config) {
-        let s = symbol.size
-        let scale = min(glyphSize / s.width, glyphSize / s.height)
-        let w = s.width * scale, h = s.height * scale
+    if px > 64 {  // soft drop shadow under the tile
         ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: -size * 0.008), blur: size * 0.02,
-                      color: NSColor.black.withAlphaComponent(0.25).cgColor)
-        symbol.draw(in: CGRect(x: tile.midX - w / 2, y: tile.midY - h / 2 - tile.height * 0.01, width: w, height: h))
+        ctx.setShadow(offset: CGSize(width: 0, height: -size * 0.012), blur: size * 0.03,
+                      color: CGColor(gray: 0, alpha: 0.35))
+        ctx.addPath(shape)
+        ctx.setFillColor(color(0x18140F))
+        ctx.fillPath()
         ctx.restoreGState()
     }
+
+    ctx.saveGState()
+    ctx.addPath(shape)
+    ctx.clip()
+    ctx.setShouldAntialias(false)
+    let unit = CGFloat(scale)
+    for p in art {
+        // The art's rows run top-down; Core Graphics' y runs bottom-up.
+        ctx.setFillColor(color(p.rgb))
+        ctx.fill(CGRect(x: tile.minX + CGFloat(p.x) * unit, y: tile.maxY - CGFloat(p.y + p.h) * unit,
+                        width: CGFloat(p.w) * unit, height: CGFloat(p.h) * unit))
+    }
+    ctx.restoreGState()
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
 }

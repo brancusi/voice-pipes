@@ -160,12 +160,12 @@ struct HUDTag: View {
 
     private var color: Color {
         switch state {
-        case .recording: Color(hex: 0xFF5555)
-        case .processing: Color(hex: 0xF1FA8C)
-        case .speaking: Color(hex: 0xBD93F9)
+        case .recording: Color(hex: 0xE0694A)
+        case .processing: Color(hex: 0xE8C26A)
+        case .speaking: Color(hex: 0xC3A3D4)
         case .paused: Palette.hudMuted
-        case .done: Color(hex: 0x50FA7B)
-        case .failed: Color(hex: 0xFFB86C)
+        case .done: Color(hex: 0xA9BF8A)
+        case .failed: Color(hex: 0xF0A35E)
         }
     }
 

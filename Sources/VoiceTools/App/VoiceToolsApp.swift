@@ -15,8 +15,7 @@ struct VoiceToolsApp: App {
         MenuBarExtra {
             MenuView(app: app).environmentObject(updates)
         } label: {
-            // An update waiting shows as a download arrow until it's looked at.
-            Image(systemName: updates.available != nil && app.run == nil ? "arrow.down.circle" : menuBarSymbol)
+            menuBarIcon
         }
         .menuBarExtraStyle(.window)
 
@@ -27,12 +26,18 @@ struct VoiceToolsApp: App {
         .windowResizability(.contentMinSize)
     }
 
-    private var menuBarSymbol: String {
+    /// The pixel pipes, except while reading aloud (a speaker) or when something needs fixing (a warning).
+    /// An update waiting adds a dot until it's looked at.
+    @ViewBuilder private var menuBarIcon: some View {
         switch app.run?.phase {
-        case .recording: "mic.fill"
-        case .processing: "ellipsis.circle"
-        case .speaking: "speaker.wave.2.fill"
-        default: app.worstCheck == .problem ? "mic.badge.xmark" : "mic"
+        case .recording: Image(nsImage: MenuBarGlyph.image(.recording))
+        case .speaking: Image(systemName: "speaker.wave.2.fill")
+        default:
+            if app.run == nil, app.worstCheck == .problem {
+                Image(systemName: "exclamationmark.triangle")
+            } else {
+                Image(nsImage: MenuBarGlyph.image(updates.available != nil && app.run == nil ? .update : .idle))
+            }
         }
     }
 }

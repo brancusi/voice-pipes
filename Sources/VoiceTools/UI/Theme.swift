@@ -1,36 +1,37 @@
 import AppKit
 import SwiftUI
 
-/// The Voice Pipes design system (Dracula / Alucard, one monospace face). Every colour and type style the UI uses
-/// comes from here; the values match the design system's tokens.json.
+/// The Voice Pipes design system (Sundown / Daylight, one monospace face). Every colour and type style the UI uses
+/// comes from here; the values match the design system's tokens.json. Names follow the hue family
+/// (purple = cloud lavender, cyan = dusk blue, green = sage, …) so they read the same as the tokens.
 enum Palette {
-    // Grounds, deepest to highest.
-    static let bg000 = dynamic(dark: 0x191A21, light: 0xF5F1DE)   // menu bar panel, sidebar
-    static let bg100 = dynamic(dark: 0x21222C, light: 0xFFFBEB)   // window
-    static let bg200 = dynamic(dark: 0x282A36, light: 0xFFFDF5)   // cards, lists
-    static let bg300 = dynamic(dark: 0x343746, light: 0xEFEBD7)   // hover, fields, buttons
-    static let line = dynamic(dark: 0x44475A, light: 0xCFCFDE)    // hairlines, selection
+    // Grounds, deepest to highest: desert earth.
+    static let bg000 = dynamic(dark: 0x18140F, light: 0xEFE3CC)   // mesquite: menu bar panel, sidebar
+    static let bg100 = dynamic(dark: 0x1F1A15, light: 0xF7EEDC)   // umber: window
+    static let bg200 = dynamic(dark: 0x27211B, light: 0xFBF5E8)   // saddle: cards, lists
+    static let bg300 = dynamic(dark: 0x332B24, light: 0xEADCC2)   // leather: hover, fields, buttons
+    static let line = dynamic(dark: 0x4A3F35, light: 0xD3C2A3)    // fence: hairlines, selection
 
     // Text.
-    static let fg = dynamic(dark: 0xF8F8F2, light: 0x1F1F1F)
-    static let fgMuted = dynamic(dark: 0xA7ABBE, light: 0x57534A)
-    /// Marks only in the dark theme (separators, handles, disabled icons): too faint for text there.
-    static let comment = dynamic(dark: 0x6272A4, light: 0x6C664B)
+    static let fg = dynamic(dark: 0xF0E4CC, light: 0x2A211B)      // bone / ink
+    static let fgMuted = dynamic(dark: 0xB8A88E, light: 0x5E5144) // sagebrush
+    /// Dust: marks only (separators, handles, disabled icons), too faint for text.
+    static let comment = dynamic(dark: 0x7D6D5C, light: 0x7A6A57)
 
-    // Accents and states.
-    static let purple = dynamic(dark: 0xBD93F9, light: 0x644AC9)  // accent, Transform, READ
-    static let pink = dynamic(dark: 0xFF79C6, light: 0xA3144D)    // focus, keyboard
-    static let cyan = dynamic(dark: 0x8BE9FD, light: 0x036A96)    // Transcribe, INFO
-    static let green = dynamic(dark: 0x50FA7B, light: 0x14710A)   // Output, OK
-    static let yellow = dynamic(dark: 0xF1FA8C, light: 0x846E15)  // PROC
-    static let orange = dynamic(dark: 0xFFB86C, light: 0xA34D14)  // WARN, ERR
-    static let red = dynamic(dark: 0xFF5555, light: 0xCB3A2A)     // REC, destructive
-    static let onAccent = dynamic(dark: 0x191A21, light: 0xFFFFFF)
+    // Accents and states: the sundown sky.
+    static let purple = dynamic(dark: 0xC3A3D4, light: 0x6C4A86)  // cloud lavender: accent, Transform, READ
+    static let pink = dynamic(dark: 0xEC8F7C, light: 0xA3432E)    // sunset rose: focus, keyboard
+    static let cyan = dynamic(dark: 0x8FB8D6, light: 0x2C5F80)    // dusk blue: Transcribe, INFO
+    static let green = dynamic(dark: 0xA9BF8A, light: 0x46632F)   // sage: Output, OK
+    static let yellow = dynamic(dark: 0xE8C26A, light: 0x7A5C0E)  // marigold: PROC
+    static let orange = dynamic(dark: 0xF0A35E, light: 0x93501A)  // apricot: WARN, ERR
+    static let red = dynamic(dark: 0xE0694A, light: 0xA1341B)     // red rock: REC, destructive
+    static let onAccent = dynamic(dark: 0x18140F, light: 0xFFFFFF)
 
     // The HUD floats over any app, so it stays dark in both themes.
-    static let hudBG = Color(hex: 0x191A21).opacity(0.9)
-    static let hudFG = Color(hex: 0xF8F8F2)
-    static let hudMuted = Color(hex: 0xA7ABBE)
+    static let hudBG = Color(hex: 0x18140F).opacity(0.9)
+    static let hudFG = Color(hex: 0xF0E4CC)
+    static let hudMuted = Color(hex: 0xB8A88E)
 
     private static func dynamic(dark: UInt32, light: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in

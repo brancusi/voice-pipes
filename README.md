@@ -48,6 +48,8 @@ offers **Install…**. Permissions carry over between versions.
 | [Building and releasing](docs/releasing.md) | Local builds, signing, the release pipeline, secrets and keys |
 | [Research and benchmarks](docs/research.md) | Every model comparison and measurement behind the defaults |
 | [Gotchas](docs/gotchas.md) | macOS, OpenRouter, FluidAudio and Jev lessons learned the hard way |
+| [Brand](docs/brand.md) | The cowboy-hacker direction: Sundown palette, type, the pixel mark and icons, the Wrangler, and links to the design artifacts |
+| [Website](docs/website/README.md) | The marketing site plan: copy, sitemap, design and the facts it needs |
 | [Release notes](RELEASE_NOTES.md) | What changed in each version |
 
 ## Build

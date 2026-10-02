@@ -100,6 +100,14 @@ spellings too. The list lives in `~/Library/Application Support/VoiceTools/vocab
 
 Tip: if your first name comes out right and the surname doesn't, add and train the surname as its own entry too.
 
+## The menu bar icon
+
+Three little organ pipes behind a `›` prompt. They jump while you're recording, a dot appears when an update is
+waiting, a speaker shows while something is read aloud, and a warning triangle means Setup needs attention.
+
+The app follows your Mac's appearance: **Sundown** (dark earth, sunset accents) or **Daylight** (bone paper and
+ink). The HUD stays dark either way.
+
 ## The HUD
 
 A slim tag at the bottom of the screen. It never takes focus from the app you're in, and ignores clicks except for
