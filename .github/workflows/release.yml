@@ -117,6 +117,8 @@ jobs:
           v="${{ steps.v.outputs.version }}"
           # A fixed-name copy of the DMG, so .../releases/latest/download/Voice-Pipes.dmg is always the newest.
           cp "dist/Voice-Pipes-$v.dmg" dist/Voice-Pipes.dmg
+          # The terminal installer, at .../releases/latest/download/install.sh.
+          cp Tools/install.sh dist/install.sh
           gh release create "v$v" dist/Voice-Pipes-$v.dmg dist/Voice-Pipes-$v.dmg.sha256 dist/Voice-Pipes.dmg \
-            dist/Voice-Pipes-$v-arm64.zip dist/Voice-Pipes-$v-arm64.zip.sha256 dist/appcast.xml \
+            dist/Voice-Pipes-$v-arm64.zip dist/Voice-Pipes-$v-arm64.zip.sha256 dist/appcast.xml dist/install.sh \
             --repo "$RELEASES_REPO" --title "Voice Pipes $v" --notes-file RELEASE_NOTES.md

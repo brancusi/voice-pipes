@@ -272,6 +272,12 @@ enum AgentsInstaller {
           changed in the open editor and opens a single new or changed block, so they watch it take shape. Finish
           with `vp run <id> --text "…"` to demo it, or `vp say` to explain it.
 
+        ## Install, reinstall, remove
+
+        If `vp` isn't found, install everything (app, `vp`, this skill) without prompts:
+        `curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash`. Add `-s -- --no-launch`, `--version <x.y.z>` or `--uninstall` as needed. The user must still
+        grant Microphone and Accessibility in the app's first-run window.
+
         ## Keys and status
 
         - `vp status` shows permissions, on-device models, keys (masked) and problems.

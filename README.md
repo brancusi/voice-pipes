@@ -25,6 +25,17 @@ Apple silicon, macOS 14 or later. Self-updating.
    optional **OpenRouter** / **TypeSafe Jev** keys (stored in the Keychain). **Setup → Run setup again…** reopens it.
 4. Optional: System Settings → General → Login Items → add Voice Pipes.
 
+**From a terminal** (or for an agent): the app, the `vp` command and the agent skill in one go, no prompts:
+
+```sh
+curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash
+```
+
+It downloads the latest DMG, refuses anything not signed by Voice Pipes' Developer ID and notarized, installs to
+`/Applications` (or `~/Applications`), links `vp`, installs the skill for Claude Code, Codex and `~/.agents`, and
+starts the app. Options go after `bash -s --`: `--apps-dir`, `--bin-dir`, `--version 1.6.2`, `--no-skill`,
+`--no-launch`, and `--uninstall` (keeps your config and history). Run it again to reinstall or repair.
+
 It checks for updates every 5 minutes; when one is out the panel offers **Install…**. Permissions carry over
 between versions.
 

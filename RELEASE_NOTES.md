@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.6.2**
+- **Install everything from a terminal.** One line installs the app, the `vp` command and the agent skill, and starts Voice Pipes: `curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash`. It asks nothing, so an agent can run it too, and it refuses any download that isn't signed by Voice Pipes' developer and notarized by Apple. Run it again to repair or reinstall; `--uninstall` removes the app, its `vp` links and the skill, and keeps your config, history and keys.
+
 **1.6.1**
 - **Agents can show you, not just tell you.** `vp open` now reaches anything in the app: a track with one block's settings open (`vp open track clean-dictation --step 4`), a route card, the cursor in a field (`--field prompt`), History filtered to a track or a search, a word in Vocabulary, a section of Setup, a step of the setup window, or the menu bar panel (`vp open menu`). What it points at flashes, and it answers with what's on screen. `vp ui` prints that on its own; `vp close` closes windows, the panel or a sheet. No screen recording or Accessibility access involved. `--background` shows a window without taking your keyboard.
 - **Watch a track being built.** When an agent (or you, in an editor) changes config.toml, the open track flashes what changed and opens a single new or changed block. The editor also stays where it was: a block you had open no longer closes on every save.

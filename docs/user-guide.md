@@ -1,5 +1,17 @@
 # User guide
 
+## Install from a terminal
+
+```sh
+curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash
+```
+
+Installs the app (checked: Developer ID and notarized), links `vp`, installs the agent skill and starts the app,
+without asking anything, so an agent can run it too. Options after `bash -s --`: `--apps-dir <dir>`,
+`--bin-dir <dir>`, `--version <x.y.z>`, `--no-skill`, `--no-launch`, `--uninstall` (removes the app, its `vp`
+links and the skill; keeps config, history and keys). macOS still asks for Microphone and Accessibility on first
+launch; those can't be granted from a script.
+
 ## First launch
 
 **Set up Voice Pipes** opens the first time (and whenever a permission is missing until it's finished):
