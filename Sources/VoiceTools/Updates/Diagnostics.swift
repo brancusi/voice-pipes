@@ -10,7 +10,7 @@ struct Check: Identifiable {
     }
 
     /// Something the user can click to fix it.
-    enum Fix { case microphoneSettings, accessibilitySettings, editTracks, openConfig }
+    enum Fix { case microphoneSettings, accessibilitySettings, editTracks, openConfig, relinkCLI }
 
     let id = UUID()
     let level: Level
@@ -34,6 +34,12 @@ enum Diagnostics {
     static func run(_ app: AppState) async -> [Check] {
         var checks: [Check] = configChecks(app.store.issues, file: app.store.configURL)
             + configChecks(VocabularyStore.shared.issues, file: ConfigPaths.vocabulary)
+        if !CLIMaintenance.brokenLinks.isEmpty {
+            checks.append(Check(level: .warning, title: "vp points at a moved app",
+                                detail: CLIMaintenance.brokenLinks.map(\.path).joined(separator: ", ")
+                                    + " still lead to where Voice Pipes used to be. Fix… links them here (macOS asks for your password).",
+                                fix: .relinkCLI))
+        }
         let tracks = app.store.tracks.filter(\.enabled)
         let steps = tracks.flatMap(\.steps).map(\.kind)
 
@@ -158,6 +164,8 @@ enum Diagnostics {
         switch fix {
         case .openConfig:
             NSWorkspace.shared.open(ConfigPaths.config)
+        case .relinkCLI:
+            CLIMaintenance.fix()
         case .accessibilitySettings:
             resetPermission("Accessibility")
             TextCapture.promptForAccessibility()

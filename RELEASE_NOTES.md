@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.6.3**
+- **The command line keeps up by itself.** `vp` always runs the app's own version, so updating from the menu updates it too. Now the rest follows as well: the agent skill is refreshed at every launch, an agent you install later (say Codex) gets it automatically, and the Claude Code session hook follows the app. If you move Voice Pipes to another folder, `vp` is repointed at it; if that needs your password, Setup → Checks shows "vp points at a moved app" with a **Fix…** button.
+
 **1.6.2**
 - **Install everything from a terminal.** One line installs the app, the `vp` command and the agent skill, and starts Voice Pipes: `curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash`. It asks nothing, so an agent can run it too, and it refuses any download that isn't signed by Voice Pipes' developer and notarized by Apple. Run it again to repair or reinstall; `--uninstall` removes the app, its `vp` links and the skill, and keeps your config, history and keys.
 

@@ -261,6 +261,11 @@ The app keeps installed skills up to date. `vp agents install --hook` also adds 
 shows Voice Pipes' state at the start of each session (your `~/.claude/settings.json` is backed up first);
 `vp agents uninstall` removes both.
 
+Updates take care of the rest: `vp` is a link to the app's own binary, so it's always the app's version. At each
+launch the app rewrites installed skills that are out of date, installs the skill for agents set up since (if it's
+installed for any agent), points the session hook at the current `vp`, and repoints `vp` links if you moved the app
+(a root-owned link it can't change shows up in Setup → Checks with **Fix…**).
+
 Agents can show you what they're doing without screen access: `vp open track <id> --step 3 --field prompt` opens the
 editor at that block with the cursor in its instructions. When an agent edits `config.toml`, the open editor flashes
 what changed and opens a single new or changed block, so you can watch a track being built.

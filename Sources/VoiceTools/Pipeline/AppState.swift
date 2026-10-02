@@ -284,7 +284,7 @@ final class AppState {
                 let granted = switch fix {
                 case .accessibilitySettings: AXIsProcessTrusted()
                 case .microphoneSettings: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-                case .editTracks, .openConfig: true
+                case .editTracks, .openConfig, .relinkCLI: true
                 }
                 if granted { break }
             }

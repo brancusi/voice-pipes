@@ -17,7 +17,8 @@ struct VoiceToolsApp: App {
         // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
         BundleRename.migrateIfNeeded()
         VPFont.registerBundledFonts()
-        AgentsInstaller.refreshIfInstalled()
+        // vp follows the app on update; if the app moved, its links, the agent skill and the hook catch up here.
+        CLIMaintenance.run()
         let state = AppState()
         _app = State(initialValue: state)
         // Light, dark or Auto, as chosen in Setup → Appearance; then the setup window on a first launch.

@@ -123,12 +123,39 @@ enum AgentsInstaller {
     }
 
     /// Keeps installed skills current after an update (the app calls this at launch).
+    /// At launch: rewrite installed skills that are out of date, and give the skill to agents installed since (an
+    /// agent home that appeared, e.g. ~/.codex). Nothing happens if the skill isn't installed anywhere
+    /// (`vp agents uninstall` sticks).
     static func refreshIfInstalled() {
-        for target in targets where isInstalled(target) {
+        guard targets.contains(where: isInstalled) else { return }
+        for target in targets where isInstalled(target) || FileManager.default.fileExists(atPath: target.home.path) {
             if (try? String(contentsOf: target.skillFile, encoding: .utf8)) != skill {
+                try? FileManager.default.createDirectory(at: target.skillFile.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try? skill.write(to: target.skillFile, atomically: true, encoding: .utf8)
             }
         }
+        refreshHook()
+    }
+
+    /// The session hook names vp's path; after the app moved (or vp was linked since), point it at the current one.
+    private static func refreshHook() {
+        guard hookInstalled, var settings = try? readSettings(), var hooks = settings["hooks"] as? [String: Any],
+              var start = hooks["SessionStart"] as? [[String: Any]] else { return }
+        var changed = false
+        for i in start.indices {
+            guard var entries = start[i]["hooks"] as? [[String: Any]] else { continue }
+            for j in entries.indices {
+                if let command = entries[j]["command"] as? String, command.hasSuffix("agents context"), command != hookCommand {
+                    entries[j]["command"] = hookCommand
+                    changed = true
+                }
+            }
+            start[i]["hooks"] = entries
+        }
+        guard changed else { return }
+        hooks["SessionStart"] = start
+        settings["hooks"] = hooks
+        try? writeSettings(settings)
     }
 
     static func uninstall() -> [URL] {
@@ -319,6 +346,52 @@ enum AgentsInstaller {
 
 /// The app's "Install command-line tool": links vp into /usr/local/bin (macOS asks for the password once) or, if
 /// that's declined, ~/.local/bin; then installs the agent skill everywhere it applies.
+/// Keeps the command line in step with the app at each launch: the app replaces vp's target on update, but if the app
+/// itself moved, links to where it was are repointed here, and the skill and hook are refreshed.
+@MainActor
+enum CLIMaintenance {
+    /// Links to where the app used to be that couldn't be repointed (root-owned): Setup → Checks offers a fix.
+    private(set) static var brokenLinks: [URL] = []
+
+    static func run() {
+        // Only an installed copy: a development build must never take over vp, the skill or the hook.
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = Bundle.main.bundleURL.resolvingSymlinksInPath().path
+        guard path.hasPrefix("/Applications/") || path.hasPrefix(home + "/Applications/") else { return }
+        brokenLinks = repairLinks()
+        AgentsInstaller.refreshIfInstalled()
+    }
+
+    /// vp / voicepipes links whose target is gone and was a Voice Pipes (or Voice Tools) app: point them here.
+    static func repairLinks(in dirs: [String] = ["/usr/local/bin", "/opt/homebrew/bin", "\(NSHomeDirectory())/.local/bin"]) -> [URL] {
+        let fm = FileManager.default
+        var broken: [URL] = []
+        for dir in dirs {
+            for name in CLI.names {
+                let link = URL(fileURLWithPath: dir).appendingPathComponent(name)
+                guard let target = try? fm.destinationOfSymbolicLink(atPath: link.path),
+                      !fm.fileExists(atPath: link.path),  // dangling: the app it named is gone
+                      target.contains(".app/Contents/MacOS/"),
+                      target.contains("Voice Pipes") || target.contains("Voice Tools") else { continue }
+                do {
+                    try fm.removeItem(at: link)
+                    try fm.createSymbolicLink(at: link, withDestinationURL: CLIInstaller.executable)
+                    NSLog("VoiceTools: repointed \(link.path) at the app's new location")
+                } catch {
+                    broken.append(link)
+                }
+            }
+        }
+        return broken
+    }
+
+    /// The Setup check's Fix…: relink with the password prompt, then look again.
+    static func fix() {
+        _ = CLISetup.install()
+        brokenLinks = repairLinks()
+    }
+}
+
 @MainActor
 enum CLISetup {
     struct State: Equatable {
