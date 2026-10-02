@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.5.1**
+- **Welcome to Voice Pipes, redrawn.** The first-run window has a step bar, plain titles, and live status: Continue waits until both permissions are on (or Skip), the models step shows Parakeet's download in MB and offers the optional Supertonic voices, the keys step links to openrouter.ai and lets you **Skip, stay local**, and Try it shows your first run's timings before the Wrangler tips his hat.
+- **Empty pages with somewhere to go.** An empty Vocabulary offers **Train a word…** (type the spelling, then say it a few times); with no tracks left, **Restore the starter tracks** brings back Fast dictation, Clean dictation and Read aloud, leaving off any hotkey another track already uses.
+- The setup window now opens centred, and a failed model download no longer leaves a stuck percentage.
+
 **1.5.0**
 - **A guided first launch.** New installs open **Set up Voice Pipes**: it explains and asks for Microphone and Accessibility one at a time, shows each one's status live, and opens a small helper beside System Settings. If Voice Pipes isn't in the Accessibility list, drag the helper's icon into it. The on-device models start downloading in the background straight away, with progress, then you can add API keys and try a hotkey. **Setup → Run setup again…** reopens it.
 - **Install from a DMG.** Download Voice-Pipes.dmg, open it, and drag Voice Pipes onto Applications.

@@ -99,6 +99,26 @@ final class TrackStore {
         return dir.appendingPathComponent("tracks.json")
     }
 
+    /// Adds back the starter tracks (Track.defaults) with fresh ids. A starter's hotkey that another track already
+    /// uses is left off rather than creating a clash.
+    func restoreStarters() {
+        var taken = Set(tracks.flatMap(\.triggers).map(\.combo))
+        var added: [Track] = []
+        for starter in Track.defaults {
+            var track = starter
+            track.id = UUID()
+            track.steps = track.steps.map { var step = $0; step.id = UUID(); return step }
+            track.triggers = track.triggers.compactMap { trigger in
+                guard taken.insert(trigger.combo).inserted else { return nil }
+                var fresh = trigger
+                fresh.id = UUID()
+                return fresh
+            }
+            added.append(track)
+        }
+        tracks.append(contentsOf: added)
+    }
+
     /// Triggers bound to more than one place, keyed by combo.
     var conflicts: Set<KeyCombo> {
         var seen = Set<KeyCombo>(), dupes = Set<KeyCombo>()

@@ -20,6 +20,7 @@ enum Onboarding {
 @MainActor
 final class OnboardingController {
     static let shared = OnboardingController()
+    static let title = "Welcome to Voice Pipes"
     private var window: NSWindow?
 
     func show(_ app: AppState) {
@@ -28,16 +29,19 @@ final class OnboardingController {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView],
-                              backing: .buffered, defer: false)
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.title = "Set up Voice Pipes"
+        let hosting = NSHostingView(rootView: OnboardingView(app: app) { [weak self] in self?.close() })
+        // Sized before centring: a zero-sized window centres its corner, not itself.
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: hosting.fittingSize),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = OnboardingController.title
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: OnboardingView(app: app) { [weak self] in self?.close() })
+        window.contentView = hosting
+        window.setContentSize(hosting.fittingSize)
         window.center()
         self.window = window
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+        var token: NSObjectProtocol?
+        token = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+            if let token { NotificationCenter.default.removeObserver(token) }
             Task { @MainActor in
                 PermissionHelper.shared.hide()
                 OnboardingController.shared.window = nil
@@ -60,6 +64,8 @@ struct OnboardingView: View {
     @State private var trusted = AXIsProcessTrusted()
     @State private var voices: [LocalVoiceEngine: LocalVoices.State] = [:]
     @State private var tryText = ""
+    /// Runs that finish after this time count as the "Try it" result.
+    @State private var tryStarted = Date.distantFuture
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(app: AppState, step: Step = .welcome, finish: @escaping () -> Void) {
@@ -68,38 +74,40 @@ struct OnboardingView: View {
         _step = State(initialValue: step)
     }
 
-    enum Step: Int, CaseIterable {
-        case welcome, permissions, models, keys, tryIt
-        var title: String {
-            switch self {
-            case .welcome: "Welcome"
-            case .permissions: "Permissions"
-            case .models: "Models"
-            case .keys: "Keys"
-            case .tryIt: "Try it"
-            }
-        }
-    }
+    enum Step: Int, CaseIterable { case welcome, permissions, models, keys, tryIt }
+
+    static let contentSize = CGSize(width: SundownScene.size.width, height: 532)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if step == .welcome {
-                SundownScene()
-            } else {
-                stepper.padding(.horizontal, 32).padding(.top, 40)
-            }
+            if step == .welcome { SundownScene(layout: .welcome) }
             VStack(alignment: .leading, spacing: 16) {
+                progress
                 content
                 Spacer(minLength: 0)
                 footer
             }
-            .padding(.horizontal, 32).padding(.top, 24).padding(.bottom, 24)
+            .padding(.horizontal, 32).padding(.top, step == .welcome ? 22 : 28).padding(.bottom, 24)
         }
-        .frame(width: SundownScene.size.width, height: 640)
+        .frame(width: Self.contentSize.width, height: Self.contentSize.height)
         .background(Palette.bg100)
         .vpWindow()
         .onReceive(tick) { _ in refresh() }
         .onAppear(perform: refresh)
+        .onChange(of: step) { _, new in if new == .tryIt { tryStarted = Date() } }
+    }
+
+    /// Five segments: done in sage, the current step in lavender, the rest a hairline.
+    private var progress: some View {
+        HStack(spacing: 6) {
+            ForEach(Step.allCases, id: \.self) { item in
+                Rectangle()
+                    .fill(item == step ? Palette.purple : item.rawValue < step.rawValue ? Palette.green : Palette.line)
+                    .frame(width: 28, height: 4)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Step \(step.rawValue + 1) of \(Step.allCases.count)")
     }
 
     // MARK: Steps
@@ -107,15 +115,16 @@ struct OnboardingView: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .welcome:
-            PixelHeadline("howdy, partner", size: 24)
-            Text("Voice Pipes runs your voice through pipelines you play with hotkeys: hold a key, talk, and the text lands at your cursor. Setup takes about a minute: two permissions, the on-device models (they download in the background), and API keys if you want cloud steps.")
-                .font(VPFont.body).lineSpacing(4).foregroundStyle(Palette.fgMuted)
+            PixelHeadline("howdy, partner", size: 28)
+            Text("Voice Pipes turns your voice into text, answers and speech through pipelines you play from the keyboard. Four quick steps: allow the microphone and paste, load the on-device models, add keys if you want cloud models, and try it.")
+                .font(VPFont.body).lineSpacing(5).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 620, alignment: .leading)
         case .permissions:
-            heading("Two permissions", "macOS asks for each once. Nothing you say leaves your Mac unless a track sends it somewhere.")
+            heading("Permissions", "Two switches in System Settings. Voice Pipes only listens while you hold or toggle a hotkey.")
             Card {
-                permissionRow(name: "Microphone", detail: "Records your voice while you hold or toggle a hotkey.",
-                              granted: mic == .authorized, button: mic == .notDetermined ? "Allow…" : "Open Settings…") {
+                permissionRow(name: "Microphone", detail: "To hear you while a track is recording.",
+                              granted: mic == .authorized, next: mic != .authorized) {
                     if mic == .notDetermined {
                         Task {
                             _ = await AVCaptureDevice.requestAccess(for: .audio)
@@ -127,166 +136,240 @@ struct OnboardingView: View {
                     }
                 }
                 Hairline()
-                permissionRow(name: "Accessibility", detail: "Pastes at your cursor and reads the text you select.",
-                              granted: trusted, button: "Open Settings…") {
+                permissionRow(name: "Accessibility",
+                              detail: "To paste at your cursor and read selected text. Click Allow, then switch on Voice Pipes in the list that opens.",
+                              granted: trusted, next: mic == .authorized && !trusted) {
                     TextCapture.promptForAccessibility()
                     Self.openPrivacy("Privacy_Accessibility")
                     PermissionHelper.shared.show(.accessibility)
                 }
             }
-            Text("Voice Pipes not in the list? Drag it in from the little helper that opens next to Settings, then switch it on.")
-                .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            if let waiting {
+                Text("Waiting for \(waiting)… this page updates by itself when it's on.")
+                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.comment)
+            }
         case .models:
-            heading("On-device models", "They download once, in the background, and keep going if you close this window.")
+            heading("On this Mac", "These run on your Mac with nothing sent anywhere. They download once and load in the background; you can keep going.")
             Card {
-                modelRow(name: "Parakeet v3", detail: "transcription · ~460 MB", state: parakeet, progress: app.parakeetProgress)
+                parakeetRow
                 Hairline()
-                modelRow(name: "Pocket TTS", detail: "read aloud · ~770 MB", state: Self.model(voices[.pocket] ?? .notLoaded), progress: nil)
+                voiceRow(.pocket, detail: "read aloud · 26 voices · 770 MB", optional: false)
+                Hairline()
+                voiceRow(.supertonic, detail: "faster voices · 100 MB · optional", optional: true)
             }
         case .keys:
-            heading("API keys (optional)", "Fast dictation and Read aloud run on your Mac and need no keys. Paste a key to turn on the cloud steps; you can do this later in Setup.")
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Keys").font(VPFont.display)
+                Text("optional").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+            }
+            Text("Fast dictation and Read aloud work without any key. Add these for the cloud tracks. They're kept in your Keychain.")
+                .font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
+                .fixedSize(horizontal: false, vertical: true)
             Card {
-                VStack(alignment: .leading, spacing: 10) {
-                    keyHeader("OpenRouter", "Clean dictation's cleanup, cloud transcription, LLM and speech models")
+                VStack(alignment: .leading, spacing: 8) {
+                    keyHeader("OpenRouter", "Clean dictation, Quick answer, cloud voices")
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
                              failed: app.openRouterKeyState == .rejected) { app.setOpenRouterKey($0) }
+                    Link("Get a key at openrouter.ai →", destination: URL(string: "https://openrouter.ai/keys")!)
+                        .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.purple)
                 }
-                .padding(14)
+                .padding(.horizontal, 16).padding(.vertical, 14)
                 Hairline()
-                VStack(alignment: .leading, spacing: 10) {
-                    keyHeader("TypeSafe · Jev", "Picks the model in Route steps; judges mishearings when you train a word")
+                VStack(alignment: .leading, spacing: 8) {
+                    keyHeader("TypeSafe · Jev", "picks the model in Route steps; judges trained words")
                     KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false) { app.setJevKey($0) }
                 }
-                .padding(14)
+                .padding(.horizontal, 16).padding(.vertical, 14)
             }
         case .tryIt:
-            heading("Try it", "Click in the box, hold a hotkey, say something, and let go.")
-            Card {
-                ForEach(Array(hotkeyTracks.enumerated()), id: \.element.id) { index, track in
-                    if index > 0 { Hairline() }
-                    HStack(spacing: 8) {
-                        Rectangle().fill(Palette.track(track.colorHex)).frame(width: 7, height: 7)
-                        Text(track.name)
-                        Spacer()
-                        ForEach(track.triggers) { trigger in
-                            Keycap(text: trigger.combo.display, mode: trigger.mode == .hold ? "hold" : "toggle")
-                        }
-                    }
-                    .padding(.horizontal, 12).frame(height: 36)
-                }
+            Text("Try it").font(VPFont.display)
+            HStack(spacing: 6) {
+                Text("Click in the box, hold")
+                if let hotkey { Keycap(text: hotkey) } else { Text("a hotkey") }
+                Text("say something, and let go.")
             }
-            VPTextField("Your words land here", text: $tryText, axis: .vertical, minHeight: 72)
+            .font(VPFont.body).foregroundStyle(Palette.fgMuted)
+            VPTextField("Your words land here", text: $tryText, axis: .vertical, font: .system(size: 14, design: .monospaced), minHeight: 64)
+            if let run = tryRun {
+                HStack(spacing: 8) {
+                    HUDTag(state: .done, label: "OK", detail: run.totalMs.msLabel)
+                    Text(run.steps.map { "\($0.title) \($0.ms.msLabel)" }.joined(separator: " · "))
+                        .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted).lineLimit(1)
+                }
+                HStack(spacing: 18) {
+                    Wrangler(pose: .done, scale: 2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        PixelHeadline("saddled up", size: 20)
+                        Text("That's the whole loop. Your tracks and their hotkeys live in the menu bar; the Wrangler swings his lasso up there while you're recording.")
+                            .font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.bg200))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.green, lineWidth: 1))
+            }
         }
     }
 
     private var footer: some View {
         HStack(spacing: 10) {
-            if step != .welcome {
-                Button("Back") { step = Step(rawValue: step.rawValue - 1) ?? .welcome }.buttonStyle(.vpSecondary)
-            }
-            Spacer()
-            if step == .permissions, !(mic == .authorized && trusted) {
-                Text("You can finish this later in Setup.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-            }
-            if step == .tryIt {
+            switch step {
+            case .welcome:
+                Text("About two minutes. You can change everything later in Setup.")
+                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.comment)
+                Spacer()
+                Button { finish() } label: { Text("Skip for now").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
+                Button("Get started") { go(+1) }.buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+            case .permissions:
+                back
+                Spacer()
+                Button { go(+1) } label: { Text("Skip").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
+                Button("Continue") { go(+1) }.buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+                    .disabled(!(mic == .authorized && trusted))
+            case .models:
+                back
+                Spacer()
+                Button("Continue") { go(+1) }.buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+            case .keys:
+                back
+                Spacer()
+                Button { go(+1) } label: { Text("Skip, stay local").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
+                Button("Continue") { go(+1) }.buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+            case .tryIt:
+                back
+                Spacer()
                 Button("Done") {
                     Onboarding.markDone()
                     finish()
                 }
                 .buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
-            } else {
-                Button(step == .welcome ? "Get started" : step == .keys && !app.hasOpenRouterKey && !app.hasJevKey ? "Skip" : "Continue") {
-                    step = Step(rawValue: step.rawValue + 1) ?? .tryIt
-                }
-                .buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
             }
         }
     }
 
-    /// `Welcome › Permissions › Models › Keys › Try it`: done in sage, the current step in bone, the rest dim.
-    private var stepper: some View {
-        HStack(spacing: 8) {
-            ForEach(Step.allCases, id: \.self) { item in
-                if item != .welcome { Text("›").foregroundStyle(Palette.comment) }
-                Text(item.title)
-                    .font(item == step ? VPFont.bodyStrong : VPFont.body)
-                    .foregroundStyle(item == step ? Palette.fg : item.rawValue < step.rawValue ? Palette.green : Palette.comment)
-            }
-        }
-        .font(VPFont.caption)
+    private var back: some View {
+        Button { go(-1) } label: { Text("Back").foregroundStyle(Palette.fgMuted) }.buttonStyle(.vpGhost)
     }
+
+    private func go(_ delta: Int) { step = Step(rawValue: step.rawValue + delta) ?? step }
 
     // MARK: Pieces
 
     private func heading(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 16) {
             Text(title).font(VPFont.display)
             Text(detail).font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func permissionRow(name: String, detail: String, granted: Bool, button: String, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            StatusCode(level: granted ? .ok : .warning)
-            VStack(alignment: .leading, spacing: 2) {
+    /// A permission: OK once granted; NEXT (apricot) on the one to do now, with its Allow… as the primary action.
+    private func permissionRow(name: String, detail: String, granted: Bool, next: Bool, action: @escaping () -> Void) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(granted ? "OK" : "NEXT").font(VPFont.label).tracking(0.9)
+                .foregroundStyle(granted ? Palette.green : next ? Palette.orange : Palette.fgMuted)
+                .frame(width: 44, alignment: .leading).padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
                 Text(name).font(VPFont.bodyStrong)
-                Text(detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                Text(detail).font(.system(size: 12, design: .monospaced)).lineSpacing(2).foregroundStyle(Palette.fgMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 8)
             if granted {
-                Text("allowed").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                Text("✓ Allowed").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.green)
             } else {
-                Button(button, action: action).buttonStyle(.vpSecondary)
+                Button("Allow…", action: action).buttonStyle(next ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(16)
     }
 
-    private func modelRow(name: String, detail: String, state: (Check.Level, String), progress: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                StatusCode(level: state.0)
-                Text(name).font(VPFont.bodyStrong)
-                Text(detail).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                Spacer()
-                Text(progress.map { "\(Int($0 * 100))%" } ?? state.1).font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
-            }
-            if let progress {
-                ProgressBar(value: progress).padding(.leading, 52)
-            } else if state.1.hasPrefix("downloading") {
-                ProgressView().progressViewStyle(.linear).tint(Palette.purple).padding(.leading, 52)
+    private var waiting: String? {
+        mic != .authorized ? "the microphone" : !trusted ? "Accessibility" : nil
+    }
+
+    private var parakeetRow: some View {
+        let (code, color, trailing): (String, Color, String) = switch app.parakeetState {
+        case .ready: ("OK", Palette.green, "✓ Loaded")
+        case .failed: ("FAIL", Palette.red, "failed: retry from Setup")
+        case .loading: ("PROC", Palette.yellow, app.parakeetProgress.map { "\(Int($0 * 460)) / 460 MB" } ?? "loading…")
+        case .notLoaded: ("INFO", Palette.cyan, "waiting")
+        }
+        return HStack(spacing: 14) {
+            Text(code).font(VPFont.label).tracking(0.9).foregroundStyle(color).frame(width: 44, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text("Parakeet v3").font(VPFont.bodyStrong)
+                    Text("transcription · needed for Fast dictation").font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Palette.fgMuted).lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(trailing).font(.system(size: 12, design: .monospaced)).monospacedDigit()
+                        .foregroundStyle(app.parakeetState == .ready ? Palette.green : Palette.fgMuted)
+                }
+                if let progress = app.parakeetProgress {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2).fill(Palette.bg300)
+                            RoundedRectangle(cornerRadius: 2).fill(Palette.cyan).frame(width: geo.size.width * progress)
+                        }
+                    }
+                    .frame(height: 4)
+                }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 16).padding(.vertical, 14)
+    }
+
+    private func voiceRow(_ engine: LocalVoiceEngine, detail: String, optional: Bool) -> some View {
+        let state = voices[engine] ?? .notLoaded
+        let (code, color): (String, Color) = switch state {
+        case .ready: ("OK", Palette.green)
+        case .loading: ("PROC", Palette.yellow)
+        case .failed: ("FAIL", Palette.red)
+        case .notLoaded: ("INFO", Palette.cyan)
+        }
+        return HStack(spacing: 14) {
+            Text(code).font(VPFont.label).tracking(0.9).foregroundStyle(color).frame(width: 44, alignment: .leading)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(engine.label).font(VPFont.bodyStrong)
+                Text(detail).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            switch state {
+            case .ready:
+                Text("✓ Loaded").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.green)
+            case .loading:
+                Text("downloading…").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+            case .failed, .notLoaded:
+                if optional || { if case .failed = state { true } else { false } }() {
+                    Button(optional ? "Load" : "Retry") { Task { try? await LocalVoices.shared.prepare(engine) } }
+                        .buttonStyle(.vpSecondary)
+                } else {
+                    Text("waiting").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
+                }
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
     }
 
     private func keyHeader(_ name: String, _ purpose: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(name).font(VPFont.bodyStrong)
-            Text(purpose).font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
+            Text(purpose).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted).lineLimit(1)
         }
     }
 
-    private var parakeet: (Check.Level, String) {
-        switch app.parakeetState {
-        case .notLoaded: (.info, "waiting")
-        case .loading: (.info, "downloading…")
-        case .ready: (.ok, "ready")
-        case .failed(let error): (.problem, "failed: \(error)")
-        }
+    /// The first hotkey of the first enabled track that has one.
+    private var hotkey: String? {
+        app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty }?.triggers.first?.combo.display
     }
 
-    private static func model(_ state: LocalVoices.State) -> (Check.Level, String) {
-        switch state {
-        case .notLoaded: (.info, "waiting")
-        case .loading: (.info, "downloading…")
-        case .ready: (.ok, "ready")
-        case .failed(let error): (.problem, "failed: \(error)")
-        }
+    /// A run that finished while this step was open.
+    private var tryRun: RunRecord? {
+        app.history.first.flatMap { $0.date > tryStarted && $0.failure == nil ? $0 : nil }
     }
-
-    private var hotkeyTracks: [Track] { app.store.tracks.filter { $0.enabled && !$0.triggers.isEmpty } }
 
     private func refresh() {
         mic = AVCaptureDevice.authorizationStatus(for: .audio)

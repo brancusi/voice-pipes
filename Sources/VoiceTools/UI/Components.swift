@@ -311,33 +311,41 @@ extension Palette {
     }
 }
 
-/// An empty page: the Wrangler busking, a flavour headline in the pixel face, then a plain sentence that says what
-/// to do (and, optionally, the button that does it). The headline can tip its hat; the sentence gets to the point.
+/// An empty page: the Wrangler, a flavour headline in the pixel face, then a plain sentence that says what to do,
+/// and the buttons that do it. The headline can tip its hat; the sentence gets to the point.
 struct WranglerEmptyState: View {
     let headline: String
+    var pose: WranglerArt.Pose = .busk
     var scale = 6
     let message: String
     var action: (String, () -> Void)?
+    var secondary: (String, () -> Void)?
 
-    init(headline: String, scale: Int = 6, message: String, action: (String, () -> Void)? = nil) {
+    init(headline: String, pose: WranglerArt.Pose = .busk, scale: Int = 6, message: String,
+         action: (String, () -> Void)? = nil, secondary: (String, () -> Void)? = nil) {
         self.headline = headline
+        self.pose = pose
         self.scale = scale
         self.message = message
         self.action = action
+        self.secondary = secondary
     }
 
     var body: some View {
-        VStack(spacing: 18) {
-            Wrangler(pose: .busk, scale: scale)
+        VStack(spacing: 16) {
+            Wrangler(pose: pose, scale: scale)
             PixelHeadline(headline)
             // No vertical fixedSize here: measured at its narrowest it would demand a tall window and stop the
             // window shrinking to its tile (the window's minimum size comes from its content).
             Text(message)
                 .font(VPFont.body).lineSpacing(4).foregroundStyle(Palette.fgMuted)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
-            if let action {
-                Button(action.0, action: action.1).buttonStyle(.vpPrimary)
+                .frame(maxWidth: 380)
+            if action != nil || secondary != nil {
+                HStack(spacing: 10) {
+                    if let action { Button(action.0, action: action.1).buttonStyle(.vpPrimary) }
+                    if let secondary { Button(secondary.0, action: secondary.1).buttonStyle(.vpSecondary) }
+                }
             }
         }
         .padding(32)

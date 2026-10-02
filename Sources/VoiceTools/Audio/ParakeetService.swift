@@ -38,6 +38,7 @@ actor ParakeetService {
             state = .ready
         } catch {
             state = .failed(error.localizedDescription)
+            report?(1) // clears the progress shown in setup; the failure is in `state`
             loadTask = nil // allow a retry
         }
     }

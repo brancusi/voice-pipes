@@ -57,25 +57,24 @@ struct AboutView: View {
     }
 }
 
-/// The About scene: 76 × 30 art pixels at 10×, sky bands, the sun, a mesa, five organ pipes on their base pipe,
-/// and the Wrangler busking. Drawn from the app mockup's pixel layout; whole pixels only.
+/// The pixel sundown: sky bands, the sun behind a mesa, five organ pipes on their base pipe, and the Wrangler
+/// busking. `.about` is the full 76 × 30 scene; `.welcome` is the setup window's shorter 76 × 24 banner. Drawn from
+/// the app mockups' pixel layouts at 10×; whole pixels only.
 struct SundownScene: View {
+    enum Layout { case about, welcome }
+    var layout: Layout = .about
+
     static let scale: CGFloat = 10
     static let size = CGSize(width: 76 * scale, height: 30 * scale)
 
     private typealias Px = (x: Int, y: Int, w: Int, h: Int, color: UInt32)
 
-    private static let art: [Px] = [
-        // Sky bands, deepest first, then the ground.
+    private static let about: [Px] = [
         (0, 0, 76, 5, 0x2A2140), (0, 5, 76, 4, 0x43294A), (0, 9, 76, 4, 0x6B3A52), (0, 13, 76, 3, 0x9A4E55),
         (0, 16, 76, 3, 0xC96A57), (0, 19, 76, 2, 0xE8915F), (0, 21, 76, 2, 0xF2B46A), (0, 23, 76, 7, 0x1F1A15),
-        // Stars.
         (9, 2, 1, 1, 0xF0E4CC), (66, 3, 1, 1, 0xF0E4CC), (38, 1, 1, 1, 0xC3A3D4),
-        // The sun, behind the mesa.
         (58, 14, 4, 1, 0xF6D58A), (57, 15, 6, 4, 0xF6D58A), (58, 19, 4, 1, 0xF6D58A),
-        // The mesa.
         (52, 18, 14, 1, 0x2B1F24), (49, 19, 22, 4, 0x2B1F24),
-        // Organ pipes, their slits, and the base pipe.
         (41, 13, 3, 11, 0x18140F), (45, 9, 3, 15, 0x18140F), (49, 6, 3, 18, 0x18140F), (53, 10, 3, 14, 0x18140F),
         (57, 14, 3, 10, 0x18140F),
         (42, 17, 1, 1, 0xC96A57), (46, 17, 1, 1, 0xC96A57), (50, 17, 1, 1, 0xC96A57), (54, 17, 1, 1, 0xC96A57),
@@ -83,22 +82,38 @@ struct SundownScene: View {
         (40, 24, 21, 1, 0xF0E4CC),
     ]
 
+    private static let welcome: [Px] = [
+        (0, 0, 76, 3, 0x2A2140), (0, 3, 76, 3, 0x43294A), (0, 6, 76, 3, 0x6B3A52), (0, 9, 76, 3, 0x9A4E55),
+        (0, 12, 76, 3, 0xC96A57), (0, 15, 76, 2, 0xE8915F), (0, 17, 76, 2, 0xF2B46A), (0, 19, 76, 5, 0x1F1A15),
+        (9, 1, 1, 1, 0xF0E4CC), (66, 2, 1, 1, 0xF0E4CC),
+        (58, 10, 4, 1, 0xF6D58A), (57, 11, 6, 4, 0xF6D58A), (58, 15, 4, 1, 0xF6D58A),
+        (52, 14, 14, 1, 0x2B1F24), (49, 15, 22, 4, 0x2B1F24),
+        (41, 9, 3, 11, 0x18140F), (45, 5, 3, 15, 0x18140F), (49, 3, 3, 17, 0x18140F), (53, 6, 3, 14, 0x18140F),
+        (57, 10, 3, 10, 0x18140F),
+        (42, 13, 1, 1, 0xC96A57), (46, 13, 1, 1, 0xC96A57), (50, 13, 1, 1, 0xC96A57), (54, 13, 1, 1, 0xC96A57),
+        (58, 13, 1, 1, 0xC96A57),
+        (40, 20, 21, 1, 0xF0E4CC),
+    ]
+
     var body: some View {
         let s = Self.scale
+        let (art, rows, wranglerX, wranglerY): ([Px], Int, Int, Int) = layout == .about
+            ? (Self.about, 30, 18, 0) : (Self.welcome, 24, 20, -6)
         Canvas(rendersAsynchronously: false) { context, _ in
-            for px in Self.art {
+            for px in art {
                 context.fill(Path(CGRect(x: CGFloat(px.x) * s, y: CGFloat(px.y) * s, width: CGFloat(px.w) * s, height: CGFloat(px.h) * s)),
                              with: .color(Color(hex: px.color)))
             }
-            // The Wrangler, busking, 18 art pixels in.
-            for (y, row) in WranglerArt.rows(.busk).enumerated() {
+            // The Wrangler, busking.
+            for (y, row) in WranglerArt.rows(.busk).enumerated() where y + wranglerY >= 0 {
                 for (x, key) in row.enumerated() {
                     guard let hex = WranglerArt.palette[key] else { continue }
-                    context.fill(Path(CGRect(x: CGFloat(18 + x) * s, y: CGFloat(y) * s, width: s, height: s)), with: .color(Color(hex: hex)))
+                    context.fill(Path(CGRect(x: CGFloat(wranglerX + x) * s, y: CGFloat(wranglerY + y) * s, width: s, height: s)),
+                                 with: .color(Color(hex: hex)))
                 }
             }
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: Self.size.width, height: CGFloat(rows) * s)
         .accessibilityElement()
         .accessibilityLabel("The Wrangler busking beside the organ pipes at sundown")
     }

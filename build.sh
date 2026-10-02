@@ -174,7 +174,12 @@ VENV=".cache/dmgbuild-$DMGBUILD_VERSION"
 swiftc "${CACHE[@]}" Tools/make_dmg_background.swift -o "$WORK/make_dmg_background"
 "$WORK/make_dmg_background" "$WORK/dmg-bg" >/dev/null
 tiffutil -cathidpicheck "$WORK/dmg-bg/background.png" "$WORK/dmg-bg/background@2x.png" -out "$WORK/dmg-bg/background.tiff" 2>/dev/null
-"$VENV/bin/dmgbuild" -s Tools/dmg_settings.py -D app="$APP" -D background="$WORK/dmg-bg/background.tiff" "$NAME" "$DMG" >/dev/null
+# GitHub's macOS runners sometimes fail hdiutil with "Resource busy"; try a few times.
+for attempt in 1 2 3; do
+  "$VENV/bin/dmgbuild" -s Tools/dmg_settings.py -D app="$APP" -D background="$WORK/dmg-bg/background.tiff" "$NAME" "$DMG" >/dev/null && break
+  [[ $attempt == 3 ]] && { echo "dmgbuild failed three times." >&2; exit 1; }
+  echo "    dmgbuild failed (attempt $attempt); retrying" >&2; rm -f "$DMG"; sleep 10
+done
 if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
   codesign --force --timestamp --sign "$IDENTITY" "$DMG"
   if [[ -n "${NOTARY_KEY_PATH:-}" ]]; then

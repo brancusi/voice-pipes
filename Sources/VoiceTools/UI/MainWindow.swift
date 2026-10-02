@@ -101,11 +101,12 @@ struct MainWindowView: View {
                 .id(id)
                 .navigationTitle(app.store.tracks[index].name)
             } else {
-                WranglerEmptyState(headline: "no pipes laid",
+                WranglerEmptyState(headline: "no pipes laid", pose: .sing,
                                    message: app.store.tracks.isEmpty
-                                       ? "No tracks yet. A track is a pipeline you play with a hotkey: microphone in, text or speech out."
+                                       ? "A track is a hotkey plus a pipeline: mic in, text or speech out. Start from a ready-made one or build your own."
                                        : "Pick a track in the sidebar, or lay a new one.",
-                                   action: ("+ New track", newTrack))
+                                   action: ("+ New track", newTrack),
+                                   secondary: app.store.tracks.isEmpty ? ("Restore the starter tracks", restoreStarters) : nil)
                     .background(Palette.bg100)
             }
         case .activity:
@@ -115,6 +116,11 @@ struct MainWindowView: View {
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }
+    }
+
+    private func restoreStarters() {
+        app.store.restoreStarters()
+        app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .setup
     }
 
     private func newTrack() {
@@ -293,6 +299,8 @@ private struct VocabularyView: View {
     @Bindable private var store = VocabularyStore.shared
     @State private var training: VocabularyEntry.ID?
     @State private var sample = "i use cloud code and open router every day."
+    @State private var askingWord = false
+    @State private var newWord = ""
 
     var body: some View {
         ScrollView {
@@ -303,8 +311,9 @@ private struct VocabularyView: View {
 
                 if store.entries.isEmpty {
                     WranglerEmptyState(headline: "nothing to rope yet", scale: 4,
-                                       message: "No words yet. Add a name or term transcription keeps getting wrong, then Train… it to catch every way it's misheard.",
-                                       action: ("+ Add word", { store.entries.append(VocabularyEntry(write: "", heardAs: [])) }))
+                                       message: "Add a word transcription keeps getting wrong, like a name or a product, and Fix words will spell it your way from then on.",
+                                       action: ("+ Add word", { store.entries.append(VocabularyEntry(write: "", heardAs: [])) }),
+                                       secondary: ("Train a word…", { askingWord = true }))
                         .frame(minHeight: 360)
                         .vpCard()
                 } else {
@@ -367,11 +376,40 @@ private struct VocabularyView: View {
             .padding(.horizontal, 32).padding(.vertical, 24)
             .frame(maxWidth: 900, alignment: .leading)
         }
+        .sheet(isPresented: $askingWord) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Which word?").font(VPFont.title)
+                Text("The spelling you want, e.g. a name or a product. Then say it a few times.")
+                    .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                VPTextField("Spelling", text: $newWord, onSubmit: startTraining)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { askingWord = false }.buttonStyle(.vpSecondary).keyboardShortcut(.cancelAction)
+                    Button("Continue", action: startTraining).buttonStyle(.vpPrimary).keyboardShortcut(.defaultAction)
+                        .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding(24)
+            .frame(width: 420)
+            .background(Palette.bg100)
+            .vpWindow()
+        }
         .sheet(isPresented: Binding { training != nil } set: { if !$0 { training = nil } }) {
             if let index = store.entries.firstIndex(where: { $0.id == training }) {
                 TrainWordSheet(parakeet: parakeet, entry: $store.entries[index])
             }
         }
+    }
+
+    /// Adds the word and opens training for it, once the "Which word?" sheet has closed.
+    private func startTraining() {
+        let word = newWord.trimmingCharacters(in: .whitespaces)
+        guard !word.isEmpty else { return }
+        let entry = VocabularyEntry(write: word, heardAs: [])
+        store.entries.append(entry)
+        newWord = ""
+        askingWord = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { training = entry.id }
     }
 
     /// Edits the comma-separated list without reformatting it while you type (a trailing comma or space stays).
@@ -412,7 +450,7 @@ struct WindowBehavior: NSViewRepresentable {
         DispatchQueue.main.async {
             let open = NSApp.windows.contains { window in
                 window.isVisible && (["main", "about"].contains { window.identifier?.rawValue.hasPrefix($0) ?? false }
-                    || window.title == "Set up Voice Pipes")
+                    || window.title == OnboardingController.title)
             }
             if !open { NSApp.setActivationPolicy(.accessory) }
         }
