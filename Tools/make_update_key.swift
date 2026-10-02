@@ -1,4 +1,4 @@
-// Makes the EdDSA (ed25519) key pair that signs Voice Tools updates. Run once, ever:
+// Makes the EdDSA (ed25519) key pair that signs Voice Pipes updates. Run once, ever:
 //   swiftc Tools/make_update_key.swift -o "$TMPDIR/make_update_key" && "$TMPDIR/make_update_key" ~/voice-tools-update-key.txt
 // Writes the PRIVATE key (base64 seed, the format Sparkle's sign_update --ed-key-file reads) to the given file,
 // readable only by you, and refuses to overwrite one. Prints the PUBLIC key for build.sh (UPDATE_PUBLIC_KEY).

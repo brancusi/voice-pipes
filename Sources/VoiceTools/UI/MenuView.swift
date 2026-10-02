@@ -30,7 +30,7 @@ struct MenuView: View {
         HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Voice Tools").font(.headline)
+                Text("Voice Pipes").font(.headline)
                 HStack(spacing: 5) {
                     Circle().fill(headline.1).frame(width: 7, height: 7)
                     Text(headline.0).font(.caption).foregroundStyle(.secondary)
@@ -95,7 +95,7 @@ struct MenuView: View {
 
     private var footer: some View {
         HStack {
-            Button { openMain(nil) } label: { Label("Open Voice Tools…", systemImage: "macwindow") }
+            Button { openMain(nil) } label: { Label("Open Voice Pipes…", systemImage: "macwindow") }
                 .help("Tracks, history and setup in a full window")
             Button { app.copyReport() } label: { Image(systemName: "doc.on.clipboard") }
                 .help("Copy a report for troubleshooting")

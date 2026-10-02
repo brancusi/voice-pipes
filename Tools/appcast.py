@@ -47,7 +47,7 @@ def main() -> None:
     print(f"""<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>Voice Tools</title>
+    <title>Voice Pipes</title>
     <item>
       <title>Version {html.escape(version)}</title>
       <pubDate>{formatdate(usegmt=True)}</pubDate>

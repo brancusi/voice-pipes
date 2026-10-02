@@ -3,7 +3,7 @@
 ## Tracks
 
 A **track** is a pipeline: an input, any number of steps, and an output, started by one or more hotkeys. You
-build tracks in **Open Voice Tools… → Tracks**. Three come by default:
+build tracks in **Open Voice Pipes… → Tracks**. Three come by default:
 
 | Track | Trigger | Pipeline |
 |---|---|---|
@@ -63,7 +63,7 @@ On-device models download once on first use and load when the app starts if a tr
 
 ## Vocabulary and Fix words
 
-**Open Voice Tools… → Vocabulary** holds words transcription keeps getting wrong. Each row:
+**Open Voice Pipes… → Vocabulary** holds words transcription keeps getting wrong. Each row:
 
 - **Write** — the spelling you want, e.g. `Claude Code`.
 - **Heard as** — what comes out instead, comma-separated, e.g. `cloud code, clawed code`.
@@ -122,7 +122,7 @@ The full text and per-step timings of every run are in **History**.
 
 Everything a track produces is kept, so a dictation that went nowhere (you clicked away, the paste had no text
 field) is never lost. The menu bar panel shows the last three runs with a copy button each; **All N →** opens
-**History** in the Voice Tools window, where you can search everything, copy any run back to the clipboard, and see
+**History** in the Voice Pipes window, where you can search everything, copy any run back to the clipboard, and see
 each step's time. A run that failed partway keeps the text it had, marked with what went wrong. When later steps
 changed what you said (a question and its answer, dictation and its cleanup), what transcription heard is shown
 above the result. The last 1,000 runs are kept; **Clear history…** removes them all.

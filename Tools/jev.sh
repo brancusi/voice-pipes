@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Call TypeSafe's Jev with the key Voice Tools keeps in the Keychain (Setup → TypeSafe (Jev)).
+# Call TypeSafe's Jev with the key Voice Pipes keeps in the Keychain (Setup → TypeSafe (Jev)).
 # The key is read straight into the request header and never printed.
 #
 #   Tools/jev.sh request.json                          # POST a full request body (model defaults to jev-latest)
@@ -7,7 +7,7 @@
 #   Tools/jev.sh --judge "Aram Zadikian" "aram zedickian" "aaron's attacking"
 #       # the Vocabulary trainer's question: is each candidate safe to always replace with the target?
 #
-# First use: macOS asks whether `security` may read the Voice Tools item; choose Always Allow.
+# First use: macOS asks whether `security` may read the Voice Pipes item; choose Always Allow.
 set -euo pipefail
 
 SERVICE="io.github.brancusi.voice-tools"
@@ -15,7 +15,7 @@ ENDPOINT="https://api.typesafe.ai/v1/systemone"
 
 key() {
   security find-generic-password -s "$SERVICE" -a typesafe -w 2>/dev/null \
-    || { echo "No Jev key in the Keychain. Add it in Voice Tools → Setup → TypeSafe (Jev)." >&2; exit 1; }
+    || { echo "No Jev key in the Keychain. Add it in Voice Pipes → Setup → TypeSafe (Jev)." >&2; exit 1; }
 }
 
 post() {

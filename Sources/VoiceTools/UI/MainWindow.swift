@@ -8,7 +8,7 @@ enum MainSection: Hashable {
     case setup
 }
 
-/// The full Voice Tools window: build tracks, look back at runs, and set up permissions and connections.
+/// The full Voice Pipes window: build tracks, look back at runs, and set up permissions and connections.
 /// The menu bar panel stays a quick launcher.
 struct MainWindowView: View {
     @Bindable var app: AppState
@@ -54,7 +54,7 @@ struct MainWindowView: View {
                 Button { newTrack() } label: { Label("New track", systemImage: "plus") }
                     .buttonStyle(.borderless)
             }
-            Section("Voice Tools") {
+            Section("Voice Pipes") {
                 Label("History", systemImage: "clock.arrow.circlepath").tag(MainSection.activity)
                 Label("Vocabulary", systemImage: "character.book.closed").tag(MainSection.vocabulary)
                 HStack {

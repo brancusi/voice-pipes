@@ -6,10 +6,10 @@ feed published to a public releases repo → installed copies update themselves.
 ## Local builds
 
 ```sh
-DEV=1 ./build.sh                                   # build/Voice Tools.app — rebuilds over itself
+DEV=1 ./build.sh                                   # build/Voice Pipes.app — rebuilds over itself
 SIGN_IDENTITY="Developer ID Application: Aram Zadikian (7F3RGY9LG8)" DEV=1 ./build.sh   # signed like releases (shares their permissions)
 # add NOTARY_KEY_PATH=~/keys/AuthKey_<KEYID>.p8 NOTARY_KEY_ID=… NOTARY_ISSUER_ID=… to notarize too
-./build.sh                                         # dist/Voice-Tools-<VERSION>-arm64.zip (+ .sha256); never overwrites
+./build.sh                                         # dist/Voice-Pipes-<VERSION>-arm64.zip (+ .sha256); never overwrites
 ```
 
 `build.sh`:
@@ -36,7 +36,7 @@ wouldn't find it inside an app bundle anyway (see [Gotchas](gotchas.md)).
 3. Commit, push, then:
 
    ```sh
-   git tag -a vx.y.z -m "Voice Tools x.y.z" && git push origin vx.y.z
+   git tag -a vx.y.z -m "Voice Pipes x.y.z" && git push origin vx.y.z
    ```
 
 The workflow (`.github/workflows/release.yml`, `macos-15` runner) checks the tag matches `VERSION`, imports the
@@ -79,7 +79,7 @@ permission re-grant.
 |---|---|---|
 | `SPARKLE_ED_PRIVATE_KEY` | Actions secret + your password manager | Signing update zips. Public half: `UPDATE_PUBLIC_KEY` (built into the app). Made once with `Tools/make_update_key.swift`. **If lost**, make a new pair and everyone reinstalls by hand once. |
 | `DEVID_CERT_P12` (base64) + `DEVID_CERT_PASSWORD` | Actions secrets + your password manager (`~/keys/VoiceTools-DeveloperID.p12` + `p12-password`) | Code signing with Developer ID. Keep using the same certificate (valid until 2031; renewing from the same team keeps the requirement). |
-| `NOTARY_KEY_P8` + `NOTARY_KEY_ID` + `NOTARY_ISSUER_ID` | Actions secrets; `.p8` in `~/keys/` + your password manager | Notarization (App Store Connect Team Key "Voice Tools notarization", Developer role). Can be revoked and replaced any time. |
+| `NOTARY_KEY_P8` + `NOTARY_KEY_ID` + `NOTARY_ISSUER_ID` | Actions secrets; `.p8` in `~/keys/` + your password manager | Notarization (App Store Connect Team Key "Voice Pipes notarization", Developer role). Can be revoked and replaced any time. |
 | `SIGNING_CERT_P12` + `SIGNING_CERT_PASSWORD` | Actions secrets | The old self-signed certificate (to 0.9.1). Unused; kept as a backup. |
 | `RELEASES_TOKEN` | Actions secret | Fine-grained PAT, Contents read/write on `brancusi/voice-tools-releases` only. Releases stop publishing when it expires. |
 | OpenRouter key | Keychain `io.github.brancusi.voice-tools` / `openrouter` (set in the app) | Cloud transcription, LLM, speech. |
@@ -90,7 +90,7 @@ GitHub never shows a secret back, so the password-manager copies are the only wa
 ## Troubleshooting
 
 - **Permissions requested again after an update** — the build wasn't signed with the certificate. Check
-  `codesign -d -r- "/Applications/Voice Tools.app"` names `certificate root`. To compare with what macOS stored:
+  `codesign -d -r- "/Applications/Voice Pipes.app"` names `certificate root`. To compare with what macOS stored:
   `sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select hex(csreq) from access where client='io.github.brancusi.voice-tools'"`, then `csreq -r <file> -t`.
 - **A stale permission blocks the prompt** — Setup → Checks → **Fix…** (runs `tccutil reset` for this app only).
 - **CI fails at "Sign the update"** — `SPARKLE_ED_PRIVATE_KEY` doesn't match `UPDATE_PUBLIC_KEY`.

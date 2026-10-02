@@ -60,7 +60,7 @@ final class Updates: NSObject, ObservableObject, SPUStandardUserDriverDelegate, 
             if notified != latest {
                 notified = latest
                 let content = UNMutableNotificationContent()
-                content.title = "Voice Tools \(latest) is available"
+                content.title = "Voice Pipes \(latest) is available"
                 content.body = "Click to install. It takes a few seconds and relaunches the app."
                 content.sound = .default
                 try? await UNUserNotificationCenter.current().add(

@@ -24,6 +24,14 @@ and `--timestamp`; Downloader with `--preserve-metadata=entitlements`. `xcrun no
 offending files. Hardened runtime is only for Developer ID builds: with a self-signed or ad hoc signature, library
 validation would refuse to load Sparkle.
 
+**Renaming the app (Voice Tools → Voice Pipes, 1.0.0).** Sparkle finds the new bundle in the update by bundle
+identifier when its file name differs, but installs it at the *old* path (`SUInstaller`: name normalization is
+off), so an updated copy stays `Voice Tools.app`. → `BundleRename` renames the bundle once at launch (same folder,
+only if writable and `Voice Pipes.app` doesn't exist) and relaunches via `sh -c "sleep 1; open …"`. TCC and the
+Keychain match the bundle id and signature, not the path. Kept on purpose: the bundle id
+`io.github.brancusi.voice-tools`, the Keychain service, the `VoiceTools` Application Support folder, the
+`VoiceTools` executable and the feed URL (`brancusi/voice-tools-releases`), so existing installs keep updating.
+
 **Signing with a self-signed certificate** (up to 0.9.1). `codesign` reports "no identity found" for a certificate that's only
 in a keychain passed with `--keychain`; the keychain must be in the user search list
 (`security list-keychains -d user -s <kc> …`). The certificate being untrusted (`CSSMERR_TP_NOT_TRUSTED`) doesn't

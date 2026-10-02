@@ -113,7 +113,7 @@ enum StepKind: Codable, Hashable {
     case route(routes: [Route])
     case http(url: String, method: String, headers: [String: String], bodyTemplate: String, responseField: String)
     case template(String)
-    /// Find-and-replace from the shared vocabulary (Voice Tools → Vocabulary).
+    /// Find-and-replace from the shared vocabulary (Voice Pipes → Vocabulary).
     case fixWords
 
     // Outputs

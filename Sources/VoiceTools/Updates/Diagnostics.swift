@@ -52,7 +52,7 @@ enum Diagnostics {
         checks.append(AXIsProcessTrusted()
             ? Check(level: .ok, title: "Accessibility", detail: "Allowed (paste and read selected text)")
             : Check(level: .problem, title: "Accessibility needed",
-                    detail: "Needed to paste and to read selected text. Click Fix, then switch Voice Tools on in the list that opens.",
+                    detail: "Needed to paste and to read selected text. Click Fix, then switch Voice Pipes on in the list that opens.",
                     fix: .accessibilitySettings))
 
         if steps.contains(where: { if case .parakeet = $0 { true } else { false } }) {
@@ -79,12 +79,12 @@ enum Diagnostics {
         if steps.contains(where: \.usesOpenRouter) {
             if !app.hasOpenRouterKey {
                 checks.append(Check(level: .problem, title: "OpenRouter key missing",
-                                    detail: "Add it in Voice Tools → Setup → OpenRouter.", fix: .editTracks))
+                                    detail: "Add it in Voice Pipes → Setup → OpenRouter.", fix: .editTracks))
             } else {
                 switch await OpenRouterClient.shared.validateKey() {
                 case .valid: checks.append(Check(level: .ok, title: "OpenRouter", detail: "Key valid"))
                 case .rejected: checks.append(Check(level: .problem, title: "OpenRouter key rejected",
-                                                    detail: "Replace it in Voice Tools → Setup → OpenRouter.", fix: .editTracks))
+                                                    detail: "Replace it in Voice Pipes → Setup → OpenRouter.", fix: .editTracks))
                 case .unreachable: checks.append(Check(level: .warning, title: "OpenRouter unreachable",
                                                        detail: "Can't reach openrouter.ai. Cloud steps will fail until it's back."))
                 }
@@ -117,7 +117,7 @@ enum Diagnostics {
 
     static func report(_ checks: [Check], tracks: [Track]) -> String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-        var lines = ["Voice Tools \(version) — \(Host.current().localizedName ?? "Mac") — \(ISO8601DateFormatter().string(from: Date()))",
+        var lines = ["Voice Pipes \(version) — \(Host.current().localizedName ?? "Mac") — \(ISO8601DateFormatter().string(from: Date()))",
                      "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"]
         for c in checks {
             let mark = ["ok  ", "info", "WARN", "FAIL"][c.level.rawValue]

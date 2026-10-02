@@ -98,7 +98,7 @@ enum PasteError: LocalizedError {
     case notTrusted
 
     var errorDescription: String? {
-        "Couldn't paste: Voice Tools needs Accessibility permission (macOS may reset it after an update). The text is on the clipboard; press ⌘V."
+        "Couldn't paste: Voice Pipes needs Accessibility permission (macOS may reset it after an update). The text is on the clipboard; press ⌘V."
     }
 }
 

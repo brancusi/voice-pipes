@@ -2,8 +2,14 @@ import SwiftUI
 
 @main
 struct VoiceToolsApp: App {
-    @State private var app = AppState()
+    @State private var app: AppState
     @StateObject private var updates = Updates()
+
+    init() {
+        // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
+        BundleRename.migrateIfNeeded()
+        _app = State(initialValue: AppState())
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -14,7 +20,7 @@ struct VoiceToolsApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Voice Tools", id: "main") {
+        Window("Voice Pipes", id: "main") {
             MainWindowView(app: app).environmentObject(updates)
         }
         .defaultSize(width: 1100, height: 760)

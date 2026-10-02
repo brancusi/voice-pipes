@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build "Voice Tools.app" for Apple silicon (macOS 14+) and zip it into dist/.
-#   ./build.sh                 # version from ./VERSION → dist/Voice-Tools-<VERSION>-arm64.zip
+# Build "Voice Pipes.app" for Apple silicon (macOS 14+) and zip it into dist/.
+#   ./build.sh                 # version from ./VERSION → dist/Voice-Pipes-<VERSION>-arm64.zip
 #   VERSION=1.2.0 ./build.sh
-#   DEV=1 ./build.sh           # local iteration: build/Voice Tools.app only, no zip, can rebuild over itself
+#   DEV=1 ./build.sh           # local iteration: build/Voice Pipes.app only, no zip, can rebuild over itself
 # Needs Xcode or the Command Line Tools (swift, codesign). Never overwrites an existing dist/ file.
 #
 # Self-updating (Sparkle): Sparkle comes in through SwiftPM (pinned in Package.swift). The release tarball of the
@@ -32,9 +32,9 @@ fi
 grep -q "Sparkle\", exact: \"$SPARKLE_VERSION\"" Package.swift \
   || { echo "Package.swift's Sparkle version doesn't match SPARKLE_VERSION ($SPARKLE_VERSION)." >&2; exit 1; }
 
-NAME="Voice Tools"
+NAME="Voice Pipes"
 DIST="dist"
-ZIP="$DIST/Voice-Tools-$VERSION-arm64.zip"
+ZIP="$DIST/Voice-Pipes-$VERSION-arm64.zip"
 if [[ "${DEV:-0}" != 1 && -e "$ZIP" ]]; then
   echo "$ZIP already exists; bump VERSION instead of rebuilding over it." >&2; exit 1
 fi
@@ -94,7 +94,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSArchitecturePriority</key><array><string>arm64</string></array>
   <key>LSUIElement</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>Voice Tools records your voice when you press a dictation hotkey.</string>
+  <key>NSMicrophoneUsageDescription</key><string>Voice Pipes records your voice when you press a dictation hotkey.</string>
 $UPDATE_KEYS
 </dict></plist>
 PLIST

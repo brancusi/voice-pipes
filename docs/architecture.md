@@ -8,7 +8,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 
 | Area | Files | Responsibility |
 |---|---|---|
-| App | `App/VoiceToolsApp.swift` | Scenes: `MenuBarExtra` (panel) and the `Window("Voice Tools")`. Menu bar icon reflects the run state / an update. |
+| App | `App/VoiceToolsApp.swift` | Scenes: `MenuBarExtra` (panel) and the `Window("Voice Pipes")`. Menu bar icon reflects the run state / an update. |
 | Model | `Model/Track.swift` | `Track`, `Trigger`, `Step`, `StepKind` (every block, with input/output `DataKind`, titles, catalog, defaults), `ParakeetMode`, `LocalVoiceEngine`. |
 | | `Model/TrackStore.swift` | Loads/saves `tracks.json`; one-time migrations; trigger conflict detection. |
 | | `Model/HistoryStore.swift` | `RunRecord` and `history.json`: the last 1,000 runs (text, heard, failure, timings), written off the main thread. |

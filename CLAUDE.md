@@ -1,4 +1,4 @@
-# Voice Tools — notes for Claude
+# Voice Pipes — notes for Claude
 
 Docs: [README](README.md) · [user guide](docs/user-guide.md) · [architecture](docs/architecture.md) ·
 [releasing](docs/releasing.md) · [research](docs/research.md) · [gotchas](docs/gotchas.md). Read gotchas before

@@ -1,4 +1,4 @@
-# Voice Tools
+# Voice Pipes
 
 A macOS menu bar app for voice: dictate into any app, have text read aloud, or ask questions — each as a
 **track**, a hotkey-triggered pipeline of building blocks you assemble yourself.
@@ -16,15 +16,15 @@ Apple silicon, macOS 14 or later. Self-updating.
 
 ## Install
 
-1. Download `Voice-Tools-<version>-arm64.zip` from the
+1. Download `Voice-Pipes-<version>-arm64.zip` from the
    [releases](https://github.com/brancusi/voice-tools-releases/releases/latest), unzip it, and move
-   **Voice Tools.app** to Applications.
+   **Voice Pipes.app** to Applications.
 2. Open it. It's signed with a Developer ID and notarized by Apple, so it opens like any other app.
 3. Allow **Microphone** and **Accessibility** when asked (Accessibility is needed to paste and to read selected
    text). The panel's **Checks** list shows anything missing, with a **Fix…** button for each.
-4. Add your **OpenRouter** key (and optionally a **TypeSafe Jev** key) in **Open Voice Tools… → Setup**. Keys are
+4. Add your **OpenRouter** key (and optionally a **TypeSafe Jev** key) in **Open Voice Pipes… → Setup**. Keys are
    stored in the Keychain.
-5. Optional: System Settings → General → Login Items → add Voice Tools.
+5. Optional: System Settings → General → Login Items → add Voice Pipes.
 
 It checks for updates every 5 minutes; when one is out the menu bar icon becomes a download arrow and the panel
 offers **Install…**. Permissions carry over between versions.
@@ -33,7 +33,7 @@ offers **Install…**. Permissions carry over between versions.
 
 - **Menu bar panel** — a launcher: your tracks (click to run), what's playing, the last few runs, and one line
   when something needs fixing.
-- **Voice Tools window** (panel → *Open Voice Tools…*) — **Tracks** (build and edit pipelines), **History**
+- **Voice Pipes window** (panel → *Open Voice Pipes…*) — **Tracks** (build and edit pipelines), **History**
   (every run's text, kept on disk, searchable and copyable), **Vocabulary** (words transcription gets wrong, with training), **Setup**
   (checks, keys, on-device models, updates). While it's open the app is in the Dock and ⌘Tab.
 - **HUD** — a small translucent tag at the bottom of the screen: `■ REC 00:04`, `PROC 312ms`, `OK 186ms`,
@@ -53,8 +53,8 @@ offers **Install…**. Permissions carry over between versions.
 ## Build
 
 ```sh
-DEV=1 ./build.sh           # → build/Voice Tools.app, for local iteration
-./build.sh                 # → dist/Voice-Tools-<VERSION>-arm64.zip
+DEV=1 ./build.sh           # → build/Voice Pipes.app, for local iteration
+./build.sh                 # → dist/Voice-Pipes-<VERSION>-arm64.zip
 ```
 
 Needs macOS 14+ and Swift 6; the Command Line Tools are enough (no Xcode). Releases are cut by pushing a

@@ -1,4 +1,8 @@
-Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
+Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
+
+**1.0.0**
+- **Voice Tools is now Voice Pipes.** Pipelines, and pipes you play from the keyboard, like an organ. The menu bar panel, the window, notifications and the app itself carry the new name.
+- After this update the app renames itself in your Applications folder from "Voice Tools" to "Voice Pipes" and reopens once. Your tracks, history, vocabulary, keys and permissions all carry over; nothing to set up again.
 
 **0.9.5**
 - **History: never lose a dictation.** Everything your tracks produce is now kept, even after you quit, so if you clicked away and the paste went nowhere, it's still there. The menu bar panel shows the last three with a copy button each; **All →** opens **History** (it was called Activity) in the main window, where you can search everything you've said and copy any of it back.
