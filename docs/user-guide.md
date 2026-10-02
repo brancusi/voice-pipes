@@ -152,6 +152,13 @@ its read-aloud buttons.
 | `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice, with **⏸/▶** and **⏹** buttons (pressing the track's hotkey again also pauses and resumes) |
 | `ERR …` | What went wrong (stays a few seconds) |
 
+**Follow along.** While anything is read aloud, the tag's third button (☰) opens a card above it with the whole
+text, a sentence per line: the one being read is lit with a lavender bar, finished ones dim, and the card scrolls
+with the voice. Hold the pointer over the card to scroll ahead; it follows the voice again when the pointer leaves.
+**−** and **+** change the speed live (0.6–2×, for this reading only; the track's speed stays as set). The card
+stays open for later readings until you close it (˅). From a terminal: `vp open reading`, `vp close reading`,
+`vp speed 1.4`.
+
 Under the tag, a second line names the model answering, once an LLM or Route step has run: for Route · Jev, the
 route, its model, and Jev's time and confidence, e.g. `quick → claude-haiku-4.5 · Jev 262 ms 100%`.
 

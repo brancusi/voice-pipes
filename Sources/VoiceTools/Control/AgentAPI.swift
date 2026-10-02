@@ -111,6 +111,13 @@ extension AppState {
             reply.result(uiState())
         case "ui":
             reply.result(uiState())
+        case "speed":
+            guard let value = (args["speed"] as? Double) ?? (args["speed"] as? String).flatMap(Double.init), (0.6...2.0).contains(value) else {
+                throw AgentError("bad_value", "Speed is 0.6 to 2.0.", hint: "vp speed 1.3")
+            }
+            guard speaker.state != .idle else { throw AgentError("not_speaking", "Nothing is being read aloud.", hint: "vp say \"…\" --speed \(value)") }
+            speaker.setRate(Float(value))
+            reply.result(["speed": Double(speaker.rate)])
         case "config.reload":
             store.reloadFromDisk()
             VocabularyStore.shared.reloadFromDisk()
@@ -386,6 +393,9 @@ extension AppState {
         case "menu":
             MenuBarPanel.open()
             return
+        case "reading":
+            readAlong = true  // shows with the next (or current) read-aloud
+            return
         case "setup":
             mainSection = .setup
             if let section = args["section"] as? String {
@@ -480,7 +490,7 @@ extension AppState {
         NotificationCenter.default.post(name: .voicePipesOpenWindow, object: "main")
     }
 
-    static let openTargets = ["main", "menu", "track", "history", "vocabulary", "setup", "onboarding", "about", "config"]
+    static let openTargets = ["main", "menu", "reading", "track", "history", "vocabulary", "setup", "onboarding", "about", "config"]
 
     /// The text fields `--field` can focus: the track's name, or the chosen block's (config file names).
     static func editorFields(_ track: Track, step: Int?, route: Int?) -> [String] {
@@ -495,12 +505,13 @@ extension AppState {
     }
 
     private func closeWindow(_ target: String) throws {
-        let targets = ["main", "menu", "about", "onboarding", "sheet", "all"]
+        let targets = ["main", "menu", "reading", "about", "onboarding", "sheet", "all"]
         guard targets.contains(target) else {
             throw AgentError("no_such_target", "Can't close '\(target)'.\(TableReader.suggestion(target, targets))", hint: "vp close " + targets.joined(separator: "|"))
         }
         if target == "sheet" || target == "all" { UINav.shared.dismissSheets += 1 }
         if target == "menu" || target == "all" { MenuBarPanel.close() }
+        if target == "reading" { readAlong = false }
         if target == "onboarding" || target == "all" { OnboardingController.shared.close() }
         for name in ["main", "about"] where target == name || target == "all" {
             for window in NSApp.windows where window.identifier?.rawValue.hasPrefix(name) == true { window.close() }
@@ -538,6 +549,8 @@ extension AppState {
             }
         }
         if let field = nav.focusedField { state["field"] = field }
+        state["reading"] = readAlong ? (speaker.state == .idle ? "open (shows when reading aloud)" : "open") : "closed"
+        if speaker.state != .idle { state["speed"] = Double(speaker.rate) }
         if let sheet = nav.sheet { state["sheet"] = sheet }
         if windows.contains("onboarding"), let step = nav.currentOnboardingStep { state["onboarding_step"] = OnboardingView.stepNames[step] }
         return state

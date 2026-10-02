@@ -252,6 +252,8 @@ enum AgentsInstaller {
           talking, and prints `answer:`. Use it when you need a decision and the user may not be at the screen.
           `--max 30` caps the recording; `--silence 1.2` is how long a pause ends it.
         - `vp listen` records and transcribes without speaking first. `vp stop` stops speech or recording.
+        - For long readings: `vp open reading` shows the text in the HUD as it's read (the user can follow and look
+          ahead); `vp speed 1.4` changes the speed of what's playing; `vp close reading` hides the text.
         - Keep spoken text short and plain: no markdown, code or URLs; they are read out literally.
 
         ## Run the user's pipelines

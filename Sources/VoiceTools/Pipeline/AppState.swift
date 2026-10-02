@@ -68,6 +68,10 @@ final class AppState {
     var hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
     /// What the main window shows; the menu bar panel sets it to jump straight to Setup.
     var mainSection: MainSection?
+    /// The HUD's read-along card is open; remembered, so the next read-aloud opens the same way.
+    var readAlong = UserDefaults.standard.bool(forKey: "hud.readAlong") {
+        didSet { UserDefaults.standard.set(readAlong, forKey: "hud.readAlong") }
+    }
     /// Set while the editor records a new key combo, so existing hotkeys don't fire.
     var hotkeysSuspended = false {
         didSet { registerHotkeys(for: store.tracks) }

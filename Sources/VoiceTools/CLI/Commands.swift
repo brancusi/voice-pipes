@@ -12,6 +12,11 @@ enum VPCommands {
                     values: ["text", "max", "silence"], handler: runTrack),
         CommandSpec(name: "say", usage: "vp say \"…\" [--model pocket|supertonic|macos|<openrouter-id>] [--voice <id>] [--speed 0.6–2.0]",
                     summary: "Speak text aloud", values: ["model", "voice", "speed", "text"], handler: say),
+        CommandSpec(name: "speed", usage: "vp speed <0.6–2.0>", summary: "Change the speed of what's being read aloud, live",
+                    handler: { parsed, out in
+                        let value = try parsed.positional(0, "speed", usage: "vp speed 1.3")
+                        out.emit(Out(any: try AppClient.request("speed", ["speed": value], launch: false)))
+                    }),
         CommandSpec(name: "stop", usage: "vp stop", summary: "Stop speaking or recording", handler: { _, out in try simple("stop", out) }),
         CommandSpec(name: "pause", usage: "vp pause", summary: "Pause reading aloud", handler: { _, out in try simple("pause", out) }),
         CommandSpec(name: "resume", usage: "vp resume", summary: "Resume reading aloud", handler: { _, out in try simple("resume", out) }),
@@ -37,10 +42,10 @@ enum VPCommands {
         CommandSpec(name: "secret", usage: "vp secret [set <name> [--value <v> | piped] | remove <name>]",
                     summary: "Your own secrets for http blocks, used as ${secret:<name>}", values: ["value"], handler: secret),
         CommandSpec(name: "watch", usage: "vp watch", summary: "Stream run events (recording, processing, speaking, done, failed) until interrupted", handler: watch),
-        CommandSpec(name: "open", usage: "vp open [main | menu | track <id> [--step n [--route n]] [--section title|triggers|pipeline] | history [--track <id>] [--search <text>] [--run n] | vocabulary [--word <w>] [--add] | setup [--section <name>] | onboarding [--step <name>] | about | config] [--field <name>] [--background]",
+        CommandSpec(name: "open", usage: "vp open [main | menu | reading | track <id> [--step n [--route n]] [--section title|triggers|pipeline] | history [--track <id>] [--search <text>] [--run n] | vocabulary [--word <w>] [--add] | setup [--section <name>] | onboarding [--step <name>] | about | config] [--field <name>] [--background]",
                     summary: "Show any window, page, block or field (it flashes); answers with what's on screen",
                     values: ["step", "route", "section", "track", "search", "run", "word", "field"], switches: ["add", "background"], handler: open),
-        CommandSpec(name: "close", usage: "vp close [main | menu | about | onboarding | sheet | all]", summary: "Close a window, the menu bar panel or an open sheet",
+        CommandSpec(name: "close", usage: "vp close [main | menu | reading | about | onboarding | sheet | all]", summary: "Close a window, the menu bar panel or an open sheet",
                     handler: { parsed, out in try uiReply("close", ["target": parsed.positionals.first ?? "main"], out) }),
         CommandSpec(name: "ui", usage: "vp ui", summary: "What's on screen: windows, page, open block, focused field",
                     handler: { _, out in try uiReply("ui", [:], out) }),

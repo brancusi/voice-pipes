@@ -13,11 +13,42 @@ final class Speaker: NSObject {
     private(set) var sourceLabel = ""
     private(set) var voiceLabel = ""
     /// 0...1 through the whole text.
-    private(set) var progress: Double = 0
+    private(set) var progress: Double = 0 {
+        didSet { if engine != .system { position = Int(progress * Double(textLength)) } }
+    }
+
+    // Read-along (the HUD's expanded card): what's being read, by sentence, and where the voice is.
+    struct Sentence: Identifiable, Equatable {
+        let id: Int
+        /// UTF-16 offset into `text`.
+        let start: Int
+        let text: String
+        /// Starts a new paragraph (a line break before it).
+        let opensParagraph: Bool
+    }
+
+    private(set) var text = ""
+    private(set) var sentences: [Sentence] = []
+    /// UTF-16 offset of the voice in `text`: exact for macOS voices (word by word), estimated from progress for
+    /// the others.
+    private(set) var position = 0
+    /// Playback speed, changeable while reading (`setRate`).
+    private(set) var rate: Float = 1
+
+    var currentSentence: Int { sentences.lastIndex { $0.start <= position } ?? 0 }
+
+    private enum Engine { case none, system, cloud, local }
+    @ObservationIgnored private var engine: Engine = .none
+    @ObservationIgnored private var textLength = 0
 
     // macOS voices
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
-    @ObservationIgnored private var systemTextLength = 0
+    @ObservationIgnored private var systemVoice: AVSpeechSynthesisVoice?
+    @ObservationIgnored private var currentUtterance: AVSpeechUtterance?
+    /// Where the current utterance starts in `text` (a speed change restarts the rest of the text from the word
+    /// being spoken: AVSpeechSynthesizer can't change rate mid-utterance).
+    @ObservationIgnored private var systemBase = 0
+    @ObservationIgnored private var systemRestartPending = false
 
     // OpenRouter voices: the text is split into segments, each fetched while the previous one plays.
     @ObservationIgnored private var player: AVAudioPlayer?
@@ -30,6 +61,7 @@ final class Speaker: NSObject {
     // On-device voices: generated audio is scheduled on a player node as it arrives.
     @ObservationIgnored private var audioEngine: AVAudioEngine?
     @ObservationIgnored private var playerNode: AVAudioPlayerNode?
+    @ObservationIgnored private var timePitch: AVAudioUnitTimePitch?
     @ObservationIgnored private var pendingBuffers = 0
     @ObservationIgnored private var scheduledSamples: Int64 = 0
     @ObservationIgnored private var scheduledChars = 0
@@ -50,15 +82,13 @@ final class Speaker: NSObject {
     /// Speaks and returns when playback finishes or is cleared.
     func speakSystem(_ text: String, voiceID: String?, rate: Float, label: String) async {
         clear()
+        begin(text, rate: rate, engine: .system)
         sourceLabel = label
         let voice = voiceID.flatMap(AVSpeechSynthesisVoice.init(identifier:)) ?? Self.bestDefaultVoice
         voiceLabel = voice?.name ?? "System voice"
-        systemTextLength = (text as NSString).length
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voice
-        utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * rate)
+        systemVoice = voice
         state = .speaking
-        synthesizer.speak(utterance)
+        speakSystem(from: 0)
         await withCheckedContinuation { finished = $0 }
     }
 
@@ -67,6 +97,7 @@ final class Speaker: NSObject {
     /// Fetches and plays speech segment by segment. Throws if the first segment can't be synthesized.
     func speakCloud(_ text: String, model: String, voice: String, rate: Float, label: String) async throws {
         clear()
+        begin(text, rate: rate, engine: .cloud)
         generation += 1
         let run = generation
         sourceLabel = label
@@ -117,6 +148,7 @@ final class Speaker: NSObject {
     /// are generated while earlier ones play. Throws if the engine can't load or the first passage fails.
     func speakLocal(_ text: String, engine kind: LocalVoiceEngine, voice: String, rate: Float, label: String) async throws {
         clear()
+        begin(text, rate: rate, engine: .local)
         generation += 1
         let run = generation
         sourceLabel = label
@@ -140,6 +172,7 @@ final class Speaker: NSObject {
         try engine.start()
         audioEngine = engine
         playerNode = node
+        self.timePitch = timePitch
         startLocalProgressTimer()
 
         do {
@@ -208,6 +241,7 @@ final class Speaker: NSObject {
         audioEngine?.stop()
         playerNode = nil
         audioEngine = nil
+        timePitch = nil
         drained?.resume()
         drained = nil
         pendingBuffers = 0
@@ -226,6 +260,82 @@ final class Speaker: NSObject {
                              rate: 1, label: "Voice preview")
     }
 
+    // MARK: - Read-along and speed
+
+    private func begin(_ text: String, rate: Float, engine: Engine) {
+        self.text = text
+        self.engine = engine
+        self.rate = rate
+        textLength = (text as NSString).length
+        sentences = Self.sentences(of: text)
+        position = 0
+        systemBase = 0
+        systemRestartPending = false
+    }
+
+    #if SNAPSHOTS
+    func setPreview(text: String, at sentence: Int, rate: Float) {
+        begin(text, rate: rate, engine: .none)
+        position = sentences[safe: sentence]?.start ?? 0
+        voiceLabel = "Alba · Pocket TTS"
+    }
+    #endif
+
+    /// Changes the speed of what's playing now (0.6–2×, in tenths). Not saved to the track.
+    func setRate(_ value: Float) {
+        let new = (min(2, max(0.6, value)) * 10).rounded() / 10
+        guard new != rate else { return }
+        rate = new
+        switch engine {
+        case .local:
+            timePitch?.rate = new
+        case .cloud:
+            playbackRate = new
+            player?.rate = new
+        case .system:
+            if state == .paused { systemRestartPending = true } else if state == .speaking { speakSystem(from: position) }
+        case .none:
+            break
+        }
+    }
+
+    /// Speaks `text` from a UTF-16 offset (the start, or the word being spoken when the speed changes).
+    private func speakSystem(from offset: Int) {
+        let all = text as NSString
+        let from = min(max(0, offset), all.length)
+        currentUtterance = nil
+        if synthesizer.isSpeaking || synthesizer.isPaused { synthesizer.stopSpeaking(at: .immediate) }
+        guard from < all.length else { return finishPlayback() }
+        systemBase = from
+        let utterance = AVSpeechUtterance(string: all.substring(from: from))
+        utterance.voice = systemVoice
+        utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * rate)
+        currentUtterance = utterance
+        synthesizer.speak(utterance)
+    }
+
+    /// Sentences with their offsets, for the read-along card.
+    static func sentences(of text: String) -> [Sentence] {
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        var result: [Sentence] = []
+        // A sentence token carries the whitespace after it, so a line break there opens the next paragraph.
+        var breakBefore = false
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            let raw = text[range]
+            let piece = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !piece.isEmpty {
+                let leading = raw.prefix { $0.isWhitespace }.contains { $0.isNewline }
+                let start = raw.firstIndex { !$0.isWhitespace } ?? range.lowerBound
+                result.append(Sentence(id: result.count, start: NSRange(start..<range.upperBound, in: text).location, text: piece,
+                                       opensParagraph: !result.isEmpty && (breakBefore || leading)))
+                breakBefore = raw.reversed().prefix { $0.isWhitespace }.contains { $0.isNewline }
+            }
+            return true
+        }
+        return result
+    }
+
     // MARK: - Controls
 
     func togglePause() {
@@ -234,7 +344,16 @@ final class Speaker: NSObject {
             if let playerNode { playerNode.pause() } else if let player { player.pause() } else { synthesizer.pauseSpeaking(at: .word) }
             state = .paused
         case .paused:
-            if let playerNode { playerNode.play() } else if let player { player.play() } else { synthesizer.continueSpeaking() }
+            if let playerNode {
+                playerNode.play()
+            } else if let player {
+                player.play()
+            } else if systemRestartPending {
+                systemRestartPending = false
+                speakSystem(from: position)  // the speed changed while paused
+            } else {
+                synthesizer.continueSpeaking()
+            }
             state = .speaking
         case .idle, .loading:
             break
@@ -250,6 +369,8 @@ final class Speaker: NSObject {
 
     func clear() {
         generation += 1
+        currentUtterance = nil
+        engine = .none
         synthesizer.stopSpeaking(at: .immediate)
         player?.stop()
         player = nil
@@ -335,12 +456,18 @@ extension Speaker: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString range: NSRange,
                                        utterance: AVSpeechUtterance) {
         Task { @MainActor in
-            self.progress = Double(range.location + range.length) / Double(max(self.systemTextLength, 1))
+            guard utterance === self.currentUtterance else { return }
+            self.position = self.systemBase + range.location
+            self.progress = Double(self.systemBase + range.location + range.length) / Double(max(self.textLength, 1))
         }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finishPlayback() }
+        Task { @MainActor in
+            // Not one stopped for a speed change.
+            guard utterance === self.currentUtterance else { return }
+            self.finishPlayback()
+        }
     }
 }
 

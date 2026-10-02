@@ -1,5 +1,11 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.6.4**
+- **Follow along with anything read aloud.** The HUD has a new button while it's reading: it opens a card above it with the whole text, one sentence per line, the one being read lit up and the card scrolling with the voice. Hover over it to look ahead; it picks up the voice again when you move away. Handy for long answers you didn't select yourself.
+- **Speed it up or slow it down as it reads.** **−** and **+** on the card change the speed on the spot, from 0.6× to 2×, with every kind of voice. The card stays open for the next reading until you close it.
+- `vp speed 1.4` changes the speed from a terminal; `vp open reading` / `vp close reading` show or hide the text.
+- `vp ui` no longer reports a focused field after you've left the page it was on.
+
 **1.6.3**
 - **The command line keeps up by itself.** `vp` always runs the app's own version, so updating from the menu updates it too. Now the rest follows as well: the agent skill is refreshed at every launch, an agent you install later (say Codex) gets it automatically, and the Claude Code session hook follows the app. If you move Voice Pipes to another folder, `vp` is repointed at it; if that needs your password, Setup → Checks shows "vp points at a moved app" with a **Fix…** button.
 

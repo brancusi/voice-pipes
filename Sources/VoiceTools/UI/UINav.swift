@@ -133,6 +133,7 @@ struct FocusKeyModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear { take() }
+            .onDisappear { if let key, UINav.shared.focusedField == key { UINav.shared.focusedField = nil } }
             .onChange(of: UINav.shared.focus) { _, _ in take() }
             .onChange(of: focused.wrappedValue) { _, isFocused in
                 guard let key else { return }

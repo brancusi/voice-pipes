@@ -9,6 +9,8 @@ final class HUDController {
     private var panel: NSPanel?
     private weak var app: AppState?
     static let size = NSSize(width: 520, height: 66)
+    /// With the read-along card open above the tag.
+    static let expandedHeight: CGFloat = 340
 
     func attach(_ app: AppState) {
         self.app = app
@@ -17,24 +19,33 @@ final class HUDController {
 
     private func observe() {
         guard let app else { return }
-        let (visible, speaking) = withObservationTracking {
-            (app.run != nil, app.run?.phase == .speaking)
+        let (visible, speaking, expanded) = withObservationTracking {
+            (app.run != nil, app.run?.phase == .speaking, HUDView.expanded(app))
         } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
+        self.expanded = expanded
         visible ? show() : hide()
         // Clickable only while its buttons are showing; otherwise clicks go straight through.
         panel?.ignoresMouseEvents = !speaking
     }
 
+    private var expanded = false
+    private weak var screen: NSScreen?
+
     private func show() {
         guard let app else { return }
         let panel = self.panel ?? makePanel(app)
+        let appearing = !(panel.isVisible && panel.alphaValue > 0)
         self.panel = panel
-        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        // Pick the screen when the HUD appears; opening the card later grows it upwards on the same screen.
+        if appearing || screen == nil {
+            screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        }
         if let frame = screen?.visibleFrame {
+            let height = expanded ? Self.expandedHeight : Self.size.height
             panel.setFrame(NSRect(x: frame.midX - Self.size.width / 2, y: frame.minY + 14,
-                                  width: Self.size.width, height: Self.size.height), display: true)
+                                  width: Self.size.width, height: height), display: true)
         }
         panel.alphaValue = 1
         panel.orderFrontRegardless()
@@ -82,9 +93,20 @@ private final class FirstClickHostingView<Content: View>: NSHostingView<Content>
 struct HUDView: View {
     let app: AppState
 
+    /// The read-along card shows while something is being read and the card is open.
+    static func expanded(_ app: AppState) -> Bool {
+        app.readAlong && app.run?.phase == .speaking && !app.speaker.sentences.isEmpty
+    }
+
     var body: some View {
-        VStack {
+        let expanded = Self.expanded(app)
+        VStack(spacing: 6) {
             Spacer(minLength: 0)
+            if expanded {
+                ReadAlongCard(speaker: app.speaker)
+                    .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
+                    .transition(.opacity)
+            }
             if let run = app.run {
                 VStack(spacing: 3) {
                     content(run)
@@ -93,7 +115,7 @@ struct HUDView: View {
                 .transition(.opacity)
             }
         }
-        .frame(width: HUDController.size.width, height: HUDController.size.height)
+        .frame(width: HUDController.size.width, height: expanded ? HUDController.expandedHeight : HUDController.size.height)
         .animation(.easeOut(duration: 0.15), value: app.run?.phase)
     }
 
@@ -114,7 +136,8 @@ struct HUDView: View {
         case .speaking:
             let speaker = app.speaker
             let controls = PlaybackControls(paused: speaker.state == .paused, canPause: speaker.state != .loading,
-                                            onToggle: speaker.togglePause, onStop: speaker.clear)
+                                            onToggle: speaker.togglePause, onStop: speaker.clear,
+                                            expanded: app.readAlong, onExpand: { app.readAlong.toggle() })
             switch speaker.state {
             case .loading: HUDTag(state: .speaking, label: "VOICE", detail: "···", controls: controls)
             case .paused: HUDTag(state: .paused, label: "PAUSED", detail: "\(Int(speaker.progress * 100))%", controls: controls)
@@ -195,12 +218,18 @@ struct PlaybackControls: View {
     let canPause: Bool
     let onToggle: () -> Void
     let onStop: () -> Void
+    var expanded = false
+    var onExpand: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 2) {
             button(paused ? "play.fill" : "pause.fill", help: paused ? "Resume" : "Pause", action: onToggle)
                 .disabled(!canPause)
             button("stop.fill", help: "Stop", action: onStop)
+            if let onExpand {
+                button(expanded ? "chevron.down" : "text.alignleft", help: expanded ? "Hide the text" : "Follow along: show the text and speed",
+                       action: onExpand)
+            }
         }
     }
 
@@ -274,5 +303,85 @@ extension Color {
         self.init(red: Double((value >> 16) & 0xFF) / 255,
                   green: Double((value >> 8) & 0xFF) / 255,
                   blue: Double(value & 0xFF) / 255)
+    }
+}
+
+/// Above the HUD while reading aloud: the whole text a sentence per line, the one being read lit with a lavender
+/// bar (finished ones dimmed), following the voice. Hover to look ahead (following pauses until the pointer
+/// leaves); the speed changes live.
+struct ReadAlongCard: View {
+    let speaker: Speaker
+    @State private var hovering = false
+    private static let lavender = Color(hex: 0xC3A3D4)
+
+    var body: some View {
+        let current = speaker.currentSentence
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(speaker.sentences) { sentence in
+                            HStack(alignment: .top, spacing: 8) {
+                                Rectangle().fill(sentence.id == current ? Self.lavender : .clear).frame(width: 2)
+                                Text(sentence.text)
+                                    .foregroundStyle(sentence.id == current ? Palette.hudFG
+                                                     : sentence.id < current ? Palette.hudMuted.opacity(0.45) : Palette.hudFG.opacity(0.7))
+                                    .lineSpacing(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.top, sentence.opensParagraph ? 7 : 0)
+                            .id(sentence.id)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                }
+                .scrollIndicators(.never)
+                .onHover { hovering = $0 }
+                .onAppear { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
+                .onChange(of: current) { _, new in follow(proxy, to: new) }
+                .onChange(of: hovering) { _, now in if !now { follow(proxy, to: current) } }
+            }
+            Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
+            HStack(spacing: 8) {
+                Text(hovering ? "looking ahead · follows again when the pointer leaves" : speaker.voiceLabel)
+                    .foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 6)
+                speedButton("minus", help: "Slower") { speaker.setRate(speaker.rate - 0.1) }
+                    .disabled(speaker.rate <= 0.6)
+                Text(String(format: "%.1f×", speaker.rate)).foregroundStyle(Palette.hudFG).monospacedDigit().frame(width: 34)
+                speedButton("plus", help: "Faster") { speaker.setRate(speaker.rate + 0.1) }
+                    .disabled(speaker.rate >= 2)
+            }
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .padding(.horizontal, 10).frame(height: 26)
+        }
+        .font(.system(size: 12, design: .monospaced))
+        .background(
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Palette.hudBG)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.hudFG.opacity(0.14), lineWidth: 0.5))
+        .environment(\.colorScheme, .dark)
+        .frame(width: HUDController.size.width - 20)
+    }
+
+    private func follow(_ proxy: ScrollViewProxy, to sentence: Int) {
+        guard !hovering else { return }
+        withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(sentence, anchor: UnitPoint(x: 0, y: 0.3)) }
+    }
+
+    private func speedButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .frame(width: 20, height: 16)
+                .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudFG.opacity(0.14)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.hudFG)
+        .help(help)
     }
 }
