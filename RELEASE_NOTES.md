@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.3.0**
+- **Meet the Wrangler, in your menu bar.** The Voice Pipes cowboy now sits up there in his hat. While you're recording, he raises an arm and swings a lasso over his head, so you can tell at a glance that the mic is open.
+- **Light, dark or Auto.** Setup → Appearance: **Auto** follows your Mac, **Daylight** is always light, **Sundown** is always dark. Applies to the whole app, menu bar panel included; the HUD stays dark either way.
+
 **1.2.0**
 - **Sundown.** Voice Pipes now wears its own colours: desert-earth backgrounds with sunset accents (dusk blue, cloud lavender, sunset rose, marigold, sage), or warm bone paper and ink in light mode. Colours still mean the same things: transcription blue, transforms lavender, outputs green, recording red.
 - **A new icon.** Four organ pipes, slits and all, standing against a pixel sundown. Drawn pixel by pixel, so it stays sharp at every size. (Finder and the Dock can take a moment, or a restart, to pick it up.)

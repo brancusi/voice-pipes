@@ -9,6 +9,8 @@ struct VoiceToolsApp: App {
         // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
         BundleRename.migrateIfNeeded()
         _app = State(initialValue: AppState())
+        // Light, dark or Auto, as chosen in Setup → Appearance.
+        DispatchQueue.main.async { AppearanceChoice.apply() }
     }
 
     var body: some Scene {
@@ -26,11 +28,11 @@ struct VoiceToolsApp: App {
         .windowResizability(.contentMinSize)
     }
 
-    /// The pixel pipes, except while reading aloud (a speaker) or when something needs fixing (a warning).
-    /// An update waiting adds a dot until it's looked at.
+    /// The Wrangler: a bust in his hat, swinging a lasso while recording. A speaker while reading aloud, a warning
+    /// when something needs fixing; an update waiting adds a dot until it's looked at.
     @ViewBuilder private var menuBarIcon: some View {
         switch app.run?.phase {
-        case .recording: Image(nsImage: MenuBarGlyph.image(.recording))
+        case .recording: Image(nsImage: MenuBarGlyph.image(.lasso(app.lassoFrame)))
         case .speaking: Image(systemName: "speaker.wave.2.fill")
         default:
             if app.run == nil, app.worstCheck == .problem {

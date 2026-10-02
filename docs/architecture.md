@@ -38,7 +38,8 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `UI/HUD.swift` | The floating status tag (`NSPanel`, click-through). |
 | Updates | `Updates/Updates.swift` | Sparkle controller + 5-minute feed poll + notifications. |
 | | `Updates/Diagnostics.swift` | The Checks list, one-click permission fixes, the copyable report. |
-| | `UI/MenuBarGlyph.swift` | The menu bar icon: the pixel mark as an 18 × 18 template image (idle, recording, update). |
+| | `UI/MenuBarGlyph.swift` | The menu bar icon: the Wrangler as an 18 × 18 template image (idle, update, three lasso frames while recording). |
+| | `UI/SetupView.swift` | Setup: checks, connections and keys, on-device models, Appearance (Auto / Daylight / Sundown), updates. |
 | Tools | `Tools/` | Icon renderer (`make_icon.swift` paints the 32-px pixel mark into every iconset size), update-key generator, appcast writer, `jev.sh` (Jev from the shell). |
 
 ## How a track runs

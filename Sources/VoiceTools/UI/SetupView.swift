@@ -5,6 +5,7 @@ struct SetupView: View {
     let app: AppState
     @EnvironmentObject var updates: Updates
     private var catalog: OpenRouterCatalog { .shared }
+    @AppStorage(AppearanceChoice.defaultsKey) private var appearance = AppearanceChoice.auto.rawValue
 
     var body: some View {
         ScrollView {
@@ -12,6 +13,7 @@ struct SetupView: View {
                 checks
                 connections
                 onThisMac
+                appearanceSection
                 updatesSection
             }
             .padding(.horizontal, 32).padding(.vertical, 24)
@@ -114,6 +116,27 @@ struct SetupView: View {
                 }
             }
         }
+    }
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionLabel("Appearance")
+            Card {
+                HStack(spacing: 14) {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(AppearanceChoice.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 280)
+                    Text((AppearanceChoice(rawValue: appearance) ?? .auto).detail)
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    Spacer()
+                }
+                .padding(14)
+            }
+        }
+        .onChange(of: appearance) { _, value in AppearanceChoice.apply(AppearanceChoice(rawValue: value) ?? .auto) }
     }
 
     private var updatesSection: some View {

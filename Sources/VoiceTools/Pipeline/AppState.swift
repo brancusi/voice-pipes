@@ -44,7 +44,14 @@ struct ActiveRun {
 final class AppState {
     let store: TrackStore
     let speaker = Speaker()
-    private(set) var run: ActiveRun?
+    private(set) var run: ActiveRun? {
+        didSet {
+            if (run?.phase == .recording) != (oldValue?.phase == .recording) { updateLasso() }
+        }
+    }
+    /// The menu bar Wrangler's lasso frame while recording (stepped at 6 fps; still under Reduce Motion).
+    private(set) var lassoFrame = 0
+    @ObservationIgnored private var lassoTimer: Timer?
     let historyStore = HistoryStore()
     /// Every run's text, newest first, kept on disk.
     var history: [RunRecord] { historyStore.records }
@@ -247,6 +254,16 @@ final class AppState {
         }
         guard capture == nil else { return }
         start(track, mode: mode, label: label)
+    }
+
+    private func updateLasso() {
+        lassoTimer?.invalidate()
+        lassoTimer = nil
+        lassoFrame = 0
+        guard run?.phase == .recording, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        lassoTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 6, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.lassoFrame += 1 }
+        }
     }
 
     // MARK: - Running tracks

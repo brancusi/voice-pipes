@@ -191,3 +191,44 @@ extension StepKind {
         }
     }
 }
+
+/// Light, dark or follow the Mac. Applied app-wide (windows and the menu bar panel); the HUD stays dark regardless.
+enum AppearanceChoice: String, CaseIterable, Identifiable {
+    case auto, daylight, sundown
+
+    static let defaultsKey = "appearance"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: "Auto"
+        case .daylight: "Daylight"
+        case .sundown: "Sundown"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .auto: "Follows your Mac: Daylight by day, Sundown when macOS is dark."
+        case .daylight: "Always light: bone paper and ink."
+        case .sundown: "Always dark: desert earth and sunset accents."
+        }
+    }
+
+    private var appearance: NSAppearance? {
+        switch self {
+        case .auto: nil
+        case .daylight: NSAppearance(named: .aqua)
+        case .sundown: NSAppearance(named: .darkAqua)
+        }
+    }
+
+    static var current: AppearanceChoice {
+        UserDefaults.standard.string(forKey: defaultsKey).flatMap(AppearanceChoice.init) ?? .auto
+    }
+
+    @MainActor static func apply(_ choice: AppearanceChoice = current) {
+        NSApp.appearance = choice.appearance
+    }
+}

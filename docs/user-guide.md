@@ -102,11 +102,12 @@ Tip: if your first name comes out right and the surname doesn't, add and train t
 
 ## The menu bar icon
 
-Three little organ pipes behind a `›` prompt. They jump while you're recording, a dot appears when an update is
-waiting, a speaker shows while something is read aloud, and a warning triangle means Setup needs attention.
+The Wrangler, the Voice Pipes cowboy, in his hat. While you're recording he raises an arm and swings a lasso over
+his hat. A dot appears when an update is waiting, a speaker shows while something is read aloud, and a warning
+triangle means Setup needs attention.
 
-The app follows your Mac's appearance: **Sundown** (dark earth, sunset accents) or **Daylight** (bone paper and
-ink). The HUD stays dark either way.
+**Appearance** (Setup → Appearance): **Auto** follows your Mac, **Daylight** is always light (bone paper and ink),
+**Sundown** is always dark (desert earth, sunset accents). The HUD stays dark either way.
 
 ## The HUD
 
