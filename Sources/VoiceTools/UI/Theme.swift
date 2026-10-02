@@ -265,6 +265,13 @@ enum AppearanceChoice: String, CaseIterable, Identifiable {
     }
 
     @MainActor static func apply(_ choice: AppearanceChoice = current) {
-        NSApp.appearance = choice.appearance
+        NSApp?.appearance = choice.appearance
+    }
+
+    /// Records the choice (config.toml's settings.appearance is the source) and applies it.
+    @MainActor static func store(_ choice: AppearanceChoice) {
+        guard UserDefaults.standard.string(forKey: defaultsKey) != choice.rawValue || NSApp?.appearance != choice.appearance else { return }
+        UserDefaults.standard.set(choice.rawValue, forKey: defaultsKey)
+        apply(choice)
     }
 }

@@ -1,5 +1,5 @@
 {
-  "originHash" : "2aaac98c638793a1abbc57e54f64ffe912d788a25990757617f5873b96e746ad",
+  "originHash" : "4e1dbbd1b759367ca1025643d2d33e704de74c350a29495377189dda6b159f88",
   "pins" : [
     {
       "identity" : "fluidaudio",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "eef1a539a373c1f1a320624b1130fc5de7b2e100",
         "version" : "2.10.0"
+      }
+    },
+    {
+      "identity" : "tomldecoder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dduan/TOMLDecoder",
+      "state" : {
+        "revision" : "a2bbd2796fe3064e107de18cb56031052c4fa899",
+        "version" : "0.4.5"
       }
     }
   ],

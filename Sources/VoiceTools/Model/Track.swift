@@ -4,6 +4,9 @@ import Foundation
 /// each step consuming the previous step's output.
 struct Track: Codable, Identifiable, Hashable {
     var id = UUID()
+    /// The track's stable name in config.toml and the CLI (`fast-dictation`). Nil in tracks saved before 1.6.0;
+    /// derived from the name then.
+    var slug: String?
     var name: String
     var colorHex: String
     var enabled = true

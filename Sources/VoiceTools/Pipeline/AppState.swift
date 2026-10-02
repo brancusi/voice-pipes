@@ -97,6 +97,8 @@ final class AppState {
         historyStore = history ?? HistoryStore()
         needsOnboarding = startServices && Onboarding.shouldShow(freshInstall: self.store.createdFresh)
         guard startServices else { return }
+        self.store.onIssuesChanged = { [weak self] in self?.refreshChecks() }
+        VocabularyStore.shared.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         hud.attach(self)
         observeTracks()
         Task { await prepare() }
@@ -222,7 +224,7 @@ final class AppState {
                 let granted = switch fix {
                 case .accessibilitySettings: AXIsProcessTrusted()
                 case .microphoneSettings: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-                case .editTracks: true
+                case .editTracks, .openConfig: true
                 }
                 if granted { break }
             }

@@ -10,7 +10,7 @@ struct Check: Identifiable {
     }
 
     /// Something the user can click to fix it.
-    enum Fix { case microphoneSettings, accessibilitySettings, editTracks }
+    enum Fix { case microphoneSettings, accessibilitySettings, editTracks, openConfig }
 
     let id = UUID()
     let level: Level
@@ -32,7 +32,8 @@ struct Check: Identifiable {
 @MainActor
 enum Diagnostics {
     static func run(_ app: AppState) async -> [Check] {
-        var checks: [Check] = []
+        var checks: [Check] = configChecks(app.store.issues, file: app.store.configURL)
+            + configChecks(VocabularyStore.shared.issues, file: ConfigPaths.vocabulary)
         let tracks = app.store.tracks.filter(\.enabled)
         let steps = tracks.flatMap(\.steps).map(\.kind)
 
@@ -134,8 +135,29 @@ enum Diagnostics {
     /// Fixes a missing permission in one click. An entry left by an older build (signed differently) shows as
     /// switched on but doesn't apply to this one, and macOS won't ask again while it exists, so clear this app's
     /// entry first; macOS then asks afresh and lists the app as it is now.
+    /// config.toml / vocabulary.toml problems: one check for errors (the file isn't applied) and one for warnings.
+    static func configChecks(_ issues: [ConfigIssue], file: URL) -> [Check] {
+        let name = file.lastPathComponent
+        var checks: [Check] = []
+        let errors = issues.filter { $0.severity == .error }, warnings = issues.filter { $0.severity == .warning }
+        if !errors.isEmpty {
+            checks.append(Check(level: .problem, title: "\(name) not applied",
+                                detail: errors.prefix(3).map(\.description).joined(separator: "\n")
+                                    + (errors.count > 3 ? "\n…and \(errors.count - 3) more. `vp config check` lists them." : "")
+                                    + "\nThe last good version is still running.",
+                                fix: .openConfig))
+        }
+        if !warnings.isEmpty {
+            checks.append(Check(level: .warning, title: "\(name): \(warnings.count) warning\(warnings.count == 1 ? "" : "s")",
+                                detail: warnings.prefix(3).map(\.description).joined(separator: "\n"), fix: .openConfig))
+        }
+        return checks
+    }
+
     static func fix(_ fix: Check.Fix) async {
         switch fix {
+        case .openConfig:
+            NSWorkspace.shared.open(ConfigPaths.config)
         case .accessibilitySettings:
             resetPermission("Accessibility")
             TextCapture.promptForAccessibility()

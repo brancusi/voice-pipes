@@ -16,38 +16,93 @@ struct VocabularyEntry: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey { case id, write, heardAs, alwaysExact }
 }
 
-/// The shared word list, saved next to the tracks so it can also be edited by hand.
+/// The shared word list, in ~/.config/voice-pipes/vocabulary.toml beside config.toml. Edits from outside the app
+/// apply within a second; a file that doesn't check out keeps the last good list and reports `issues`.
 @MainActor
 @Observable
 final class VocabularyStore {
     static let shared = VocabularyStore()
 
     var entries: [VocabularyEntry] {
-        didSet { save() }
+        didSet { if !applyingFile { save() } }
     }
 
-    private let fileURL = TrackStore.defaultURL.deletingLastPathComponent().appendingPathComponent("vocabulary.json")
+    private(set) var issues: [ConfigIssue] = []
+    @ObservationIgnored var onIssuesChanged: () -> Void = {}
 
-    private init() {
-        if let data = try? Data(contentsOf: fileURL), let decoded = try? JSONDecoder().decode([VocabularyEntry].self, from: data) {
-            entries = decoded
+    @ObservationIgnored private let fileURL: URL
+    @ObservationIgnored private let legacyURL = TrackStore.defaultURL.deletingLastPathComponent().appendingPathComponent("vocabulary.json")
+    @ObservationIgnored private var applyingFile = false
+    @ObservationIgnored private var diskText: String?
+    @ObservationIgnored private var watcher: FileWatcher?
+
+    static let starters = [
+        VocabularyEntry(write: "Claude Code", heardAs: ["cloud code", "clawed code"]),
+        VocabularyEntry(write: "OpenRouter", heardAs: ["open router"]),
+        VocabularyEntry(write: "FluidAudio", heardAs: ["fluid audio"]),
+    ]
+
+    init(fileURL: URL = ConfigPaths.vocabulary, watch: Bool = true) {
+        self.fileURL = fileURL
+        let cached = (try? Data(contentsOf: legacyURL)).flatMap { try? JSONDecoder().decode([VocabularyEntry].self, from: $0) }
+        if let text = try? String(contentsOf: fileURL, encoding: .utf8) {
+            diskText = text
+            let result = VocabularyFile.parse(text)
+            entries = result.entries ?? cached ?? Self.starters
+            issues = result.errors + result.warnings
         } else {
-            entries = [
-                VocabularyEntry(write: "Claude Code", heardAs: ["cloud code", "clawed code"]),
-                VocabularyEntry(write: "OpenRouter", heardAs: ["open router"]),
-                VocabularyEntry(write: "FluidAudio", heardAs: ["fluid audio"]),
-            ]
+            // 1.6.0: the list moves from vocabulary.json to vocabulary.toml, once (the JSON stays as a last-good copy).
+            entries = cached ?? Self.starters
             save()
         }
+        if watch { watcher = FileWatcher(fileURL) { [weak self] in self?.reloadFromDisk() } }
     }
 
     /// The spellings, for handing to an LLM as a glossary.
     var glossary: [String] { entries.map(\.write).filter { !$0.isEmpty } }
 
+    func reloadFromDisk() {
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8), text != diskText else { return }
+        if let previous = diskText { ConfigBackups.save(previous, of: fileURL, in: backupsURL) }
+        diskText = text
+        let result = VocabularyFile.parse(text)
+        if let parsed = result.entries {
+            applyingFile = true
+            entries = parsed
+            applyingFile = false
+            writeCache()
+        }
+        setIssues(result.errors + result.warnings)
+    }
+
+    private var backupsURL: URL { fileURL.deletingLastPathComponent().appendingPathComponent("backups", isDirectory: true) }
+
+    private func setIssues(_ new: [ConfigIssue]) {
+        guard new != issues else { return }
+        issues = new
+        onIssuesChanged()
+    }
+
     private func save() {
+        let text = VocabularyFile.write(entries)
+        guard text != diskText else { return }
+        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let previous = diskText { ConfigBackups.save(previous, of: fileURL, minimumGap: 60, in: backupsURL) }
+        do {
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            diskText = text
+            watcher?.noteWrite(fileURL)
+            writeCache()
+            setIssues([])
+        } catch {
+            NSLog("VoiceTools: failed to save vocabulary.toml: \(error)")
+        }
+    }
+
+    private func writeCache() {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try? encoder.encode(entries).write(to: fileURL, options: .atomic)
+        try? encoder.encode(entries).write(to: legacyURL, options: .atomic)
     }
 }
 

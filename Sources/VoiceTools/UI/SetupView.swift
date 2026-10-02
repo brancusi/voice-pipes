@@ -51,7 +51,7 @@ struct SetupView: View {
                         }
                         Spacer()
                         if let fix = check.fix, fix != .editTracks {
-                            Button("Fix…") { app.fix(fix) }.buttonStyle(.vpGhost)
+                            Button(fix == .openConfig ? "Open file…" : "Fix…") { app.fix(fix) }.buttonStyle(.vpGhost)
                         }
                     }
                     .padding(.horizontal, 14).padding(.vertical, 9)
@@ -143,7 +143,10 @@ struct SetupView: View {
                 .padding(16)
             }
         }
-        .onChange(of: appearance) { _, value in AppearanceChoice.apply(AppearanceChoice(rawValue: value) ?? .auto) }
+        .onChange(of: appearance) { _, value in
+            AppearanceChoice.apply(AppearanceChoice(rawValue: value) ?? .auto)
+            app.store.saveConfig()  // settings.appearance in config.toml
+        }
     }
 
     private var updatesSection: some View {
