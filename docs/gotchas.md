@@ -110,3 +110,8 @@ AppKit controls but drops SwiftUI text. Good enough to check layout, not looks.
 - MLX Swift (for a local LLM) needs its Metal shaders compiled, which SwiftPM can't do without Xcode; CI runners
   have Xcode, or llama.cpp (which embeds its Metal library) is the alternative.
 - `swift build` caches aggressively; a "Build complete" in ~2 s after edits is normal.
+
+**CI's Swift is stricter than the local toolchain.** 1.1.2's first tag failed on CI with `cannot convert value of
+type 'Substring' to expected argument type 'String'` for `string + key.suffix(4)`, which built locally. → Wrap
+`prefix`/`suffix` results in `String(…)` when concatenating. A failed tag publishes nothing, so fixing and
+force-moving the tag is safe (check `gh release view v<VERSION> -R brancusi/voice-tools-releases` first).
