@@ -332,7 +332,8 @@ final class AppState {
             }
         }
         unavailableCombos = hotkeys.register(bindings)
-        // register() replaced every hotkey, including a recording's Esc.
+        // register() replaced every hotkey, including a reading's shortcuts and a recording's Esc.
+        if readingShortcutsOn { setReadingShortcuts(true) }
         if capture != nil || agentRecording {
             cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
                 if pressed { self?.cancelCapture() }
@@ -582,6 +583,38 @@ final class AppState {
         case .openRouterSpeech(_, let voice, _): OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first
         case .speak(let id, _): id.flatMap { AVSpeechSynthesisVoice(identifier: $0)?.name }
         default: nil
+        }
+    }
+
+    // MARK: Steering a reading
+
+    /// One reading action, from the HUD's keys, a global shortcut or `vp next` / `vp prev` / `vp speed`.
+    func readingAction(_ action: ReadingSettings.Action) {
+        switch action {
+        case .stop: speaker.clear()
+        case .pause: speaker.togglePause()
+        case .next: speaker.seek(toSentence: min(speaker.currentSentence + 1, max(0, speaker.sentences.count - 1)))
+        case .previous: speaker.seek(toSentence: max(0, speaker.currentSentence - 1))
+        case .slower: speaker.setRate(speaker.rate - 0.1)
+        case .faster: speaker.setRate(speaker.rate + 0.1)
+        case .start: speaker.seek(toSentence: 0)
+        case .end: speaker.seek(toSentence: max(0, speaker.sentences.count - 1))
+        }
+    }
+
+    @ObservationIgnored private var readingShortcutIDs: [UInt32] = []
+    @ObservationIgnored private var readingShortcutsOn = false
+
+    /// [settings.reading.global]: registered only while something is being read.
+    func setReadingShortcuts(_ on: Bool) {
+        readingShortcutsOn = on
+        readingShortcutIDs.forEach { hotkeys.remove($0) }
+        readingShortcutIDs = []
+        guard on else { return }
+        for (action, combo) in store.reading.global {
+            if let id = hotkeys.add(combo, { [weak self] pressed in if pressed { self?.readingAction(action) } }) {
+                readingShortcutIDs.append(id)
+            }
         }
     }
 

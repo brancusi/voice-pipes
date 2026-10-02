@@ -23,6 +23,10 @@ enum VPCommands {
                         let value = try parsed.positional(0, "speed", usage: "vp speed 1.3")
                         out.emit(Out(any: try AppClient.request("speed", ["speed": value], launch: false)))
                     }),
+        CommandSpec(name: "next", usage: "vp next", summary: "Jump to the next sentence of what's being read",
+                    handler: { _, out in out.emit(Out(any: try AppClient.request("reading", ["action": "next"], launch: false))) }),
+        CommandSpec(name: "prev", usage: "vp prev", summary: "Jump back a sentence in what's being read",
+                    handler: { _, out in out.emit(Out(any: try AppClient.request("reading", ["action": "previous"], launch: false))) }),
         CommandSpec(name: "stop", usage: "vp stop", summary: "Stop speaking or recording", handler: { _, out in try simple("stop", out) }),
         CommandSpec(name: "pause", usage: "vp pause", summary: "Pause reading aloud", handler: { _, out in try simple("pause", out) }),
         CommandSpec(name: "resume", usage: "vp resume", summary: "Resume reading aloud", handler: { _, out in try simple("resume", out) }),

@@ -6,7 +6,8 @@ import SwiftUI
 /// you're in, and fades out as soon as a run is done.
 @MainActor
 final class HUDController {
-    private var panel: NSPanel?
+    private var panel: HUDPanel?
+    private var tracker: PointerTracker?
     private weak var app: AppState?
     static let size = NSSize(width: 520, height: 66)
     /// With the read-along card open above the tag.
@@ -28,6 +29,83 @@ final class HUDController {
         visible ? show() : hide()
         // Clickable only while its buttons are showing; otherwise clicks go straight through.
         panel?.ignoresMouseEvents = !speaking
+        // The keyboard while reading: taken at once in "always" mode; given back when the reading ends.
+        if speaking != wasSpeaking {
+            wasSpeaking = speaking
+            app.setReadingShortcuts(speaking)
+            if speaking, app.store.reading.takeKeys == .always { takeKeys(.reading) } else if !speaking { releaseKeys() }
+        }
+    }
+
+    // MARK: The keyboard while reading
+
+    private var wasSpeaking = false
+    private var keysReason: HUDKeys.Reason?
+    /// The app you were in, to give the keys back to.
+    private weak var previousApp: NSRunningApplication?
+    private var pointerAtShow: NSPoint?
+    private var releasing = false
+
+    private var reading: ReadingSettings { app?.store.reading ?? ReadingSettings() }
+    private var isSpeaking: Bool { app?.run?.phase == .speaking }
+
+    /// Makes the HUD the key window without activating Voice Pipes: the app you're in stays in front.
+    private func takeKeys(_ reason: HUDKeys.Reason) {
+        guard let panel, isSpeaking, reading.takeKeys != .never else { return }
+        if keysReason == nil || reason != .hover { keysReason = reason }
+        guard !panel.isKeyWindow else { return }
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
+        panel.acceptsKeys = true
+        panel.makeKey()
+        HUDKeys.shared.active = true
+    }
+
+    /// Gives the keyboard back to the app you were in.
+    private func releaseKeys() {
+        guard let panel else { return }
+        keysReason = nil
+        HUDKeys.shared.active = false
+        guard panel.isKeyWindow else { panel.acceptsKeys = false; return }
+        releasing = true
+        panel.acceptsKeys = false
+        if let previousApp, !previousApp.isTerminated {
+            previousApp.activate()
+        } else {
+            NSApp.mainWindow?.makeKey()
+        }
+    }
+
+    /// Clicking elsewhere took the keys: maybe stop the reading too (Setup → Reading).
+    private func keysResigned() {
+        let ours = releasing
+        releasing = false
+        panel?.acceptsKeys = false
+        keysReason = nil
+        HUDKeys.shared.active = false
+        if !ours, isSpeaking, reading.clickAway == .stop { app?.speaker.clear() }
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        guard HUDKeys.shared.active else { return false }
+        // A ⌘ shortcut isn't for the HUD (and must never reach Voice Pipes' menu, ⌘Q): give the keys back.
+        if event.modifierFlags.contains(.command) {
+            releaseKeys()
+            return true
+        }
+        if let action = reading.action(for: event) { app?.readingAction(action) }
+        return true  // other keys are swallowed while the HUD has the keyboard, rather than beeping
+    }
+
+    private func pointerMoved(inside: Bool) {
+        guard reading.takeKeys == .hover || reading.takeKeys == .always else { return }
+        if inside {
+            // Only when the pointer moves onto it: the card appearing under a resting pointer doesn't count.
+            guard NSEvent.mouseLocation != pointerAtShow else { return }
+            takeKeys(.hover)
+        } else if keysReason == .hover {
+            releaseKeys()
+        }
     }
 
     private var expanded = false
@@ -47,6 +125,7 @@ final class HUDController {
             panel.setFrame(NSRect(x: frame.midX - Self.size.width / 2, y: frame.minY + 14,
                                   width: Self.size.width, height: height), display: true)
         }
+        if appearing { pointerAtShow = NSEvent.mouseLocation }
         panel.alphaValue = 1
         panel.orderFrontRegardless()
     }
@@ -64,7 +143,7 @@ final class HUDController {
         }
     }
 
-    private func makePanel(_ app: AppState) -> NSPanel {
+    private func makePanel(_ app: AppState) -> HUDPanel {
         let panel = HUDPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless],
                              backing: .buffered, defer: false)
         panel.becomesKeyOnlyIfNeeded = true
@@ -74,15 +153,58 @@ final class HUDController {
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.contentView = FirstClickHostingView(rootView: HUDView(app: app))
+        let host = FirstClickHostingView(rootView: HUDView(app: app))
+        panel.contentView = host
+        panel.onKey = { [weak self] event in self?.handleKey(event) ?? false }
+        panel.onClick = { [weak self] in
+            guard let self, self.reading.takeKeys != .never else { return }
+            self.takeKeys(.click)
+        }
+        // Tracks the pointer even though Voice Pipes isn't the active app (SwiftUI's hover only works when it is).
+        let tracker = PointerTracker { [weak self] inside in self?.pointerMoved(inside: inside) }
+        self.tracker = tracker
+        host.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+                                            owner: tracker))
+        NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keysResigned() }
+        }
         return panel
     }
 }
 
-/// Never key or main, so clicking the HUD leaves the keyboard focus in the app you were using.
+/// Never main, and key only while it has taken the keys for a reading (a non-activating panel, so the app you're
+/// in stays the active app). Key presses and clicks go to the controller first.
 private final class HUDPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
+    var acceptsKeys = false
+    var onKey: ((NSEvent) -> Bool)?
+    var onClick: (() -> Void)?
+
+    override var canBecomeKey: Bool { acceptsKeys }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, onKey?(event) == true { return }
+        if event.type == .leftMouseDown { onClick?() }
+        super.sendEvent(event)
+    }
+}
+
+/// Whether the HUD has the keyboard, for its "keys on" marker.
+@MainActor @Observable
+final class HUDKeys {
+    static let shared = HUDKeys()
+    enum Reason { case reading, hover, click }
+    var active = false
+}
+
+/// Enter/exit/move over the HUD, delivered even while another app is active.
+private final class PointerTracker: NSObject {
+    let onChange: (Bool) -> Void
+    private var inside = false
+    init(onChange: @escaping (Bool) -> Void) { self.onChange = onChange }
+    @objc func mouseEntered(with event: NSEvent) { inside = true; onChange(true) }
+    @objc func mouseMoved(with event: NSEvent) { if inside { onChange(true) } }
+    @objc func mouseExited(with event: NSEvent) { inside = false; onChange(false) }
 }
 
 /// Buttons respond to the first click even though the HUD is never the active window.
@@ -98,12 +220,24 @@ struct HUDView: View {
         app.readAlong && app.run?.phase == .speaking && !app.speaker.sentences.isEmpty
     }
 
+    /// "⎋ stop · Space pause · J/K sentence · H/L speed", from the keys you've set (first key of each).
+    static func keysHint(_ reading: ReadingSettings) -> String {
+        func key(_ action: ReadingSettings.Action) -> String? { reading.keys[action]?.first?.display }
+        func pair(_ a: ReadingSettings.Action, _ b: ReadingSettings.Action) -> String? {
+            guard let x = key(a), let y = key(b) else { return key(a) ?? key(b) }
+            return "\(x)/\(y)"
+        }
+        return [key(.stop).map { "\($0) stop" }, key(.pause).map { "\($0) pause" },
+                pair(.next, .previous).map { "\($0) sentence" }, pair(.slower, .faster).map { "\($0) speed" }]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
     var body: some View {
         let expanded = Self.expanded(app)
         VStack(spacing: 6) {
             Spacer(minLength: 0)
             if expanded {
-                ReadAlongCard(speaker: app.speaker)
+                ReadAlongCard(speaker: app.speaker, keysHint: Self.keysHint(app.store.reading))
                     .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
                     .transition(.opacity)
             }
@@ -175,6 +309,12 @@ struct HUDTag: View {
                 BlinkingCursor()
             }
             if let controls { controls.padding(.leading, 2) }
+            if controls != nil, HUDKeys.shared.active {
+                Text("KEYS").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Color(hex: 0xC3A3D4))
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color(hex: 0xC3A3D4).opacity(0.7), lineWidth: 1))
+                    .help("The HUD has the keyboard; Esc stops, move away or click elsewhere to give it back")
+            }
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
         .tracking(0.4)
@@ -311,6 +451,7 @@ extension Color {
 /// leaves); the speed changes live.
 struct ReadAlongCard: View {
     let speaker: Speaker
+    var keysHint = ""
     @State private var hovering = false
     private static let lavender = Color(hex: 0xC3A3D4)
 
@@ -337,8 +478,14 @@ struct ReadAlongCard: View {
             }
             Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
             HStack(spacing: 8) {
-                Text(hovering ? "click a sentence to read from there" : speaker.voiceLabel)
-                    .foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
+                if HUDKeys.shared.active {
+                    // The HUD has the keyboard: say so, and which keys do what.
+                    (Text("KEYS ON").foregroundColor(Self.lavender).bold() + Text("  " + keysHint).foregroundColor(Palette.hudMuted))
+                        .lineLimit(1).truncationMode(.tail)
+                } else {
+                    Text(hovering ? "click a sentence to read from there" : speaker.voiceLabel)
+                        .foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
+                }
                 Spacer(minLength: 6)
                 speedButton("minus", help: "Slower") { speaker.setRate(speaker.rate - 0.1) }
                     .disabled(speaker.rate <= 0.6)

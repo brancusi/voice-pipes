@@ -111,6 +111,14 @@ extension AppState {
             reply.result(uiState())
         case "ui":
             reply.result(uiState())
+        case "reading":
+            guard let name = args["action"] as? String, let action = ReadingSettings.Action(rawValue: name) else {
+                throw AgentError("bad_value", "Unknown reading action.", hint: "vp next | vp prev")
+            }
+            guard speaker.state != .idle else { throw AgentError("not_speaking", "Nothing is being read aloud.", hint: "vp say \"…\"") }
+            readingAction(action)
+            try await Task.sleep(nanoseconds: 150_000_000)
+            reply.result(["sentence": speaker.currentSentence + 1, "of": speaker.sentences.count, "speed": Double(speaker.rate)])
         case "speed":
             guard let value = (args["speed"] as? Double) ?? (args["speed"] as? String).flatMap(Double.init), (0.6...2.0).contains(value) else {
                 throw AgentError("bad_value", "Speed is 0.6 to 2.0.", hint: "vp speed 1.3")

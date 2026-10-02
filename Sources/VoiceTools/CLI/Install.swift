@@ -266,7 +266,9 @@ enum AgentsInstaller {
         2. `vp open reading` (shows the follow-along card), then pipe the text in: `printf '%s' "$TEXT" | vp say`.
            `vp say` returns when the reading ends, whether it finished, was stopped or the user jumped around.
         3. Don't talk over it: wait for `vp say` to return before speaking or asking anything else.
-        - The user controls it from the HUD; you can too: `vp speed <0.6–2.0>`, `vp pause`, `vp resume`, `vp stop`.
+        - The user controls it from the HUD (and its keys: by default Esc stops, Space pauses, j/k move by sentence,
+          h/l change speed; they set when the HUD takes the keyboard in Setup → Reading). You can too:
+          `vp next`, `vp prev`, `vp speed <0.6–2.0>`, `vp pause`, `vp resume`, `vp stop`.
         - `vp close reading` hides the card for later readings (the user's choice is remembered either way).
         - Keep spoken text short and plain: no markdown, code or URLs; they are read out literally.
 

@@ -170,6 +170,15 @@ voice again when the pointer leaves.
 stays open for later readings until you close it (˅). From a terminal: `vp open reading`, `vp close reading`,
 `vp speed 1.4`.
 
+**Keys while reading.** The HUD can take the keyboard without bringing Voice Pipes forward: by default when you
+point at it or click it (it doesn't count if the HUD appears under a resting pointer); **Setup → Reading** sets
+*Always* (from the moment reading starts), *Point or click*, *Click* or *Never*, and whether clicking away keeps
+reading or stops. While it has the keys (**KEYS ON** shows in the HUD): Esc stop, Space pause, j/↓ next sentence,
+k/↑ previous, h/− slower, l/= faster, g start, G end. Change any of them there or in config.toml
+`[settings.reading]`; `[settings.reading.global]` adds shortcuts that work in any app, only while something is
+read (none by default; include ⌃, ⌥ or ⌘). A ⌘ shortcut gives the keys back. `vp next`, `vp prev`, `vp speed`
+do the same from a terminal.
+
 Under the tag, a second line names the model answering, once an LLM or Route step has run: for Route · Jev, the
 route, its model, and Jev's time and confidence, e.g. `quick → claude-haiku-4.5 · Jev 262 ms 100%`.
 

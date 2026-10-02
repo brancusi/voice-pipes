@@ -4,6 +4,7 @@ import TOMLDecoder
 /// Everything config.toml holds: settings and tracks. (Vocabulary is in vocabulary.toml beside it.)
 struct AppConfig: Equatable {
     var appearance: AppearanceChoice = .auto
+    var reading = ReadingSettings()
     var tracks: [Track]
 }
 
@@ -286,10 +287,16 @@ enum ConfigFile {
             top.error("version", "is \(v), but this Voice Pipes reads version \(version)")
         }
         var appearance = AppearanceChoice.auto
+        var reading = ReadingSettings()
         if case .table(let settingsTable)? = top.raw("settings") {
             var settings = TableReader(settingsTable, path: "settings")
             if let a = settings.choice("appearance", AppearanceChoice.allCases.map(\.rawValue)) { appearance = AppearanceChoice(rawValue: a) ?? .auto }
-            settings.finish(known: ["appearance"])
+            if case .table(let readingTable)? = settings.raw("reading") {
+                var r = TableReader(readingTable, path: "settings.reading")
+                reading = readReading(&r)
+                settings.issues += r.issues
+            }
+            settings.finish(known: ["appearance", "reading"])
             top.issues += settings.issues
         } else if root["settings"] != nil {
             top.error("settings", "should be a table: [settings]")
@@ -314,7 +321,47 @@ enum ConfigFile {
 
         let errors = top.issues.filter { $0.severity == .error }
         let warnings = top.issues.filter { $0.severity == .warning }
-        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, tracks: tracks) : nil, errors: errors, warnings: warnings)
+        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, reading: reading, tracks: tracks) : nil, errors: errors, warnings: warnings)
+    }
+
+    /// [settings.reading]: when the HUD takes the keyboard, click-away, its keys, and [settings.reading.global].
+    private static func readReading(_ r: inout TableReader) -> ReadingSettings {
+        var reading = ReadingSettings()
+        if let take = r.choice("take_keys", ReadingSettings.TakeKeys.allCases.map(\.rawValue)) {
+            reading.takeKeys = ReadingSettings.TakeKeys(rawValue: take) ?? .hover
+        }
+        if let away = r.choice("click_away", ReadingSettings.ClickAway.allCases.map(\.rawValue)) {
+            reading.clickAway = ReadingSettings.ClickAway(rawValue: away) ?? .keepReading
+        }
+        for action in ReadingSettings.Action.allCases {
+            guard let names = r.strings(action.rawValue) else { continue }
+            var combos: [KeyCombo] = []
+            for name in names {
+                do { combos.append(try KeyNames.parse(name)) } catch { r.error(action.rawValue, "'\(name)' \(error)") }
+            }
+            reading.keys[action] = combos
+        }
+        if case .table(let globalTable)? = r.raw("global") {
+            var g = TableReader(globalTable, path: "settings.reading.global")
+            for action in ReadingSettings.Action.allCases {
+                guard let name = g.string(action.rawValue), !name.isEmpty else { continue }
+                do {
+                    let combo = try KeyNames.parse(name)
+                    let formatted = KeyNames.format(combo)
+                    let functionKey = formatted.count > 1 && formatted.first == "f" && formatted.dropFirst().allSatisfy(\.isNumber)
+                    if combo.modifiers.isEmpty, !functionKey {
+                        g.warning(action.rawValue, "'\(name)' has no modifier, so it would take that key from every app while reading; add control, option or command")
+                    }
+                    reading.global[action] = combo
+                } catch {
+                    g.error(action.rawValue, "'\(name)' \(error)")
+                }
+            }
+            g.finish(known: ReadingSettings.Action.allCases.map(\.rawValue))
+            r.issues += g.issues
+        }
+        r.finish(known: ["take_keys", "click_away", "global"] + ReadingSettings.Action.allCases.map(\.rawValue))
+        return reading
     }
 
     static func syntaxIssue(_ error: Error) -> ConfigIssue {
@@ -513,6 +560,7 @@ enum ConfigFile {
         out += "version = \(version)\n\n"
         out += "[settings]\n"
         out += "appearance = \(quote(config.appearance.rawValue))  # auto (follow macOS) | daylight | sundown\n"
+        out += writeReading(config.reading)
         for track in tracks { out += "\n" + write(track) }
         out += "\n" + reference
         return out
@@ -537,6 +585,26 @@ enum ConfigFile {
             out += "]\n"
         }
         for step in track.steps { out += "\n" + write(step.kind, table: "track.step", indent: "  ") }
+        return out
+    }
+
+    /// Reading controls: every action listed with its keys, so the defaults are visible and easy to change.
+    private static func writeReading(_ reading: ReadingSettings) -> String {
+        var out = "\n[settings.reading]  # steering anything read aloud from the keyboard\n"
+        out += "take_keys = \(quote(reading.takeKeys.rawValue))  # when the HUD takes the keys: always | hover (point at or click it) | click | never\n"
+        out += "click_away = \(quote(reading.clickAway.rawValue))  # keep-reading | stop\n"
+        out += "# Keys while the HUD has the keyboard (a list each; plain keys are fine, they only work then):\n"
+        for action in ReadingSettings.Action.allCases {
+            let names = (reading.keys[action] ?? []).map { quote(KeyNames.format($0)) }.joined(separator: ", ")
+            out += "\(action.rawValue) = [\(names)]\n"
+        }
+        out += "\n[settings.reading.global]  # work in any app, only while something is being read; none by default\n"
+        if reading.global.isEmpty {
+            out += "# e.g. faster = \"control+option+right\"   slower = \"control+option+left\"   stop = \"control+option+escape\"\n"
+        }
+        for action in ReadingSettings.Action.allCases {
+            if let combo = reading.global[action] { out += "\(action.rawValue) = \(quote(KeyNames.format(combo)))\n" }
+        }
         return out
     }
 

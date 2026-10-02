@@ -12,6 +12,11 @@ final class TrackStore {
         didSet { if !applyingFile { save() } }
     }
 
+    /// Keyboard control while reading ([settings.reading]); Setup edits it, the file can too.
+    var reading = ReadingSettings() {
+        didSet { if !applyingFile, reading != oldValue { save() } }
+    }
+
     /// Problems in config.toml as of its last read: errors (not applied) and warnings (applied).
     private(set) var issues: [ConfigIssue] = []
     /// Called when `issues` changes (AppState re-runs its checks).
@@ -40,6 +45,7 @@ final class TrackStore {
         var text: String?
         var found: [ConfigIssue] = []
         var fresh = false
+        var loadedReading = ReadingSettings()
         let disk = DiskText.read(configURL)
         switch disk {
         case .text(let content):
@@ -48,6 +54,7 @@ final class TrackStore {
             if let config = result.config {
                 loaded = config.tracks
                 AppearanceChoice.store(config.appearance)
+                loadedReading = config.reading
             } else {
                 // A broken file at launch: run the last good tracks and leave the file for its author to fix.
                 loaded = cached ?? Track.defaults
@@ -88,6 +95,7 @@ final class TrackStore {
         ConfigFile.assignSlugs(&loaded)
         let changed = migrated || loaded != before
         tracks = loaded
+        reading = loadedReading
         issues = found
         diskText = text
         createdFresh = fresh
@@ -132,6 +140,9 @@ final class TrackStore {
             tracks = updated
             applyingFile = false
             AppearanceChoice.store(config.appearance)
+            applyingFile = true
+            reading = config.reading
+            applyingFile = false
             writeCache()
             if !changes.isEmpty { onExternalChanges(changes) }
         }
@@ -251,7 +262,7 @@ final class TrackStore {
             tracks = slugged
             applyingFile = false
         }
-        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, tracks: tracks))
+        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, reading: reading, tracks: tracks))
         guard text != diskText else { return }
         do {
             try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)

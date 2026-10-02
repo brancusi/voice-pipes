@@ -16,6 +16,7 @@ struct SetupView: View {
                     VPSection("Command line and agents") { Card { CommandLineCard() } }.vpSetupSection("cli")
                     onThisMac.vpSetupSection("models")
                     appearanceSection.vpSetupSection("appearance")
+                    ReadingSettingsSection(app: app).vpSetupSection("reading")
                     updatesSection.vpSetupSection("updates")
                 }
                 .padding(.horizontal, 32).padding(.vertical, 24)
@@ -33,7 +34,7 @@ struct SetupView: View {
     }
 
     /// `vp open setup --section <name>`.
-    static let sections = ["checks", "connections", "cli", "models", "appearance", "updates"]
+    static let sections = ["checks", "connections", "cli", "models", "appearance", "reading", "updates"]
 
     private func takeRequest(_ proxy: ScrollViewProxy) {
         guard let section = UINav.shared.setupSection else { return }
@@ -369,5 +370,152 @@ private struct ThemeSwatch: View {
 private extension View {
     func vpSetupSection(_ name: String) -> some View {
         id("setup-\(name)").vpFlash("setup-\(name)")
+    }
+}
+
+/// Setup → Reading: when the HUD takes the keyboard while something is read aloud, what clicking away does, the
+/// keys for each action, and shortcuts that work anywhere while reading. Saved in config.toml [settings.reading].
+private struct ReadingSettingsSection: View {
+    let app: AppState
+
+    private var reading: Binding<ReadingSettings> {
+        Binding { app.store.reading } set: { app.store.reading = $0 }
+    }
+
+    private static let modeDetail: [ReadingSettings.TakeKeys: String] = [
+        .always: "As soon as something is read aloud, its keys work. Your app stays in front; click it to type again.",
+        .hover: "Move the pointer onto the HUD, or click it, and its keys work. Move away and they're yours again.",
+        .click: "Click the HUD and its keys work; click anywhere else to give them back.",
+        .never: "Only the buttons and any shortcuts below.",
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionLabel("Reading")
+            Card {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Keyboard while reading").font(VPFont.bodyStrong)
+                        VPSegmented(selection: reading.takeKeys, options: ReadingSettings.TakeKeys.allCases.map { ($0, $0.label) })
+                        Text(Self.modeDetail[reading.wrappedValue.takeKeys] ?? "").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("When I click away").font(VPFont.bodyStrong)
+                        VPSegmented(selection: reading.clickAway, options: [(.keepReading, "Keep reading"), (.stop, "Stop")])
+                    }
+                    Hairline()
+                    HStack {
+                        Text("Keys while the HUD has the keyboard").font(VPFont.bodyStrong)
+                        Spacer()
+                        Button("Reset to defaults") { reading.wrappedValue.keys = ReadingSettings.defaultKeys }
+                            .buttonStyle(.vpGhost)
+                            .disabled(reading.wrappedValue.keys == ReadingSettings.defaultKeys)
+                    }
+                    ForEach(ReadingSettings.Action.allCases) { action in
+                        actionRow(action.label) {
+                            ForEach(Array((reading.wrappedValue.keys[action] ?? []).enumerated()), id: \.offset) { index, combo in
+                                RemovableKeycap(combo: combo) { reading.wrappedValue.keys[action]?.remove(at: index) }
+                            }
+                            KeyCaptureButton(title: "+ key", app: app) { combo in
+                                if !(reading.wrappedValue.keys[action] ?? []).contains(combo) { reading.wrappedValue.keys[action, default: []].append(combo) }
+                                return nil
+                            }
+                        }
+                    }
+                    Hairline()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Anywhere while reading").font(VPFont.bodyStrong)
+                        Text("Shortcuts that work in any app, but only while something is being read. Include ⌃, ⌥ or ⌘ so they don't take a key from your typing.")
+                            .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(ReadingSettings.Action.allCases) { action in
+                        actionRow(action.label) {
+                            if let combo = reading.wrappedValue.global[action] {
+                                RemovableKeycap(combo: combo) { reading.wrappedValue.global[action] = nil }
+                            } else {
+                                KeyCaptureButton(title: "Set…", app: app) { combo in
+                                    guard !combo.modifiers.isEmpty else { return "needs ⌃, ⌥ or ⌘" }
+                                    reading.wrappedValue.global[action] = combo
+                                    return nil
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private func actionRow<Keys: View>(_ label: String, @ViewBuilder keys: () -> Keys) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label).font(VPFont.caption).foregroundStyle(Palette.fgMuted).frame(width: 150, alignment: .leading)
+            FlowLayout(spacing: 6) { keys() }
+        }
+    }
+}
+
+/// A key in a list, with × to remove it.
+private struct RemovableKeycap: View {
+    let combo: KeyCombo
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Keycap(text: combo.display)
+            Button(action: onRemove) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
+                .buttonStyle(.plain).foregroundStyle(Palette.fgMuted).frame(width: 16, height: 22)
+                .help("Remove \(combo.display)")
+        }
+    }
+}
+
+/// Click, then press a key (with or without modifiers) to add it. Esc cancels; your track hotkeys pause meanwhile.
+/// `onCapture` returns a reason to refuse the key, or nil to accept it.
+private struct KeyCaptureButton: View {
+    let title: String
+    let app: AppState
+    let onCapture: (KeyCombo) -> String?
+    @State private var recording = false
+    @State private var monitor: Any?
+    @State private var refusal: String?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button { recording ? stop() : start() } label: {
+                Text(recording ? "Press a key…" : title)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(recording ? Palette.pink : Palette.purple)
+                    .padding(.horizontal, 8).frame(height: 22)
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(recording ? Palette.pink : Palette.line, lineWidth: 1))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if let refusal { Text(refusal).font(VPFont.caption).foregroundStyle(Palette.orange) }
+        }
+        .onDisappear(perform: stop)
+    }
+
+    private func start() {
+        recording = true
+        refusal = nil
+        app.hotkeysSuspended = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
+                stop()  // plain Esc cancels
+            } else {
+                refusal = onCapture(KeyCombo(key: .init(code: UInt32(event.keyCode)), modifiers: .init(event.modifierFlags)))
+                stop()
+            }
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        if recording { app.hotkeysSuspended = false }
+        recording = false
     }
 }
