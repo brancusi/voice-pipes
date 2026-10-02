@@ -1,5 +1,12 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.9.2**
+- **No more Keychain password after updates.** Voice Tools is now signed with an Apple Developer ID and notarized by Apple. Until now, every update made macOS ask for your login password before the app could read your OpenRouter and Jev keys. From the next update on, it won't.
+- **One-time setup for this update:** macOS sees a newly signed app, so:
+  - When asked for your Keychain password, enter it and choose **Always Allow** (once for each key).
+  - Allow **Microphone** again, and turn **Accessibility** back on. The panel's **Checks** list has a **Fix…** button for each.
+- New installs open with a double-click; no more right-click → Open.
+
 **0.9.1**
 - **Reorder steps by dragging.** Each step in a track now has a handle (☰) on its left. Drag it up or down and the other steps move aside as you go; let go and the pipeline runs in the new order. If a step's input no longer matches the one before it, the editor says so under the list.
 

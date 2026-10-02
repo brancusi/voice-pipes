@@ -6,7 +6,7 @@ Things that cost time, with the symptom, the cause and what the code does about 
 
 **Permissions lost on every update.** Ad hoc signatures pin TCC grants (Accessibility, Microphone) to one
 build's hash; an update looks like a new app. The old entry even stays switched on in System Settings while not
-applying, and macOS won't prompt again while it exists. → Releases are signed with a fixed self-signed
+applying, and macOS won't prompt again while it exists. → Releases are signed with a fixed Developer ID
 certificate ([releasing](releasing.md)). Stale entries are cleared by **Fix…** with
 `tccutil reset <service> io.github.brancusi.voice-tools`, which works without admin for the app's own bundle id
 (it fails with `-10814` for an unregistered bundle id).
@@ -15,10 +15,16 @@ certificate ([releasing](releasing.md)). Stale entries are cleared by **Fix…**
 requirement, which survives updates, but each item also has a *partition list*, and for a non-Apple certificate the
 app's partition is its `cdhash:` — one build. Each update adds another cdhash only after you type the password
 (`security dump-keychain -a` showed 12 on the OpenRouter item by 0.9.1). Only a Developer ID certificate gets a
-stable `teamid:` partition. Decision (0.9.1): keep the keys in the Keychain and move to Developer ID, rather than a
-plain file.
+stable `teamid:` partition. → Kept the keys in the Keychain and moved to Developer ID in 0.9.2 (one last prompt on
+that update), rather than a plain file.
 
-**Signing with a self-signed certificate.** `codesign` reports "no identity found" for a certificate that's only
+**Notarization rejected Sparkle's helpers.** Sparkle 2's framework holds `XPCServices/Installer.xpc` and
+`Downloader.xpc` (a `find -maxdepth 6` misses them). Each must be signed with the Developer ID, `--options runtime`
+and `--timestamp`; Downloader with `--preserve-metadata=entitlements`. `xcrun notarytool log <id>` lists the
+offending files. Hardened runtime is only for Developer ID builds: with a self-signed or ad hoc signature, library
+validation would refuse to load Sparkle.
+
+**Signing with a self-signed certificate** (up to 0.9.1). `codesign` reports "no identity found" for a certificate that's only
 in a keychain passed with `--keychain`; the keychain must be in the user search list
 (`security list-keychains -d user -s <kc> …`). The certificate being untrusted (`CSSMERR_TP_NOT_TRUSTED`) doesn't
 stop signing, and the designated requirement becomes `certificate root = H"…"`. Use LibreSSL's `/usr/bin/openssl`

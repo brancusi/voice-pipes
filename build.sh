@@ -116,6 +116,9 @@ if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
 </dict></plist>
 ENT
   SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+  # Sparkle's own order; the Downloader keeps its entitlements (network access for its sandbox).
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$SPK/XPCServices/Installer.xpc"
+  codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "$IDENTITY" "$SPK/XPCServices/Downloader.xpc"
   for item in "$SPK/Autoupdate" "$SPK/Updater.app" "$APP/Contents/Frameworks/Sparkle.framework"; do
     codesign --force --options runtime --timestamp --sign "$IDENTITY" "$item"
   done

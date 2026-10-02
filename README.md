@@ -19,7 +19,7 @@ Apple silicon, macOS 14 or later. Self-updating.
 1. Download `Voice-Tools-<version>-arm64.zip` from the
    [releases](https://github.com/brancusi/voice-tools-releases/releases/latest), unzip it, and move
    **Voice Tools.app** to Applications.
-2. The app isn't notarized, so the first time: **right-click → Open → Open**.
+2. Open it. It's signed with a Developer ID and notarized by Apple, so it opens like any other app.
 3. Allow **Microphone** and **Accessibility** when asked (Accessibility is needed to paste and to read selected
    text). The panel's **Checks** list shows anything missing, with a **Fix…** button for each.
 4. Add your **OpenRouter** key (and optionally a **TypeSafe Jev** key) in **Open Voice Tools… → Setup**. Keys are

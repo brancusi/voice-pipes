@@ -7,8 +7,9 @@ touching signing, paste, windows, OpenRouter or FluidAudio code.
 - **Shipping a change = a release.** The user runs the installed app and updates via Sparkle: add notes to the top
   of `RELEASE_NOTES.md`, bump `VERSION`, commit, push, tag `v<VERSION>`, watch the workflow, then check the
   public `appcast.xml`. Release notes are user-facing: plain language, what changed and why it matters.
-- **Never ship an ad hoc build or a different certificate.** Releases must be signed with "Voice Tools Signing"
-  (CI does this; `REQUIRE_SIGNING=1`), or every user loses Microphone/Accessibility permissions.
+- **Never ship an ad hoc build or a different certificate.** Releases must be signed with "Developer ID Application:
+  Aram Zadikian (7F3RGY9LG8)" and notarized (CI does this; `REQUIRE_SIGNING=1`, `REQUIRE_NOTARIZATION=1`), or every
+  user loses Microphone/Accessibility permissions and Keychain access.
 - **Saved data must keep decoding.** Add new `StepKind` associated values as optionals; changes to existing
   tracks go in a one-time migration in `TrackStore` guarded by a `UserDefaults` flag. Test migrations on a *copy*
   of `~/Library/Application Support/VoiceTools/tracks.json`; never edit the live file while the app runs.
