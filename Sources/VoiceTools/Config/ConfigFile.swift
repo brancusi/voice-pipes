@@ -184,6 +184,15 @@ struct TableReader {
     }
 
     static func suggestion(_ word: String, _ options: [String]) -> String {
+        let lowered = word.lowercased()
+        // A prefix, or a misspelt prefix ('quik' → 'quick-answer').
+        if lowered.count >= 3, let prefixed = options.first(where: {
+            let o = $0.lowercased()
+            return o.hasPrefix(lowered) || (lowered.count >= 4 && distance(lowered, String(o.prefix(lowered.count + 1))) <= 1)
+                || (lowered.count >= 4 && distance(lowered, String(o.prefix(lowered.count))) <= 1)
+        }) {
+            return " (did you mean '\(prefixed)'?)"
+        }
         let best = options.map { ($0, Self.distance(word.lowercased(), $0.lowercased())) }.min { $0.1 < $1.1 }
         guard let best, best.1 <= max(2, word.count / 3) else { return "" }
         return " (did you mean '\(best.0)'?)"
@@ -397,7 +406,7 @@ enum ConfigFile {
             } else {
                 if s.raw("mode") != nil { s.warning("mode", "only applies to model = \"parakeet\"") }
                 if s.raw("pause_ms") != nil { s.warning("pause_ms", "only applies to model = \"parakeet\"") }
-                if !model.contains("/") { s.error("model", "'\(model)' should be \"parakeet\" or an OpenRouter model id like \"microsoft/mai-transcribe-2\"") }
+                if !model.contains("/") { s.error("model", "'\(model)' should be \"parakeet\" or an OpenRouter model id like \"microsoft/mai-transcribe-2\"\(TableReader.suggestion(model, ["parakeet"]))") }
                 kind = .openRouterSTT(model: model)
             }
         case "llm":

@@ -36,7 +36,7 @@ final class VocabularyStore {
     @ObservationIgnored private var diskText: String?
     @ObservationIgnored private var watcher: FileWatcher?
 
-    static let starters = [
+    nonisolated static let starters = [
         VocabularyEntry(write: "Claude Code", heardAs: ["cloud code", "clawed code"]),
         VocabularyEntry(write: "OpenRouter", heardAs: ["open router"]),
         VocabularyEntry(write: "FluidAudio", heardAs: ["fluid audio"]),

@@ -44,8 +44,12 @@ struct ActiveRun {
 final class AppState {
     let store: TrackStore
     let speaker = Speaker()
-    private(set) var run: ActiveRun? {
+    var run: ActiveRun? {
         didSet {
+            if run?.phase != oldValue?.phase, let run, let event = Self.phaseEvent(run.phase) {
+                // The track's id when it's a configured track, so events match `vp tracks` and `vp run`.
+                emit(["event": event, "track": store.tracks.first { $0.id == run.trackID }?.slug ?? run.trackName])
+            }
             if (run?.phase == .recording) != (oldValue?.phase == .recording) { updateLasso() }
         }
     }
@@ -71,14 +75,14 @@ final class AppState {
 
     @ObservationIgnored let parakeet = ParakeetService()
     @ObservationIgnored private let hotkeys = HotkeyManager()
-    @ObservationIgnored private let recorder = AudioRecorder()
-    @ObservationIgnored private var capture: Capture?
+    @ObservationIgnored let recorder = AudioRecorder()
+    @ObservationIgnored var capture: Capture?
     @ObservationIgnored private var cancelHotkey: UInt32?
     @ObservationIgnored private var speakingTrack: Track.ID?
     @ObservationIgnored let hud = HUDController()
 
     /// An in-progress microphone capture.
-    private struct Capture {
+    struct Capture {
         let track: Track
         let mode: Trigger.Mode
         let live: LiveTranscriber?
@@ -92,6 +96,28 @@ final class AppState {
     /// Show the setup window: a first launch, or a permission is missing and setup was never finished.
     let needsOnboarding: Bool
 
+    /// `vp watch` connections, sent every run event.
+    @ObservationIgnored var watchers: [ControlReply] = []
+    /// A word `vp vocab train` asked to train; the Vocabulary page opens its training sheet.
+    var pendingTraining: String?
+    @ObservationIgnored private var control: ControlServer?
+
+    func emit(_ event: [String: Any]) {
+        watchers.removeAll { !$0.isOpen }
+        var event = event
+        event["at"] = ISO8601DateFormatter().string(from: Date())
+        for watcher in watchers { watcher.event(event) }
+    }
+
+    private static func phaseEvent(_ phase: ActiveRun.Phase) -> String? {
+        switch phase {
+        case .recording: "run.recording"
+        case .processing: "run.processing"
+        case .speaking: "run.speaking"
+        case .done, .failed: nil  // sent with their details from runSteps
+        }
+    }
+
     init(store: TrackStore? = nil, history: HistoryStore? = nil, startServices: Bool = true) {
         self.store = store ?? TrackStore()
         historyStore = history ?? HistoryStore()
@@ -101,6 +127,13 @@ final class AppState {
         VocabularyStore.shared.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         hud.attach(self)
         observeTracks()
+        // `vp` talks to the app through this socket.
+        let server = ControlServer { [weak self] cmd, args, reply in
+            guard let self else { return reply.error("not_ready", "Voice Pipes is starting.") }
+            self.handleControl(cmd, args, reply)
+        }
+        server.start()
+        control = server
         Task { await prepare() }
     }
 
@@ -394,7 +427,15 @@ final class AppState {
         }
     }
 
-    private func runSteps(_ track: Track, from start: Int, payload initial: Payload, startedAt: Date = Date()) async {
+    /// How a run ended: its final text (what was pasted, spoken or sent), or why it stopped.
+    struct RunOutcome {
+        var text: String?
+        var totalMs: Int
+        var failure: String?
+    }
+
+    @discardableResult
+    func runSteps(_ track: Track, from start: Int, payload initial: Payload, startedAt: Date = Date()) async -> RunOutcome {
         var payload = initial
         var index = start
         var heard: String?
@@ -409,9 +450,10 @@ final class AppState {
                     NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
                 } else {
                     // Keep what the run had so far, so a dictation whose paste failed can still be copied.
-                    record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
+                    let total = record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
                     show(failure: error.localizedDescription, for: track)
-                    return
+                    emit(["event": "run.failed", "track": track.slug ?? track.name, "error": error.localizedDescription])
+                    return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
                 }
             }
             run?.stepMs[index] = Int(Date().timeIntervalSince(t0) * 1000)
@@ -423,10 +465,15 @@ final class AppState {
         }
 
         let total = record(track, startedAt: startedAt, heard: heard, failure: nil)
+        let finalText = run?.liveText
         run?.totalMs = total
         run?.phase = .done
-        try? await Task.sleep(for: .milliseconds(650))
-        if run?.phase == .done, run?.trackID == track.id { run = nil }
+        emit(["event": "run.done", "track": track.slug ?? track.name, "ms": total, "text": finalText ?? ""])
+        Task {
+            try? await Task.sleep(for: .milliseconds(650))
+            if run?.phase == .done, run?.trackID == track.id { run = nil }
+        }
+        return RunOutcome(text: finalText, totalMs: total, failure: nil)
     }
 
     /// Adds the run's text (if any) to History; returns the total time.

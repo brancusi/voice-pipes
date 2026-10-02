@@ -74,7 +74,8 @@ final class OpenRouterCatalog {
             case .text, .transcription:
                 let input = perMillion(pricing?.prompt), output = perMillion(pricing?.completion)
                 if input == nil, output == nil { return pricing == nil ? nil : "free" }
-                return "\(input ?? "$0")/\(output ?? "$0")"
+                guard let output else { return input.map { "\($0) in" } }
+                return "\(input ?? "$0")/\(output)"
             }
         }
 

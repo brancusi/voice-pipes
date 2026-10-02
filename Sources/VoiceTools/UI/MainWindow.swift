@@ -112,7 +112,7 @@ struct MainWindowView: View {
         case .activity:
             HistoryView(app: app).navigationTitle("History").background(Palette.bg100)
         case .vocabulary:
-            VocabularyView(parakeet: app.parakeet).scrollsSidewaysBelow(520).navigationTitle("Vocabulary").background(Palette.bg100)
+            VocabularyView(parakeet: app.parakeet, app: app).scrollsSidewaysBelow(520).navigationTitle("Vocabulary").background(Palette.bg100)
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }
@@ -296,6 +296,7 @@ private struct StepChain: View {
 /// A plain table rather than a Form: Form shows a text field's title as a label beside it.
 private struct VocabularyView: View {
     let parakeet: ParakeetService
+    let app: AppState
     @Bindable private var store = VocabularyStore.shared
     @State private var training: VocabularyEntry.ID?
     @State private var sample = "i use cloud code and open router every day."
@@ -376,6 +377,8 @@ private struct VocabularyView: View {
             .padding(.horizontal, 32).padding(.vertical, 24)
             .frame(maxWidth: 900, alignment: .leading)
         }
+        .onAppear(perform: takePendingTraining)
+        .onChange(of: app.pendingTraining) { _, _ in takePendingTraining() }
         .sheet(isPresented: $askingWord) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Which word?").font(VPFont.title)
@@ -399,6 +402,13 @@ private struct VocabularyView: View {
                 TrainWordSheet(parakeet: parakeet, entry: $store.entries[index])
             }
         }
+    }
+
+    /// `vp vocab train <word>`: open that word's training.
+    private func takePendingTraining() {
+        guard let word = app.pendingTraining else { return }
+        app.pendingTraining = nil
+        if let entry = store.entries.first(where: { $0.write.lowercased() == word.lowercased() }) { training = entry.id }
     }
 
     /// Adds the word and opens training for it, once the "Which word?" sheet has closed.

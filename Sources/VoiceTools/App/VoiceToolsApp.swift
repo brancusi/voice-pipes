@@ -1,6 +1,14 @@
 import SwiftUI
 
+/// One binary, two faces: run as `vp` / `voicepipes` (a symlink) it's the command-line tool; otherwise the app.
 @main
+enum Entry {
+    static func main() {
+        if CLI.isInvocation { CLI.main() }
+        VoiceToolsApp.main()
+    }
+}
+
 struct VoiceToolsApp: App {
     @State private var app: AppState
     @StateObject private var updates = Updates()
@@ -9,6 +17,7 @@ struct VoiceToolsApp: App {
         // Before anything else starts (hotkeys, models, Sparkle): finish the Voice Tools → Voice Pipes rename.
         BundleRename.migrateIfNeeded()
         VPFont.registerBundledFonts()
+        AgentsInstaller.refreshIfInstalled()
         let state = AppState()
         _app = State(initialValue: state)
         // Light, dark or Auto, as chosen in Setup → Appearance; then the setup window on a first launch.
@@ -23,6 +32,7 @@ struct VoiceToolsApp: App {
             MenuView(app: app).environmentObject(updates)
         } label: {
             menuBarIcon
+                .modifier(WindowRequests(updates: updates))
         }
         .menuBarExtraStyle(.window)
 
@@ -67,5 +77,21 @@ private struct AboutCommand: Commands {
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
+    }
+}
+
+/// Opens windows and checks for updates when `vp` asks (the menu bar icon is the one view that always exists, and
+/// SwiftUI only lets views open windows).
+private struct WindowRequests: ViewModifier {
+    let updates: Updates
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .voicePipesOpenWindow)) { note in
+                openWindow(id: note.object as? String ?? "main")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .voicePipesCheckForUpdates)) { _ in updates.check() }
     }
 }
