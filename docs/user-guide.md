@@ -177,12 +177,11 @@ voice again when the pointer leaves.
 stays open for later readings until you close it (˅). From a terminal: `vp open reading`, `vp close reading`,
 `vp speed 1.4`.
 
-**Keys while reading.** The HUD can take the keyboard without bringing Voice Pipes forward: by default when you
-point at it or click it (it doesn't count if the HUD appears under a resting pointer); **Setup → Reading** sets
-*Always* (from the moment reading starts), *Point or click*, *Click* or *Never*, and whether clicking away keeps
-reading or stops. While it has the keys (**KEYS ON** shows in the HUD): Esc stop, Space pause, j/↓ next sentence,
+**Keys while reading.** The HUD takes the keyboard without bringing Voice Pipes forward: by default as soon as
+reading starts; **Setup → Reading** (or `vp reading keys …`) sets *Always*, *Point or click* (it doesn't count if
+the HUD appears under a resting pointer), *Click* or *Never*, and whether clicking away keeps reading or stops. While it has the keys (**KEYS ON** shows in the HUD): Esc stop, Space pause, j/↓ next sentence,
 k/↑ previous, h/− slower, l/= faster, g start, G end. Change any of them there or in config.toml
-`[settings.reading]`; `[settings.reading.global]` adds shortcuts that work in any app, only while something is
+`[settings.reading]` (or `vp reading key <action> <keys>`); `[settings.reading.global]` (`vp reading shortcut`) adds shortcuts that work in any app, only while something is
 read (none by default; include ⌃, ⌥ or ⌘). A ⌘ shortcut gives the keys back. `vp next`, `vp prev`, `vp speed`
 do the same from a terminal.
 
@@ -307,7 +306,7 @@ launch the app rewrites installed skills that are out of date, installs the skil
 installed for any agent), points the session hook at the current `vp`, and repoints `vp` links if you moved the app
 (a root-owned link it can't change shows up in Setup → Checks with **Fix…**).
 
-**What agents read aloud.** `vp agents read-aloud off|long|attention|all` (or `[settings.agents] read_aloud` in
+**What agents read aloud.** By default, anything that needs your attention. `vp agents read-aloud off|long|attention|all` (or `[settings.agents] read_aloud` in
 config.toml) tells every agent what to read to you unasked: nothing, long text (summaries, reports), long text plus
 anything that needs you (questions, finished tasks, problems), or every reply. `long_text` sets what counts as long
 (characters, default 600). Agents read a spoken version and keep code and links on screen.

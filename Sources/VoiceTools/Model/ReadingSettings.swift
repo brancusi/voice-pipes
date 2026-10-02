@@ -49,7 +49,8 @@ struct ReadingSettings: Equatable {
         }
     }
 
-    var takeKeys: TakeKeys = .hover
+    /// Default since 1.8.1: the HUD takes the keys whenever something is read (your app stays in front).
+    var takeKeys: TakeKeys = .always
     var clickAway: ClickAway = .keepReading
     /// Keys while the HUD has the keyboard (plain keys are fine: they only work then).
     var keys: [Action: [KeyCombo]] = ReadingSettings.defaultKeys
@@ -95,7 +96,8 @@ struct AgentSettings: Equatable {
         }
     }
 
-    var readAloud: ReadAloud = .off
+    /// Default since 1.8.1: long replies plus anything that needs you.
+    var readAloud: ReadAloud = .attention
     /// Text longer than this (characters) counts as long.
     var longText = 600
 }

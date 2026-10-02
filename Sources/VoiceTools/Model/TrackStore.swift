@@ -98,9 +98,12 @@ final class TrackStore {
             let colors = Self.sundownColors(&loaded)
             migrated = pocket || fixWords || colors
         }
+        // One-time (1.8.1): the new defaults (HUD takes the keys always; agents read what needs you) reach setups
+        // still on the old ones; a different choice someone made is kept.
+        let newDefaults = !fresh && Self.adoptReadingDefaults(&loadedReading, &loadedAgents)
         let before = loaded
         ConfigFile.assignSlugs(&loaded)
-        let changed = migrated || loaded != before
+        let changed = migrated || newDefaults || loaded != before
         tracks = loaded
         reading = loadedReading
         agents = loadedAgents
@@ -111,6 +114,16 @@ final class TrackStore {
         if disk == .missing || (changed && !found.contains { $0.severity == .error }) { save() }
         ConfigPaths.writeSchemas(in: configURL.deletingLastPathComponent())
         if watch { watcher = FileWatcher(configURL) { [weak self] in self?.reloadFromDisk() } }
+    }
+
+    private static func adoptReadingDefaults(_ reading: inout ReadingSettings, _ agents: inout AgentSettings) -> Bool {
+        let key = "migration.readingDefaults.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
+        UserDefaults.standard.set(true, forKey: key)
+        var changed = false
+        if reading.takeKeys == .hover { reading.takeKeys = .always; changed = true }
+        if agents.readAloud == .off { agents.readAloud = .attention; changed = true }
+        return changed
     }
 
     private static func markLegacyMigrationsDone() {

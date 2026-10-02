@@ -27,6 +27,8 @@ enum VPCommands {
                     handler: { _, out in out.emit(Out(any: try AppClient.request("reading", ["action": "next"], launch: false))) }),
         CommandSpec(name: "prev", usage: "vp prev", summary: "Jump back a sentence in what's being read",
                     handler: { _, out in out.emit(Out(any: try AppClient.request("reading", ["action": "previous"], launch: false))) }),
+        CommandSpec(name: "reading", usage: "vp reading [keys always|hover|click|never | click-away keep-reading|stop | key <action> <key>… | shortcut <action> <combo>|none]",
+                    summary: "How readings are steered from the keyboard: when the HUD takes the keys, and which keys", handler: reading),
         CommandSpec(name: "stop", usage: "vp stop", summary: "Stop speaking or recording", handler: { _, out in try simple("stop", out) }),
         CommandSpec(name: "pause", usage: "vp pause", summary: "Pause reading aloud", handler: { _, out in try simple("pause", out) }),
         CommandSpec(name: "resume", usage: "vp resume", summary: "Resume reading aloud", handler: { _, out in try simple("resume", out) }),
@@ -571,6 +573,69 @@ enum VPCommands {
         default:
             throw UsageError("unknown_subcommand", "vp secret takes list, set or remove.", hint: "vp secret --help")
         }
+    }
+
+    // MARK: Reading keys
+
+    /// [settings.reading] from the command line (the app picks the change up within a second).
+    static func reading(_ parsed: Parsed, _ out: Output) throws {
+        let (loaded, issues) = loadConfig()
+        guard var config = loaded else {
+            throw AppClient.Failure(code: "config_invalid", message: "config.toml doesn't check out: \(issues.first?.description ?? "")", hint: "vp config check")
+        }
+        let actions = ReadingSettings.Action.allCases.map(\.rawValue)
+        func action(_ index: Int) throws -> ReadingSettings.Action {
+            let name = try parsed.positional(index, "action", usage: "vp reading key <action> <key>…")
+            guard let action = ReadingSettings.Action(rawValue: name) else {
+                throw UsageError("bad_value", "No action '\(name)'.\(TableReader.suggestion(name, actions))", hint: "actions: " + actions.joined(separator: ", "))
+            }
+            return action
+        }
+        func combo(_ name: String) throws -> KeyCombo {
+            do { return try KeyNames.parse(name) } catch { throw UsageError("bad_value", "'\(name)' \(error)") }
+        }
+        switch parsed.positionals.first {
+        case nil:
+            break
+        case "keys":
+            let mode = try parsed.positional(1, "mode", usage: "vp reading keys always|hover|click|never")
+            guard let value = ReadingSettings.TakeKeys(rawValue: mode) else {
+                throw UsageError("bad_value", "keys is always, hover, click or never.\(TableReader.suggestion(mode, ReadingSettings.TakeKeys.allCases.map(\.rawValue)))")
+            }
+            config.reading.takeKeys = value
+        case "click-away":
+            let mode = try parsed.positional(1, "mode", usage: "vp reading click-away keep-reading|stop")
+            guard let value = ReadingSettings.ClickAway(rawValue: mode) else { throw UsageError("bad_value", "click-away is keep-reading or stop.") }
+            config.reading.clickAway = value
+        case "key":
+            let which = try action(1)
+            let names = Array(parsed.positionals.dropFirst(2))
+            guard !names.isEmpty else { throw UsageError("missing_value", "Which keys?", hint: "vp reading key faster period shift+equal") }
+            config.reading.keys[which] = try names.map(combo)
+        case "shortcut":
+            let which = try action(1)
+            let name = try parsed.positional(2, "combo", usage: "vp reading shortcut faster control+option+right   (or none)")
+            if name == "none" {
+                config.reading.global[which] = nil
+            } else {
+                let parsedCombo = try combo(name)
+                guard !parsedCombo.modifiers.isEmpty else { throw UsageError("bad_value", "A shortcut that works in any app needs control, option or command.") }
+                config.reading.global[which] = parsedCombo
+            }
+        case "reset":
+            config.reading = ReadingSettings()
+        default:
+            throw UsageError("unknown_subcommand", "vp reading takes keys, click-away, key, shortcut or reset.", hint: "vp reading --help")
+        }
+        if parsed.positionals.first != nil { try writeConfig(config) }
+        let r = config.reading
+        out.emit(.object([
+            ("keys", .string(r.takeKeys.rawValue)), ("click_away", .string(r.clickAway.rawValue)),
+            ("bindings", .table(["action", "keys", "anywhere"], ReadingSettings.Action.allCases.map { a in
+                [.string(a.rawValue), .string((r.keys[a] ?? []).map(KeyNames.format).joined(separator: " ")),
+                 .string(r.global[a].map(KeyNames.format) ?? "")]
+            })),
+        ]), help: ["vp reading keys always|hover|click|never", "vp reading key faster period shift+equal", "vp reading shortcut faster control+option+right"])
     }
 
     // MARK: Windows

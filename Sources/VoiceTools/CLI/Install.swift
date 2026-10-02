@@ -310,6 +310,20 @@ enum AgentsInstaller {
         - One reading at a time; wait for `vp say` to return before starting another or asking anything aloud.
         - Still write the full reply as text too; reading is in addition, never instead.
 
+        ## Change how Voice Pipes reads to the user (when they ask)
+
+        These are the user's preferences; change them only when they ask, then confirm in a sentence:
+        - What agents read aloud unasked (default `attention`): "only read me long stuff" → `vp agents read-aloud
+          long`; "stop reading things to me" → `off`; "read me everything" → `all`; "read me what needs my
+          attention" → `attention`. `--long-text <chars>` sets what counts as long.
+        - When the HUD takes the keyboard during a reading (default `always`; their app stays in front): "don't take
+          my keys" → `vp reading keys hover` (when they point at or click it) or `click` or `never`; "always take
+          them" → `vp reading keys always`. `vp reading click-away stop|keep-reading`.
+        - Which keys do what: `vp reading key faster period shift+equal` (actions: stop, pause, next, previous,
+          slower, faster, start, end); shortcuts that work in any app while reading: `vp reading shortcut faster
+          control+option+right` (needs a modifier; `none` removes it). `vp reading` shows them all; `vp reading
+          reset` restores the defaults (Esc, Space, j/k, h/l, g/G).
+
         ## Read long text to the user
 
         Voice Pipes can read a long summary, report or answer aloud while the user sits back and listens. The HUD

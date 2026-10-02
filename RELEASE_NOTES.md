@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.8.1**
+- **New defaults: hands on the keyboard, ears on what matters.** While something is read aloud, the HUD now takes the keys straight away (Esc stops, Space pauses, j/k and h/l steer; the app you're in stays in front), and agents read aloud anything that needs your attention: questions they're waiting on, finished tasks, problems, and long replies. If you'd kept the old defaults, you now have these; anything you'd changed yourself stays as it was.
+- **Change it by asking.** Tell your agent "don't take my keys", "only read me long stuff" or "stop reading to me" and it updates the setting for you, or do it yourself: `vp reading keys hover|click|never|always`, `vp agents read-aloud off|long|attention|all`, and `vp reading key faster period` for your own keys. Setup → Reading has the same.
+- Model pickers: free tiers no longer say "free" twice in their name.
+
 **1.8.0**
 - **Model pickers now show what a paragraph costs, how fast each model is on your Mac, and a quality rating from Artificial Analysis.** Sort by best value, quality, speed or cost; each picker remembers your choice. On-device models stay on top in every sort: they're free, private and work offline. Costs are only shown where the billing unit is known (otherwise "—"); speeds come from your own runs (on-device models show our benchmark until then); quality comes from Artificial Analysis's public leaderboards as of October 2026, and models they don't cover say "not rated". Click a model for what it's good at, then **Use** it; ↑↓, →, Return and Esc work too.
 - The sidebar is a little wider, so track names read in full (hover for the whole name), and ↑↓ move through it again.
