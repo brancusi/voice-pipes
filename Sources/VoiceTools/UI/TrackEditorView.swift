@@ -6,6 +6,7 @@ struct TrackDetailView: View {
     @Binding var track: Track
     let onDelete: () -> Void
     @State private var expandedStep: Step.ID?
+    @State private var draggingStep: Step.ID?
 
     var body: some View {
         Form {
@@ -50,9 +51,11 @@ struct TrackDetailView: View {
                         expandedStep = expandedStep == step.id ? nil : step.id
                     } onDelete: {
                         track.steps.removeAll { $0.id == step.id }
+                    } onDragStart: {
+                        draggingStep = step.id
                     }
+                    .onDrop(of: [.text], delegate: StepDropDelegate(target: step.id, steps: $track.steps, dragging: $draggingStep))
                 }
-                .onMove { track.steps.move(fromOffsets: $0, toOffset: $1) }
                 addStepMenu
             } header: {
                 Text("Pipeline")
@@ -108,10 +111,21 @@ private struct StepRow: View {
     let expanded: Bool
     let onToggle: () -> Void
     let onDelete: () -> Void
+    let onDragStart: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, height: 28)
+                    .contentShape(Rectangle())
+                    .onHover { inside in inside ? NSCursor.openHand.push() : NSCursor.pop() }
+                    .onDrag {
+                        onDragStart()
+                        return NSItemProvider(object: step.id.uuidString as NSString)
+                    }
+                    .help("Drag to reorder")
                 Image(systemName: icon)
                     .frame(width: 28, height: 28)
                     .background(RoundedRectangle(cornerRadius: 7).fill(step.kind.tint.opacity(0.15)))
@@ -151,6 +165,29 @@ private struct StepRow: View {
         case .localSpeech: "speaker.wave.2.bubble"
         case .showHUD: "rectangle.bottomthird.inset.filled"
         }
+    }
+}
+
+/// Reorders steps live as a dragged step passes over the others; the drop itself just ends the drag.
+private struct StepDropDelegate: DropDelegate {
+    let target: Step.ID
+    @Binding var steps: [Step]
+    @Binding var dragging: Step.ID?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging != target,
+              let from = steps.firstIndex(where: { $0.id == dragging }),
+              let to = steps.firstIndex(where: { $0.id == target }) else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            steps.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
     }
 }
 

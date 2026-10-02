@@ -27,7 +27,8 @@ Setup → Checks. Modifier-only keys (like Right ⌘ alone) aren't supported.
 ### Building blocks
 
 Every block declares what it takes and gives (`audio`, `text`, or nothing); the editor flags a block whose input
-doesn't match the previous block's output. **+ Add step** lists them by category.
+doesn't match the previous block's output. **+ Add step** lists them by category; drag a step by its ☰ handle
+to reorder the pipeline.
 
 | Block | Takes → gives | What it does |
 |---|---|---|

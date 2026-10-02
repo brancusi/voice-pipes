@@ -1,10 +1,13 @@
 Voice Tools: a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**0.9.1**
+- **Reorder steps by dragging.** Each step in a track now has a handle (☰) on its left. Drag it up or down and the other steps move aside as you go; let go and the pipeline runs in the new order. If a step's input no longer matches the one before it, the editor says so under the list.
+
 **0.9.0**
 - **Route · Jev: let Jev pick the model.** A new block under Transform (+ Add step → **Route · Jev**). Jev reads what you said and sends it down one of your routes, each with its own model and instructions. It starts with three: **quick** (Claude Haiku 4.5, a sentence or two), **web** (Perplexity Sonar, for news, weather, prices) and **deep** (Claude Sonnet 5.5, for advice, comparisons and explanations). Rename them, describe when each should be used, change their models, or add more.
 - Choosing takes Jev about a quarter of a second. In 15 test questions it picked the route we would have every time.
 - The HUD and Activity show what was picked and how long Jev took, e.g. "Jev 260 ms → web 100% · sonar", so you can see whether it's choosing well.
-- To try it on **Quick answer**: add Route · Jev, drag it just above the Speak step, and delete the old LLM step. Needs your TypeSafe (Jev) key in Setup; without it the first route answers.
+- To try it on **Quick answer**: add Route · Jev, drag it by its handle to just above the Speak step, and delete the old LLM step. Needs your TypeSafe (Jev) key in Setup; without it the first route answers.
 
 **0.8.0**
 - **Faster takes when training a word.** Click **Start takes** and say it; **Next take** (or Space) ends that take and starts the next one straight away; **Finish** (or Return) ends the last. No more stop/start for every take. A live level meter shows it's hearing you, and silent takes are caught instead of quietly kept.
