@@ -2,7 +2,13 @@ import AppKit
 import Foundation
 
 enum VPCommands {
-    static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev" }
+    /// The app's version. Run through the /usr/local/bin/vp link, Bundle.main is the link's folder (no
+    /// Info.plist), so read the bundle the link resolves into.
+    static var version: String {
+        let app = CLIInstaller.executable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let bundle = app.pathExtension == "app" ? Bundle(url: app) : nil
+        return (bundle ?? Bundle.main).object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
 
     static let table: [CommandSpec] = [
         CommandSpec(name: "status", usage: "vp status", summary: "App, permissions, models, keys, checks and config health", handler: status),
@@ -27,8 +33,8 @@ enum VPCommands {
                     values: ["max", "silence", "voice", "voice-model", "listen-model", "speed"], handler: ask),
         CommandSpec(name: "transcribe", usage: "vp transcribe <audio-file> [--model parakeet|<openrouter-id>]",
                     summary: "Transcribe an audio file (on this Mac by default)", values: ["model"], handler: transcribe),
-        CommandSpec(name: "history", usage: "vp history [show <n>] [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
-                    summary: "Recent runs: what was said, what came out, how long it took", values: ["limit", "track", "search", "since"], handler: history),
+        CommandSpec(name: "history", usage: "vp history [show <n> | usage] [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
+                    summary: "Recent runs and their logs: what was said, each step, Jev's picks, tokens and cost", values: ["limit", "track", "search", "since"], handler: history),
         CommandSpec(name: "vocab", usage: "vp vocab [add <word> --heard \"a, b\" [--exact] | remove <word> | test \"<sentence>\" | train <word>]",
                     summary: "The words Fix words corrects", values: ["heard"], switches: ["exact"], handler: vocab),
         CommandSpec(name: "config", usage: "vp config [check [file] | schema [vocabulary] | backups | restore <n> | reload | open | path]",
@@ -279,8 +285,32 @@ enum VPCommands {
             if let heard = r.heard { pairs.append(("heard", .string(heard))) }
             pairs.append(("text", .string(r.text)))
             if let failure = r.failure { pairs.append(("failure", .string(failure))) }
-            pairs.append(("steps", .table(["block", "ms"], r.steps.map { [.string($0.title), .int($0.ms)] })))
-            return out.emit(.object(pairs))
+            if let log = r.log {
+                // Step by step: branches indented, Jev's picks and what each step used and gave.
+                pairs.append(("log", .table(["step", "ms", "used", "out"], log.map { e in
+                    var used = RunLogFormat.usage(e)
+                    if let others = e.decision?.others, !others.isEmpty { used += " (not taken: \(others.joined(separator: ", ")))" }
+                    let outText = e.status == .ok ? (e.output ?? "") : (e.message ?? "failed")
+                    return [.string(String(repeating: "  ", count: e.depth) + e.title), .int(e.ms), .string(used),
+                            .string(out.trim(outText.replacingOccurrences(of: "\n", with: " "), out.full ? 2000 : 80))]
+                })))
+                pairs.append(("total", .string(UsageSummary([r]).line ?? "on this Mac")))
+            } else {
+                pairs.append(("steps", .table(["block", "ms"], r.steps.map { [.string($0.title), .int($0.ms)] })))
+            }
+            return out.emit(.object(pairs), help: r.log == nil ? [] : ["vp history show \(n) --full   (untrimmed outputs)"])
+        }
+        if parsed.positionals.first == "usage" {
+            let now = Date()
+            func summary(_ label: String, _ within: TimeInterval?) -> [Out] {
+                let picked = records.filter { within == nil ? Calendar.current.isDateInToday($0.date) : now.timeIntervalSince($0.date) < within! }
+                let s = UsageSummary(picked)
+                return [.string(label), .int(s.runs), .int(s.promptTokens), .int(s.completionTokens),
+                        .string(RunLogFormat.cost(s.exact)), .string(s.estimated > 0 ? "≈" + RunLogFormat.cost(s.estimated) : "0")]
+            }
+            return out.emit(.object([("usage", .table(["period", "runs", "tokens_in", "tokens_out", "cost", "speech_estimate"],
+                                                      [summary("today", nil), summary("7 days", 7 * 86_400), summary("30 days", 30 * 86_400)]))]),
+                            help: ["vp history show <n>   (one run's log and cost)"])
         }
         var shown = Array(records.enumerated())
         if let track = parsed["track"]?.lowercased() {
@@ -298,10 +328,12 @@ enum VPCommands {
         shown = Array(shown.prefix(limit))
         out.emit(.object([
             ("count", .string("\(shown.count) of \(matching) matching (\(records.count) total)")),
-            ("runs", .table(["n", "at", "track", "ms", "text"], shown.map { index, r in
-                [.int(index + 1), .string(r.date.shortAgo), .string(r.trackName), .int(r.totalMs), .string(out.trim(r.text, 100) + (r.failure.map { " · failed: \($0)" } ?? ""))]
+            ("runs", .table(["n", "at", "track", "ms", "cost", "text"], shown.map { index, r in
+                [.int(index + 1), .string(r.date.shortAgo), .string(r.trackName), .int(r.totalMs),
+                 .string(r.log == nil ? "" : UsageSummary([r]).usedCloud ? RunLogFormat.cost(UsageSummary([r]).exact + UsageSummary([r]).estimated) : "local"),
+                 .string(out.trim(r.text, 100) + (r.failure.map { " · failed: \($0)" } ?? ""))]
             })),
-        ]), help: shown.isEmpty ? ["vp run <id> --text \"…\""] : ["vp history show <n>   (full text and timings)"])
+        ]), help: shown.isEmpty ? ["vp run <id> --text \"…\""] : ["vp history show <n>   (the run's log: every step, Jev's picks, tokens, cost)", "vp history usage   (today, 7 and 30 days)"])
     }
 
     static func durationSeconds(_ text: String) -> TimeInterval? {

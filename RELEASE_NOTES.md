@@ -1,5 +1,11 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.7.2**
+- **History now shows every step of a run**: what each one took, cost and gave, including which branch Jev picked and what happened when a step failed. Open a run with the ▸ beside it (or → on the keyboard): every step in order with its time and output, the path Jev took through a Branch or Route and the ones it didn't take, and, if an LLM failed and passed its text on, what the next step got instead. **Copy log** copies it as plain text.
+- **What it cost.** Each step shows its tokens and cost (exact, as OpenRouter reports them; cloud speech is estimated from its price, marked ≈), on-device steps say "on this Mac", and each run shows its total. The top of History adds up today and the last 7 days. From a terminal: `vp history show <n>` for a run's log, `vp history usage` for totals.
+- History shows each run as its own card, and fits a narrow window: search on its own line, track filters that wrap. Runs from before this version have no log.
+- `vp --version` now shows the real version (it said "dev" when run from your PATH).
+
 **1.7.1**
 - **A new Add step picker.** "+ Add step" now opens a proper picker in the Voice Pipes look instead of a plain menu: every block with its icon and a one-line description, what fits after the previous step first, and the rest in a dimmed "Doesn't fit" section that says why ("needs audio", "starts a pipeline"). It shows which blocks need a Jev or OpenRouter key you haven't added yet. Type to filter (it searches descriptions too: "clipboard" finds Copy), ↑↓ to move, Return to add, Esc to close. Inside a branch it says which branch you're adding to.
 

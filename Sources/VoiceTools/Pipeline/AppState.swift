@@ -39,6 +39,8 @@ struct ActiveRun {
     var heldBy: String?
     /// Branch blocks (by step index): Jev's time, and the chosen branch's steps with their times, for History.
     var branchDetail: [Int: (jevMs: Int, steps: [RunRecord.StepTiming])] = [:]
+    /// The run's log so far, saved with it in History.
+    var log: [RunRecord.LogEntry] = []
 }
 
 @MainActor
@@ -484,22 +486,19 @@ final class AppState {
         var payload = initial
         var index = start
         var heard: String?
+        if run?.trackID == track.id { run?.log = prelude(track, from: start, payload: initial) }
         while index < track.steps.count {
             let step = track.steps[index]
             if run?.trackID == track.id { run?.currentStep = index }
             let t0 = Date()
             do {
-                payload = try await execute(step.kind, payload: payload, track: track)
+                payload = try await runLogged(step, payload: payload, track: track, depth: 0, index: index)
             } catch {
-                if case .llm(_, _, .passThrough) = step.kind {
-                    NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
-                } else {
-                    // Keep what the run had so far, so a dictation whose paste failed can still be copied.
-                    let total = record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
-                    show(failure: error.localizedDescription, for: track)
-                    emit(["event": "run.failed", "track": track.slug ?? track.name, "error": error.localizedDescription])
-                    return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
-                }
+                // Keep what the run had so far, so a dictation whose paste failed can still be copied.
+                let total = record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
+                show(failure: error.localizedDescription, for: track)
+                emit(["event": "run.failed", "track": track.slug ?? track.name, "error": error.localizedDescription])
+                return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
             }
             // A Branch's own time is Jev's; the steps it ran are listed after it with theirs.
             let jevMs = run?.trackID == track.id ? run?.branchDetail[index]?.jevMs : nil
@@ -523,6 +522,110 @@ final class AppState {
         return RunOutcome(text: finalText, totalMs: total, failure: nil)
     }
 
+    // MARK: The run log
+
+    /// One step, logged: text in and out, time, what its cloud calls used, and (Route) Jev's pick. A Branch logs
+    /// itself and its steps. An LLM set to pass through on failure hands its input on (logged as such); any other
+    /// failure is logged and rethrown.
+    private func runLogged(_ step: Step, payload: Payload, track: Track, depth: Int, index: Int?) async throws -> Payload {
+        if case .branch = step.kind { return try await execute(step.kind, payload: payload, track: track, depth: depth) }
+        let meter = UsageMeter()
+        let t0 = Date()
+        lastDecision = nil
+        // Cloud transcription's title is the bare model id; say what the step is.
+        var entry = RunRecord.LogEntry(title: Self.logTitle(step.kind), category: step.kind.category, depth: depth, ms: 0,
+                                       input: Self.describe(payload), status: .ok, voice: Self.logVoice(step.kind))
+        func finish(_ output: Payload?) {
+            entry.ms = Int(Date().timeIntervalSince(t0) * 1000)
+            if let index, depth == 0, case .route = step.kind, let title = run?.stepTitles[safe: index], run?.trackID == track.id { entry.title = title }
+            entry.output = output.flatMap(Self.describe)
+            entry.usage = meter.total ?? (Self.runsOnThisMac(step.kind) ? RunRecord.Usage(local: true) : nil)
+            entry.decision = lastDecision
+            if run?.trackID == track.id { run?.log.append(entry) }
+        }
+        do {
+            let output = try await UsageMeter.$current.withValue(meter) {
+                try await execute(step.kind, payload: payload, track: track, depth: depth)
+            }
+            finish(output)
+            return output
+        } catch {
+            entry.message = error.localizedDescription
+            if case .llm(_, _, .passThrough) = step.kind {
+                NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
+                entry.status = .passedThrough
+                finish(payload)
+                return payload
+            }
+            entry.status = .failed
+            finish(nil)
+            throw error
+        }
+    }
+
+    /// A step's name in the log: what it is and which model, without words the usage column already says
+    /// ("on this Mac") and without the voice (it goes with the usage, so it isn't cut off at narrow widths).
+    static func logTitle(_ kind: StepKind) -> String {
+        switch kind {
+        case .openRouterSTT(let model): "Transcribe · \(model.split(separator: "/").last ?? "")"
+        case .parakeet(_, let mode): (mode ?? .onRelease) == .onRelease ? "Parakeet v3" : kind.title.replacingOccurrences(of: " · local", with: "")
+        case .localSpeech(let engine, _, _): "Speak · \(engine.label)"
+        case .openRouterSpeech(let model, _, _): "Speak · \(model.split(separator: "/").last ?? "")"
+        case .speak: "Speak · macOS voice"
+        default: kind.title
+        }
+    }
+
+    static func logVoice(_ kind: StepKind) -> String? {
+        switch kind {
+        case .localSpeech(let engine, let voice, _): engine.voiceLabel(voice)
+        case .openRouterSpeech(_, let voice, _): OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first
+        case .speak(let id, _): id.flatMap { AVSpeechSynthesisVoice(identifier: $0)?.name }
+        default: nil
+        }
+    }
+
+    /// A Route's pick, for its log entry (set while it runs).
+    @ObservationIgnored private var lastDecision: RunRecord.Decision?
+
+    /// Steps that ran before `runSteps` (the recording; streamed transcription; text handed over by `vp run`).
+    private func prelude(_ track: Track, from start: Int, payload: Payload) -> [RunRecord.LogEntry] {
+        guard start > 0 else { return [] }
+        var entries: [RunRecord.LogEntry] = []
+        let recorded = run.map { $0.processingStarted.timeIntervalSince($0.recordingStarted) } ?? 0
+        if track.steps.first?.kind == .microphone {
+            entries.append(RunRecord.LogEntry(title: "Microphone", category: "Input", depth: 0, ms: Int(max(0, recorded) * 1000),
+                                              output: String(format: "audio · %.1f s", max(0, recorded)), usage: RunRecord.Usage(local: true),
+                                              status: .ok, message: "recorded while the hotkey was held or toggled"))
+            if start >= 2, let transcribe = track.steps[safe: 1] {
+                entries.append(RunRecord.LogEntry(title: transcribe.kind.title, category: transcribe.kind.category, depth: 0, ms: 0,
+                                                  input: String(format: "audio · %.1f s", max(0, recorded)), output: Self.describe(payload),
+                                                  usage: RunRecord.Usage(local: true), status: .ok, message: "transcribed while you spoke"))
+            }
+        } else if payload.text != nil {
+            entries.append(RunRecord.LogEntry(title: "Text from vp", category: "Input", depth: 0, ms: 0, output: Self.describe(payload),
+                                              status: .ok, message: "handed over by `vp run`, so the track's earlier steps were skipped"))
+        }
+        return entries
+    }
+
+    /// A payload for the log: text (capped), "audio · 4.2 s", or nothing.
+    static func describe(_ payload: Payload) -> String? {
+        switch payload {
+        case .text(let text): text.count > 2000 ? String(text.prefix(2000)) + "…" : text
+        case .audio(let samples): String(format: "audio · %.1f s", Double(samples.count) / 16_000)
+        case .none: nil
+        }
+    }
+
+    /// Runs on this Mac with no cloud call (logged as "on this Mac").
+    static func runsOnThisMac(_ kind: StepKind) -> Bool {
+        switch kind {
+        case .microphone, .text, .parakeet, .fixWords, .template, .paste, .copy, .speak, .localSpeech, .showHUD: true
+        case .openRouterSTT, .llm, .route, .branch, .http, .openRouterSpeech: false
+        }
+    }
+
     /// Adds the run's text (if any) to History; returns the total time.
     @discardableResult
     private func record(_ track: Track, startedAt: Date, heard: String?, failure: String?) -> Int {
@@ -535,11 +638,12 @@ final class AppState {
                 + (run?.branchDetail[index]?.steps ?? [])
         }
         historyStore.add(RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
-                                   heard: heard == text ? nil : heard, failure: failure))
+                                   heard: heard == text ? nil : heard, failure: failure, log: run?.log))
         return total
     }
 
-    private func execute(_ kind: StepKind, payload: Payload, track: Track, nested: Bool = false) async throws -> Payload {
+    private func execute(_ kind: StepKind, payload: Payload, track: Track, depth: Int = 0) async throws -> Payload {
+        let nested = depth > 0
         switch kind {
         case .microphone:
             throw PipelineError.misplacedInput
@@ -583,6 +687,9 @@ final class AppState {
                 label = "Jev failed → \(routes[0].name)"
             }
             let route = routes[chosen]
+            lastDecision = RunRecord.Decision(kind: "route", question: nil, chosen: route.name, confidence: jevMs == nil ? nil : confidence,
+                                              jevMs: jevMs ?? Int(Date().timeIntervalSince(t0) * 1000),
+                                              others: routes.indices.filter { $0 != chosen }.map { routes[$0].name })
             let model = route.model.split(separator: "/").last ?? ""
             if let index = run?.currentStep, run?.trackID == track.id, index < (run?.stepTitles.count ?? 0) {
                 run?.stepTitles[index] = "\(label) · \(model)"
@@ -613,16 +720,18 @@ final class AppState {
                 run?.modelInfo = pick
                 run?.branchDetail[index] = (jevMs, [])
             }
+            if run?.trackID == track.id {
+                run?.log.append(RunRecord.LogEntry(
+                    title: "Branch · \(pick)", category: kind.category, depth: depth, ms: jevMs, input: Self.describe(payload),
+                    decision: RunRecord.Decision(kind: "branch", question: question, chosen: branch.name, confidence: confidence, jevMs: jevMs,
+                                                 others: branches.indices.filter { $0 != chosen }.map { branches[$0].name }),
+                    status: .ok, message: branch.steps.isEmpty ? "no steps: the text passed through" : nil))
+            }
             // The branch's steps, as a little track of their own (an LLM that fails can pass its input through).
             var current: Payload = .text(input)
             for step in branch.steps {
                 let s0 = Date()
-                do {
-                    current = try await execute(step.kind, payload: current, track: track, nested: true)
-                } catch {
-                    guard case .llm(_, _, .passThrough) = step.kind else { throw error }
-                    NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
-                }
+                current = try await runLogged(step, payload: current, track: track, depth: depth + 1, index: nil)
                 if !nested, run?.trackID == track.id {
                     run?.branchDetail[index]?.steps.append(RunRecord.StepTiming(title: "\(branch.name) › \(step.kind.title)",
                                                                               ms: Int(Date().timeIntervalSince(s0) * 1000),

@@ -25,6 +25,93 @@ struct RunRecord: Codable, Identifiable, Hashable {
     var heard: String?
     /// Why the run stopped, if it failed; `text` is then the last text it had.
     var failure: String?
+    /// Exactly how the run went, step by step (runs from 1.7.2 on; older runs have none).
+    var log: [LogEntry]?
+
+    /// One step as it ran: what went in and came out, how long it took, what it cost, and for a Branch or Route
+    /// what Jev chose.
+    struct LogEntry: Codable, Hashable {
+        enum Status: String, Codable { case ok, failed, passedThrough }
+
+        var title: String
+        var category: String?
+        /// 0 for the track's own steps, 1 inside a branch, 2 inside a branch in a branch…
+        var depth: Int
+        var ms: Int
+        /// Text in and out (capped), or "audio · 4.2 s".
+        var input: String?
+        var output: String?
+        var decision: Decision?
+        var usage: Usage?
+        var status: Status
+        var message: String?
+        /// A Speak step's voice, shown with its usage rather than in the title.
+        var voice: String?
+    }
+
+    struct Decision: Codable, Hashable {
+        /// "branch" or "route".
+        var kind: String
+        var question: String?
+        var chosen: String
+        var confidence: Double?
+        var jevMs: Int
+        /// The branches or routes not taken.
+        var others: [String]
+    }
+
+    /// What a step's cloud calls used. Exact for LLMs and transcription (OpenRouter reports it); cloud speech is
+    /// priced from the catalogue (`estimated`); on-device steps are `local`.
+    struct Usage: Codable, Hashable {
+        var model: String?
+        var promptTokens: Int?
+        var completionTokens: Int?
+        var seconds: Double?
+        var characters: Int?
+        var cost: Double?
+        var estimated: Bool?
+        var local: Bool?
+
+        mutating func add(_ other: Usage) {
+            func sum<T: AdditiveArithmetic>(_ a: T?, _ b: T?) -> T? { a == nil && b == nil ? nil : (a ?? .zero) + (b ?? .zero) }
+            model = other.model ?? model
+            promptTokens = sum(promptTokens, other.promptTokens)
+            completionTokens = sum(completionTokens, other.completionTokens)
+            seconds = sum(seconds, other.seconds)
+            characters = sum(characters, other.characters)
+            cost = sum(cost, other.cost)
+            if other.estimated == true { estimated = true }
+            if other.local == true, cost == nil { local = true }
+        }
+    }
+
+    /// The whole run's cloud use (nil for runs without a log, or that used nothing).
+    var usageTotal: Usage? {
+        let used = (log ?? []).compactMap(\.usage).filter { $0.local != true }
+        guard !used.isEmpty else { return nil }
+        var total = Usage()
+        for u in used { total.add(u) }
+        total.model = nil
+        return total
+    }
+}
+
+/// Collects what one step's cloud calls used. A task-local, so OpenRouterClient can report into whichever step
+/// is calling it and concurrent runs never mix.
+final class UsageMeter: @unchecked Sendable {
+    @TaskLocal static var current: UsageMeter?
+    private let lock = NSLock()
+    private var usage: RunRecord.Usage?
+
+    func add(_ part: RunRecord.Usage) {
+        lock.lock(); defer { lock.unlock() }
+        if usage == nil { usage = part } else { usage?.add(part) }
+    }
+
+    var total: RunRecord.Usage? {
+        lock.lock(); defer { lock.unlock() }
+        return usage
+    }
 }
 
 /// Every run's text, kept on disk (`history.json` beside the tracks) so a dictation that went nowhere — focus

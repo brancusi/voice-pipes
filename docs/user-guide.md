@@ -186,6 +186,13 @@ above the result. Runs are grouped by day; the chips next to the search box filt
 are listed in order with their times, coloured by kind (transcription blue, transforms lavender, outputs green). The
 last 1,000 runs are kept; **Clear history…** removes them all.
 
+
+**Run log.** Click **▸** (or the run's header) to open its log: each step with its time and output (**more**
+shows the full text), Jev's pick for a Branch or Route with the ones not taken, and what each step used: tokens
+and exact cost for LLMs, seconds and cost for cloud transcription, characters and an estimate (≈) for cloud speech,
+"on this Mac" for everything local. A step that failed shows what went wrong and what the next step got instead.
+**Copy log** copies it all as text. The strip at the top totals today and the last 7 days. `vp history show <n>`
+prints a run's log; `vp history usage` the totals for today, 7 and 30 days. Runs from before 1.7.2 have no log.
 ## About
 
 **About Voice Pipes** (the ⓘ button in the menu bar panel's footer, or the app menu while the window is open) shows

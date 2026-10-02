@@ -57,8 +57,11 @@ final class OpenRouterClient: Sendable {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
 
-        struct Response: Decodable { let text: String }
-        return try await send(request, as: Response.self).text.trimmingCharacters(in: .whitespacesAndNewlines)
+        struct Usage: Decodable { let seconds: Double?; let cost: Double? }
+        struct Response: Decodable { let text: String; let usage: Usage? }
+        let response = try await send(request, as: Response.self)
+        UsageMeter.current?.add(RunRecord.Usage(model: model, seconds: response.usage?.seconds, cost: response.usage?.cost))
+        return response.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Synthesizes speech as MP3. Speed is applied at playback, since only some providers honor it.
@@ -89,7 +92,9 @@ final class OpenRouterClient: Sendable {
         struct Request: Encodable { let model: String; let messages: [Message] }
         struct Response: Decodable {
             struct Choice: Decodable { let message: Message }
+            struct Usage: Decodable { let prompt_tokens: Int?; let completion_tokens: Int?; let cost: Double? }
             let choices: [Choice]
+            let usage: Usage?
         }
         var messages: [Message] = []
         if let system, !system.isEmpty { messages.append(Message(role: "system", content: system)) }
@@ -102,6 +107,9 @@ final class OpenRouterClient: Sendable {
         request.httpBody = try JSONEncoder().encode(Request(model: model, messages: messages))
 
         let response = try await send(request, as: Response.self)
+        // OpenRouter reports tokens and the exact cost with every reply.
+        UsageMeter.current?.add(RunRecord.Usage(model: model, promptTokens: response.usage?.prompt_tokens,
+                                                completionTokens: response.usage?.completion_tokens, cost: response.usage?.cost))
         guard let text = response.choices.first?.message.content else { throw OpenRouterError.emptyResponse }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

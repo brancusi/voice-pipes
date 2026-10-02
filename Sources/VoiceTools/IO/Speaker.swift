@@ -147,6 +147,11 @@ final class Speaker: NSObject {
                 throw error
             }
             guard isCurrent(run, pass) else { return }
+            // OpenRouter returns no usage for speech: price the characters from the catalogue.
+            let price = OpenRouterCatalog.shared.model(model)?.pricing?.prompt.flatMap(Double.init)
+            let characters = segments[index].count
+            UsageMeter.current?.add(RunRecord.Usage(model: model, characters: characters, cost: price.map { $0 * Double(characters) },
+                                                    estimated: true))
 
             let player = try AVAudioPlayer(data: audio)
             player.delegate = self

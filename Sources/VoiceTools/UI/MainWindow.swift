@@ -48,38 +48,46 @@ struct MainWindowView: View {
         }
         .vpWindow()
     }
+
+    /// Harness only: the page alone (a narrow tile with the sidebar hidden).
+    var snapshotDetail: some View { detail.vpWindow() }
     #endif
 
     private var sidebar: some View {
-        List(selection: $app.mainSection) {
+        // No List selection: the system draws it as a neutral grey pill; ours is the palette's bg300.
+        List {
             Section {
                 ForEach(app.store.tracks) { track in
-                    HStack(spacing: 8) {
-                        Rectangle().fill(Palette.track(track.colorHex)).frame(width: 7, height: 7)
-                        Text(track.name).lineLimit(1)
-                        Spacer(minLength: 4)
-                        if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
+                    sidebarItem(.track(track.id)) {
+                        HStack(spacing: 8) {
+                            Rectangle().fill(Palette.track(track.colorHex)).frame(width: 7, height: 7)
+                            Text(track.name).lineLimit(1)
+                            Spacer(minLength: 4)
+                            if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
+                        }
+                        .opacity(track.enabled ? 1 : 0.4)
                     }
-                    .opacity(track.enabled ? 1 : 0.4)
-                    .tag(MainSection.track(track.id))
                 }
                 .onMove { app.store.tracks.move(fromOffsets: $0, toOffset: $1) }
                 Button { newTrack() } label: {
                     Text("+ New track").foregroundStyle(Palette.purple)
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .listRowBackground(Color.clear)
             } header: {
                 SectionLabel("Tracks")
             }
             Section {
-                Text("History").tag(MainSection.activity)
-                Text("Vocabulary").tag(MainSection.vocabulary)
-                HStack {
-                    Text("Setup")
-                    Spacer()
-                    if app.worstCheck >= .warning { StatusCode(level: app.worstCheck, width: nil) }
+                sidebarItem(.activity) { Text("History") }
+                sidebarItem(.vocabulary) { Text("Vocabulary") }
+                sidebarItem(.setup) {
+                    HStack {
+                        Text("Setup")
+                        Spacer()
+                        if app.worstCheck >= .warning { StatusCode(level: app.worstCheck, width: nil) }
+                    }
                 }
-                .tag(MainSection.setup)
             } header: {
                 Hairline().padding(.vertical, 4)
             }
@@ -87,6 +95,21 @@ struct MainWindowView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Palette.bg000)
+    }
+
+    /// A sidebar row: selected, it sits on a bg300 pill with fg text.
+    private func sidebarItem<Label: View>(_ section: MainSection, @ViewBuilder _ label: () -> Label) -> some View {
+        let selected = app.mainSection == section
+        return label()
+            .foregroundStyle(Palette.fg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Palette.bg300 : Color.clear).padding(.horizontal, -4))
+            .contentShape(Rectangle())
+            .onTapGesture { app.mainSection = section }
+            .listRowInsets(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0))
+            .listRowBackground(Color.clear)
+            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
     @ViewBuilder private var detail: some View {
@@ -139,7 +162,10 @@ private struct HistoryView: View {
     @State private var query = ""
     @State private var trackFilter: String?
     @State private var copied: RunRecord.ID?
+    @State private var copiedLog: RunRecord.ID?
     @State private var confirmingClear = false
+    /// Runs whose log is open (several can be).
+    @State private var open: Set<RunRecord.ID> = HistoryPreview.open
 
     private var records: [RunRecord] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -178,21 +204,23 @@ private struct HistoryView: View {
                                    message: hotkey.map { "No runs yet. Hold \($0) and say something; every run lands here so you can copy it again." }
                                        ?? "No runs yet. Run a track and say something; every run lands here so you can copy it again.")
             } else {
+                // The page's width decides a row's layout: below 560 pt of card, its buttons go under its text.
+                GeometryReader { page in
+                let narrow = page.size.width - 56 < 560
                 ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        filters
+                        UsageTotalsStrip(records: app.history)
+                        filters(narrow: page.size.width - 56 < 600)
                         if records.isEmpty {
                             Text("Nothing matches. Try fewer words, or All.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                         }
                         ForEach(days, id: \.0) { day in
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 SectionLabel(day.0)
-                                Card {
-                                    ForEach(Array(day.1.enumerated()), id: \.element.id) { index, record in
-                                        if index > 0 { Hairline() }
-                                        row(record).id("run-\(record.id)").vpFlash("run-\(record.id)", cornerRadius: 0)
-                                    }
+                                // A card per run; an open run shows its log under it, with a purple border.
+                                ForEach(day.1) { record in
+                                    runCard(record, narrow: narrow).id("run-\(record.id)").vpFlash("run-\(record.id)", cornerRadius: 6)
                                 }
                             }
                         }
@@ -203,6 +231,7 @@ private struct HistoryView: View {
                 }
                 .onAppear { takeRequest(proxy) }
                 .onChange(of: UINav.shared.history) { _, _ in takeRequest(proxy) }
+                }
                 }
                 .toolbar {
                     ToolbarItem {
@@ -242,30 +271,136 @@ private struct HistoryView: View {
         UINav.shared.historySearch = query
     }
 
-    private var filters: some View {
-        HStack(spacing: 8) {
-            VPTextField("Search everything you've said", text: $query).focusKey("search").frame(maxWidth: 300)
-            VPChip(title: "All", selected: trackFilter == nil) { trackFilter = nil }
-            ForEach(trackNames.prefix(5), id: \.self) { name in
-                VPChip(title: name, selected: trackFilter == name) { trackFilter = trackFilter == name ? nil : name }
+    /// Search and track chips; narrow, search gets its own line and the chips wrap (never truncated).
+    @ViewBuilder private func filters(narrow: Bool) -> some View {
+        let search = VPTextField("Search everything you've said", text: $query).focusKey("search")
+        let chips = ForEach(["All"] + Array(trackNames.prefix(5)), id: \.self) { name in
+            VPChip(title: name, selected: name == "All" ? trackFilter == nil : trackFilter == name) {
+                trackFilter = name == "All" || trackFilter == name ? nil : name
             }
-            Spacer(minLength: 8)
-            Text("\(app.history.count.formatted()) runs · on this Mac").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                .lineLimit(1).fixedSize()
+            .fixedSize()
+        }
+        if narrow {
+            VStack(alignment: .leading, spacing: 8) {
+                search
+                FlowLayout(spacing: 8) { chips }
+            }
+        } else {
+            HStack(spacing: 8) {
+                search.frame(maxWidth: 300)
+                chips
+                Spacer(minLength: 8)
+                Text("\(app.history.count.formatted()) runs · on this Mac").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    .lineLimit(1).fixedSize()
+            }
         }
     }
 
-    private func row(_ record: RunRecord) -> some View {
+    private func runCard(_ record: RunRecord, narrow: Bool) -> some View {
+        let isOpen = open.contains(record.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            row(record, isOpen: isOpen, narrow: narrow)
+            if isOpen, record.log != nil {
+                Hairline()
+                RunLogView(record: record)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(record.failure != nil ? Palette.bg300 : Palette.bg200))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(isOpen ? Palette.purple : Palette.line, lineWidth: 1))
+    }
+
+    private func toggle(_ record: RunRecord) {
+        if open.contains(record.id) { open.remove(record.id) } else { open.insert(record.id) }
+    }
+
+    /// "· $0.0027 + ≈$0.0004", "· on this Mac", "· 1 step passed its input through" after the track and time.
+    private func usageMeta(_ record: RunRecord) -> Text {
+        guard record.log != nil else { return Text("") }
+        let summary = UsageSummary([record])
+        var text = Text("")
+        if summary.exact > 0 || summary.estimated > 0 {
+            if summary.exact > 0 {
+                text = text + Text(" · ") + Text(" \(RunLogFormat.cost(summary.exact)) ").bold().foregroundColor(Palette.fg)
+            }
+            if summary.estimated > 0 {
+                text = text + Text(summary.exact > 0 ? " + " : " · ") + Text("≈\(RunLogFormat.cost(summary.estimated))")
+            }
+        } else if !summary.usedCloud {
+            text = text + Text(" · on this Mac")
+        }
+        let passed = record.passedThroughCount
+        if passed > 0 {
+            text = text + Text(" · \(passed) step\(passed == 1 ? "" : "s") passed \(passed == 1 ? "its" : "their") input through").foregroundColor(Palette.orange)
+        }
+        return text
+    }
+
+    private func row(_ record: RunRecord, isOpen: Bool, narrow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            rowBody(record, isOpen: isOpen, showButtons: !narrow)
+            if narrow { rowButtons(record, isOpen: isOpen).padding(.leading, record.log != nil ? 28 : 0) }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        // The header toggles the log (text inside stays selectable); a focused row opens with → and closes with ←.
+        .contentShape(Rectangle())
+        .onTapGesture { if record.log != nil { toggle(record) } }
+        .focusable(record.log != nil)
+        .onKeyPress(.rightArrow) {
+            guard record.log != nil, !open.contains(record.id) else { return .ignored }
+            open.insert(record.id)
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            guard open.contains(record.id) else { return .ignored }
+            open.remove(record.id)
+            return .handled
+        }
+    }
+
+    private func rowButtons(_ record: RunRecord, isOpen: Bool) -> some View {
+        HStack(spacing: 8) {
+            if isOpen {
+                Button(copiedLog == record.id ? "Copied ✓" : "Copy log") {
+                    Clipboard.shared.copy(record.logText)
+                    copiedLog = record.id
+                }
+                .buttonStyle(copiedLog == record.id ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
+            }
+            Button(copied == record.id ? "Copied ✓" : "Copy") {
+                Clipboard.shared.copy(record.text)
+                copied = record.id
+            }
+            .buttonStyle(copied == record.id ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
+        }
+    }
+
+    private func rowBody(_ record: RunRecord, isOpen: Bool, showButtons: Bool) -> some View {
         let failed = record.failure != nil
         let color = failed ? Palette.orange
             : (record.colorHex ?? app.store.tracks.first { $0.name == record.trackName }?.colorHex).map(Palette.track) ?? Palette.fgMuted
-        return HStack(alignment: .top, spacing: 14) {
+        return HStack(alignment: .top, spacing: 12) {
+            if record.log != nil {
+                Button { toggle(record) } label: {
+                    Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(isOpen ? Palette.purple : Palette.fgMuted)
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isOpen ? "Hide run log" : "Show run log")
+                .help(isOpen ? "Hide the log" : "Show how this run went, step by step")
+            }
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Rectangle().fill(color).frame(width: 7, height: 7)
+                // The square sits on the first line when the meta line wraps.
+                HStack(alignment: .top, spacing: 8) {
+                    Rectangle().fill(color).frame(width: 7, height: 7).padding(.top, 4)
                     (Text("\(record.trackName) · \(record.date.formatted(date: .omitted, time: .shortened)) · \(record.totalMs.msLabel)")
+                        + usageMeta(record)
                         + (record.failure.map { Text(" · " + $0).foregroundColor(Palette.orange) } ?? Text("")))
-                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
                 }
                 if let heard = record.heard {
                     Text("› " + heard).foregroundStyle(Palette.fgMuted).textSelection(.enabled)
@@ -275,14 +410,8 @@ private struct HistoryView: View {
                 if !record.steps.isEmpty { StepChain(steps: record.steps) }
             }
             Spacer(minLength: 0)
-            Button(copied == record.id ? "Copied ✓" : "Copy") {
-                Clipboard.shared.copy(record.text)
-                copied = record.id
-            }
-            .buttonStyle(copied == record.id ? VPButtonStyle(kind: .primary) : VPButtonStyle(kind: .secondary))
+            if showButtons { rowButtons(record, isOpen: isOpen) }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .background(failed ? Palette.bg300 : .clear)
     }
 }
 
@@ -531,4 +660,13 @@ struct WindowBehavior: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+/// Harness only: runs to show with their logs open.
+enum HistoryPreview {
+    #if SNAPSHOTS
+    nonisolated(unsafe) static var open: Set<RunRecord.ID> = []
+    #else
+    static let open: Set<RunRecord.ID> = []
+    #endif
 }
