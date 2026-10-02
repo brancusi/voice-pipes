@@ -12,9 +12,9 @@ enum MainSection: Hashable {
 /// The menu bar panel stays a quick launcher.
 struct MainWindowView: View {
     @Bindable var app: AppState
-    /// Narrowest the detail pages lay out properly; a tiled or split-screen window can be narrower than the
-    /// window's own minimum, and below this the page scrolls sideways instead of being clipped on both edges.
-    static let detailMinWidth: CGFloat = 520
+    /// Narrowest the detail pages lay out properly. Pages squeeze down to this; below it (a narrow tile with the
+    /// sidebar showing) they scroll sideways instead of being clipped on both edges.
+    static let detailMinWidth: CGFloat = 380
 
     var body: some View {
         NavigationSplitView {
@@ -22,7 +22,9 @@ struct MainWindowView: View {
         } detail: {
             detail.scrollsSidewaysBelow(Self.detailMinWidth)
         }
-        .frame(minWidth: 900, minHeight: 640)
+        .frame(minWidth: 420, minHeight: 320)
+        // Small minimums on purpose: tiling window managers (yabai, Stage Manager, split screen) size the window
+        // to its tile, and a window that refuses to shrink spills into the neighbouring one.
         .vpWindow()
         .background(WindowBehavior())
         // A menu bar app has no Dock icon and isn't in ⌘Tab, so its window would be unreachable once you click
@@ -92,7 +94,7 @@ struct MainWindowView: View {
         case .activity:
             HistoryView(app: app).navigationTitle("History").background(Palette.bg100)
         case .vocabulary:
-            VocabularyView(parakeet: app.parakeet).navigationTitle("Vocabulary").background(Palette.bg100)
+            VocabularyView(parakeet: app.parakeet).scrollsSidewaysBelow(520).navigationTitle("Vocabulary").background(Palette.bg100)
         case .setup, nil:
             SetupView(app: app).navigationTitle("Setup")
         }

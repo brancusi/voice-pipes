@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.1.3**
+- **The window fits any tile.** The Voice Pipes window used to refuse to get narrower than about 900 points, so in yabai, Stage Manager or split screen it pushed past its space into the next window. It now shrinks to whatever space it's given and its pages squeeze to fit. In a very narrow space, a page scrolls left and right rather than spilling over. You can also hide the sidebar for more room.
+
 **1.1.2**
 - **A cleaner Setup page.** It now matches the rest of the app: cards of status rows (OK, INFO, WARN, FAIL) for Checks, Connections, On this Mac and Updates.
 - **Simpler API keys.** A saved key now shows as its first characters, dots and its last four, e.g. `sk-or-v1-••••3f9a`. To change it, click the field and paste the new one: it's saved straight away, with no Save button, and the OpenRouter key is checked on the spot. **Remove key** deletes one. Keys are still kept in your Mac's Keychain.

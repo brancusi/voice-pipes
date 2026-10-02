@@ -27,7 +27,7 @@ struct TrackDetailView: View {
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
-                        .frame(width: 200)
+                        .frame(minWidth: 150, maxWidth: 200)
                         if app.store.conflicts.contains(trigger.combo) {
                             Label("Also used by another trigger", systemImage: "exclamationmark.triangle")
                                 .font(.caption).foregroundStyle(.orange)
