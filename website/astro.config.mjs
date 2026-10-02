@@ -9,6 +9,8 @@ export default defineConfig({
   // without a redirect (Cloudflare's default html_handling, auto-trailing-slash, maps them).
   build: { format: 'file', inlineStylesheets: 'always' },
   trailingSlash: 'never',
+  // Docs and blog code blocks are plain text styled by global.css (.prose pre): no highlighter's inline colours.
+  markdown: { syntaxHighlight: false },
   // The site's three faces, served from this site (no font CDN). Latin only, from the installed Fontsource packages:
   // characters outside it fall back to the next font in the stack.
   fonts: [

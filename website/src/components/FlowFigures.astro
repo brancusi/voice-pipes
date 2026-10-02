@@ -1,0 +1,48 @@
+---
+// Steps the illustrative figures in blog posts (<figure data-flow>): each [data-step="n"] element appears at stage n,
+// and the newest flashes, like the app outlining what changed. Without JavaScript, or with reduced motion, every step
+// shows at once (the finished state). It runs only while the figure is on screen and the tab is visible, and the
+// figure's own Pause and Replay buttons control it. Nothing here touches the microphone, speakers or network.
+---
+
+<script>
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  for (const fig of document.querySelectorAll<HTMLElement>('[data-flow]')) {
+    const steps = [...fig.querySelectorAll<HTMLElement>('[data-step]')];
+    const last = Math.max(...steps.map((el) => Number(el.dataset.step)));
+    const controls = fig.querySelector<HTMLElement>('[data-flow-controls]');
+    const pause = fig.querySelector<HTMLButtonElement>('[data-flow-pause]');
+    let stage = last, timer = 0, held = false, inView = false;
+
+    const show = (s: number) => {
+      stage = s;
+      for (const el of steps) {
+        const n = Number(el.dataset.step);
+        el.toggleAttribute('data-off', n > s);
+        el.toggleAttribute('data-now', n === s && s < last);
+      }
+    };
+    const playing = () => !held && inView && !document.hidden && !reduce.matches;
+    const run = () => {
+      clearTimeout(timer);
+      if (playing()) timer = window.setTimeout(() => { show(stage >= last ? 0 : stage + 1); run(); }, stage >= last ? 4200 : 1500);
+    };
+    const restart = () => { show(reduce.matches ? last : 0); run(); };
+
+    if (controls) controls.hidden = reduce.matches;
+    pause?.addEventListener('click', () => {
+      held = !held;
+      pause.setAttribute('aria-pressed', String(held));
+      pause.textContent = held ? 'Play' : 'Pause';
+      run();
+    });
+    fig.querySelector('[data-flow-replay]')?.addEventListener('click', restart);
+    reduce.addEventListener('change', () => { if (controls) controls.hidden = reduce.matches; restart(); });
+    document.addEventListener('visibilitychange', run);
+    let started = false;
+    new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting;
+      if (inView && !started) { started = true; restart(); } else run();
+    }).observe(fig);
+  }
+</script>

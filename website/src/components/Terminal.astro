@@ -1,0 +1,60 @@
+---
+// The command line: the one-line installer and real vp commands (from the app's CLI, Sources/VoiceTools/CLI), with
+// what each does. Commands only, no made-up output.
+import CopyCode from './CopyCode.astro';
+import { INSTALL_COMMAND } from '../site';
+
+const commands = [
+  ['vp', 'live state: the app, your config, your tracks'],
+  ['vp say "Tests passed."', 'speak, on your Mac'],
+  ['vp ask "Staging or production?"', 'ask out loud, print the answer'],
+  ['vp run <track> --text "…"', 'send text through a track'],
+  ['vp transcribe memo.m4a', 'a file, on your Mac'],
+  ['vp config check', 'validate config.toml'],
+];
+---
+
+<section id="terminal" class="sec sec--deep">
+  <div class="wrap split">
+    <div class="stack">
+      <span class="eyebrow c-purple">From the terminal</span>
+      <h2 class="display h2">ride it from the terminal</h2>
+      <p class="lede">
+        <code class="c-fg">vp</code>, the command-line tool, runs your tracks, speaks, listens and transcribes, and edits
+        your config, keys and vocabulary. It's built for agents too: compact output, next-step hints and no prompts,
+        plus a skill that teaches Claude Code, Codex and others to use it.
+      </p>
+      <div class="term">
+        <div class="term-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">install: app, vp and agent skill</span>
+        </div>
+        <pre class="term-body term-install" data-copy><code><span class="c-muted" aria-hidden="true">$ </span>{INSTALL_COMMAND}</code></pre>
+      </div>
+      <p class="small">
+        It checks the download is signed by Voice Pipes' developer and notarized by Apple, and asks nothing, so an agent
+        can run it. macOS still asks you for Microphone and Accessibility on the first launch.
+      </p>
+      <div class="actions">
+        <a class="btn btn-p" href="/docs/install">Install guide</a>
+        <a class="btn btn-s" href="/docs/cli">CLI reference</a>
+        <a class="nav-a" href="/docs/agents">For agents →</a>
+      </div>
+    </div>
+    <div class="term" role="region" aria-label="vp commands">
+      <div class="term-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">vp</span>
+      </div>
+      <div class="term-body term-cmds">
+        {
+          commands.map(([command, does]) => (
+            <div class="term-cmd">
+              <span class="c-muted"># {does}</span>
+              <code class="c-fg"><span class="c-muted" aria-hidden="true">$ </span>{command}</code>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+<CopyCode />

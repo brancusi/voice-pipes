@@ -8,7 +8,8 @@ HTML and CSS, served by Cloudflare Workers static assets. The plan, copy and sit
 of the Voice Pipes Website design (a Claude design canvas), built on the Voice Pipes design system (its Philosophy,
 Sundown tokens, components and logo rules) with the system's own logo and mascot files. See `docs/brand.md` for the
 direction. `/setup` is the key setup guide the app links to (`/setup#openrouter`, `/setup#jev`; keep those anchors).
-The other pages in the sitemap aren't designed yet.
+`/docs` is the developer docs (terminal install, the `vp` reference, config.toml, agents) and `/blog` the blog, both
+written in Markdown (see Writing below). The other pages in the sitemap aren't designed yet.
 
 This folder is independent of the Mac app: `build.sh`, `Package.swift` and the release workflow never read it, and a
 website change is not an app release (no `VERSION` bump or release notes).
@@ -35,6 +36,9 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 | `src/pages/` | One file per URL. `features/speed.astro` builds to `features/speed.html`, served at `/features/speed` |
 | `src/components/` | The home page's sections, in page order from `SiteHeader` to `SiteFooter`; `HeroDemo` is the illustrative demo |
 | `src/pages/setup.astro` | The key setup guide: what needs which key, OpenRouter and TypeSafe steps, where keys go in the app |
+| `src/content/docs/` | The developer docs, one Markdown file per page; `src/pages/docs/[...slug].astro` renders them with the sidebar |
+| `src/content/blog/` | Blog posts, one Markdown file each; `src/pages/blog/` has the index, the post page and `rss.xml`; `FlowFigures.astro` steps a post's animated figures |
+| `src/content.config.ts` | The two collections and their front matter |
 | `src/layouts/Base.astro` | The document shell: title, description, canonical URL, `noindex`, fonts, skip link |
 | `src/styles/global.css` | All styles: the design system's colour tokens, the design's classes and its two breakpoints (900 and 520 px) |
 | `src/lib/releases.ts` | Reads the newest releases from the app's `RELEASE_NOTES.md` for the Changelog section |
@@ -44,6 +48,23 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 | `public/` | Copied to `dist/` as is: `_headers` for Cloudflare's response headers |
 | `scripts/payload.mjs` | The payload report behind `npm run payload` |
 | `wrangler.jsonc` | Cloudflare hosting: the asset directory, 404 handling and the custom domain |
+
+## Writing docs and posts
+
+- **A blog post** is a Markdown file in `src/content/blog/`; its file name is its URL (`my-post.md` → `/blog/my-post`).
+  Front matter: `title`, `description` (the index and the feed use it) and `date` (`2026-10-02`); `draft: true`
+  keeps it out of the build. The index, the post page and `/blog/rss.xml` pick it up.
+- **A docs page** is a Markdown file in `src/content/docs/` (`index.md` is `/docs`). Front matter: `title`, `nav` (its
+  sidebar name), `description`, `order` (its place in the sidebar) and optionally `headline` (the big lowercase
+  heading; the title, lowercased, by default). `##` headings become the sidebar's sections, `###` their subsections.
+- **Figures** in a post are plain HTML in the Markdown file, using the `fig__*` classes in `global.css` (see
+  `why-i-built-voice-pipes.md`; keep each figure free of blank lines). In `<figure data-flow>`, elements with
+  `data-step="n"` appear one stage at a time (`FlowFigures.astro`); without JavaScript or with reduced motion
+  everything shows at once. Label recreations of the app as illustrative, not screenshots.
+- Code blocks are plain (no highlighter). Fence commands as `sh` and they get a Copy button; fence sample output as
+  `text` and they don't.
+- Docs describe the app as shipped: check commands against the CLI source (`Sources/VoiceTools/CLI/`) and
+  `Tools/install.sh`, and say which version a page matches. Don't link the private repository as documentation.
 
 ## Content that comes from the app
 
@@ -55,8 +76,9 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 
 ## Where it differs from the design
 
-- **Header below 900 px:** the section links are hidden, as the design's stylesheet says. In the design an inline
-  style overrides that rule, so on a phone the links wrap and push Download off-screen (the page scrolls sideways).
+- **Header below 1100 px:** the section links are hidden (the design's stylesheet says 900 px; Docs and Blog, which
+  stay on every screen, need the room). In the design an inline style overrides that rule, so on a phone the links
+  wrap and push Download off-screen (the page scrolls sideways). Below 520 px Docs and Blog take a second row.
 - **Changelog rows** come from the release notes (above), so the text differs from the design's 1.1.0-era sample.
 - **Logo:** the header uses the design system's primary Sundown mark at 32 px (the design drew the 16 px three-pipe
   drawing there, which the system keeps for sizes under 32 px), in the system's horizontal lockup: a gap of a fifth of

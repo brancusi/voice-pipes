@@ -1,0 +1,63 @@
+---
+// The developer docs: one page per Markdown file in src/content/docs, with the sidebar beside it.
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import DocsNav from '../../components/DocsNav.astro';
+import CopyCode from '../../components/CopyCode.astro';
+import { docsPath } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+  return pages.map((page, i) => ({
+    params: { slug: page.id === 'index' ? undefined : page.id },
+    props: { page, previous: pages[i - 1], next: pages[i + 1] },
+  }));
+}
+
+const { page, previous, next } = Astro.props;
+const { Content, headings } = await render(page);
+const sections = headings.filter((h) => h.depth === 2);
+---
+
+<Base title={page.id === 'index' ? 'Developer docs · Voice Pipes' : `${page.data.title} · Voice Pipes docs`} description={page.data.description}>
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="band">
+      <div class="wrap docs-intro">
+        <span class="eyebrow c-purple">Docs</span>
+        <h1 class="display docs-intro__title">{page.data.headline ?? page.data.title.toLowerCase()}<span class="c-pink">.</span></h1>
+        <p class="lede hero__lede">{page.data.description}</p>
+      </div>
+    </section>
+    <div class="wrap docs">
+      <DocsNav current={page.id} headings={headings} />
+      <div class="docs__main">
+        {
+          sections.length > 2 && (
+            <details class="docs-toc card">
+              <summary>On this page</summary>
+              <ul>
+                {sections.map((h) => (
+                  <li>
+                    <a href={`#${h.slug}`}>{h.text}</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )
+        }
+        <article class="prose">
+          <Content />
+        </article>
+        <nav class="docs-pager" aria-label="Previous and next page">
+          {previous && <a class="card docs-pager__link" href={docsPath(previous.id)} rel="prev"><span class="eyebrow">Previous</span>{previous.data.nav}</a>}
+          {next && <a class="card docs-pager__link docs-pager__link--next" href={docsPath(next.id)} rel="next"><span class="eyebrow">Next</span>{next.data.nav}</a>}
+        </nav>
+      </div>
+    </div>
+  </main>
+  <SiteFooter />
+  <CopyCode />
+</Base>

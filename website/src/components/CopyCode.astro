@@ -1,0 +1,36 @@
+---
+// Progressive enhancement for code blocks in docs and posts (and pre[data-copy] elsewhere): a Copy button on each, and keyboard focus for the ones
+// that scroll sideways. Without JavaScript the blocks are still selectable and scroll as usual.
+---
+
+<script>
+  for (const pre of document.querySelectorAll<HTMLPreElement>('.prose > pre, pre[data-copy]')) {
+    const box = document.createElement('div');
+    box.className = 'code';
+    pre.replaceWith(box);
+    box.append(pre);
+    if (pre.scrollWidth > pre.clientWidth) {
+      pre.tabIndex = 0;
+      pre.setAttribute('aria-label', 'Code, scrolls sideways');
+    }
+    // Sample output (```text blocks) has nothing to copy.
+    if (pre.querySelector('code.language-text')) continue;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'code__copy';
+    button.textContent = 'Copy';
+    button.addEventListener('click', async () => {
+      try {
+        // The code alone: a prompt (aria-hidden, like the home page's `$ `) isn't part of the command.
+        const code = pre.cloneNode(true) as HTMLPreElement;
+        code.querySelectorAll('[aria-hidden]').forEach((el) => el.remove());
+        await navigator.clipboard.writeText(code.textContent!.trimEnd());
+        button.textContent = 'Copied ✓';
+      } catch {
+        button.textContent = 'Select and copy';
+      }
+      setTimeout(() => (button.textContent = 'Copy'), 2000);
+    });
+    box.append(button);
+  }
+</script>

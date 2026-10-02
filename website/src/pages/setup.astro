@@ -87,6 +87,7 @@ const TS = {
             New accounts get a small free allowance, but the cloud models Voice Pipes uses by default are paid ones.
           </p>
           <p class="guide__source">Fees, the free allowance and limits: <a href={OR.faq}>OpenRouter's FAQ</a>.</p>
+          <p class="guide__source">From a terminal, <code>vp auth login openrouter</code> signs in through your browser and saves the key for you (<a href="/docs/cli#vp-auth">CLI reference</a>).</p>
         </div>
         <ol class="card guide__steps">
           <li><a href={OR.signUp}>Create an OpenRouter account</a>.</li>
@@ -109,6 +110,7 @@ const TS = {
             measurement), so routing costs very little.
           </p>
           <p class="guide__source">Current price and limits: <a href={TS.models}>TypeSafe's Models page</a>.</p>
+          <p class="guide__source">From a terminal, copy the key and run <code>pbpaste | vp auth set typesafe</code> (<a href="/docs/cli#vp-auth">CLI reference</a>).</p>
         </div>
         <ol class="card guide__steps">
           <li>Sign in to the <a href={TS.console}>TypeSafe console</a>, or create an account there.</li>
@@ -150,7 +152,7 @@ const TS = {
         </div>
         <ul class="card guide__steps guide__steps--plain">
           <li>Voice Pipes keeps both keys in your Mac's login Keychain, not in a file, and shows a saved key masked: its first characters and its last four.</li>
-          <li>This website never asks for a key. Paste keys only into the app.</li>
+          <li>This website never asks for a key. Paste keys only into the app, or give them to <code>vp auth</code>, which saves them to the same Keychain and never prints them in full.</li>
           <li><strong>Remove key</strong> deletes a key from the Keychain.</li>
           <li>If a key may have leaked, create a new one in the provider's dashboard, paste it into the app, and remove the old one there.</li>
         </ul>

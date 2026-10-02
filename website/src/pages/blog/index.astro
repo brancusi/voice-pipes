@@ -1,0 +1,46 @@
+---
+// The blog index: every published post in src/content/blog, newest first.
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { blogPath, formatDate, posts } from '../../lib/content';
+
+const list = await posts();
+---
+
+<Base title="Blog · Voice Pipes" description="News and notes from the people building Voice Pipes: new releases, the vp command line, and how the pipes work.">
+  <link slot="head" rel="alternate" type="application/rss+xml" title="Voice Pipes blog" href="/blog/rss.xml" />
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="band">
+      <div class="wrap docs-intro">
+        <span class="eyebrow c-purple">Blog</span>
+        <h1 class="display docs-intro__title">news from the range<span class="c-pink">.</span></h1>
+        <p class="lede hero__lede">What's new in Voice Pipes and how it works, for people who build their own pipes.</p>
+      </div>
+    </section>
+    <section class="sec sec--flush">
+      <div class="wrap">
+        <div class="posts">
+          {
+            list.length === 0 ? (
+              <p class="lede">Quiet on the range. No posts yet.</p>
+            ) : (
+              list.map((post) => (
+                <article class="card post-card">
+                  <time class="eyebrow" datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time>
+                  <h2 class="post-card__title">
+                    <a href={blogPath(post.id)}>{post.data.title}</a>
+                  </h2>
+                  <p class="small">{post.data.description}</p>
+                </article>
+              ))
+            )
+          }
+          <p class="small">Follow along with the <a href="/blog/rss.xml">RSS feed</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>

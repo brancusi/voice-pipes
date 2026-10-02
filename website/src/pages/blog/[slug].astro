@@ -1,0 +1,40 @@
+---
+// One blog post: src/content/blog/<slug>.md → /blog/<slug>.
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import CopyCode from '../../components/CopyCode.astro';
+import FlowFigures from '../../components/FlowFigures.astro';
+import { formatDate, posts } from '../../lib/content';
+
+export async function getStaticPaths() {
+  return (await posts()).map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<Base title={`${post.data.title} · Voice Pipes blog`} description={post.data.description}>
+  <link slot="head" rel="alternate" type="application/rss+xml" title="Voice Pipes blog" href="/blog/rss.xml" />
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="band">
+      <div class="wrap docs-intro">
+        <a class="eyebrow c-purple post__back" href="/blog">← Blog</a>
+        <h1 class="display docs-intro__title post__title">{post.data.title}</h1>
+        <time class="hero__small" datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time>
+      </div>
+    </section>
+    <div class="wrap post">
+      <article class="prose">
+        <p class="lede">{post.data.description}</p>
+        <Content />
+      </article>
+    </div>
+  </main>
+  <SiteFooter />
+  <CopyCode />
+  <FlowFigures />
+</Base>

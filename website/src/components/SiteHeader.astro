@@ -11,6 +11,9 @@ const sections = [
   ['/#changelog', 'Changelog'],
   ['/setup', 'Setup'],
 ];
+// Marks Docs or Blog as the current section on its pages (built as docs/cli.html and the like).
+const path = Astro.url.pathname.replace(/\.html$/, '');
+const here = (section: string) => (path === section ? 'page' : path.startsWith(`${section}/`) ? 'true' : undefined);
 ---
 
 <header class="band">
@@ -23,6 +26,11 @@ const sections = [
       {sections.map(([href, label]) => <a class="nav-a" href={href}>{label}</a>)}
     </nav>
     <span class="spacer"></span>
+    {/* Kept on every screen size, unlike the section links. */}
+    <nav class="devlinks" aria-label="Developers">
+      <a class="nav-a" href="/docs" aria-current={here('/docs')}>Docs</a>
+      <a class="nav-a" href="/blog" aria-current={here('/blog')}>Blog</a>
+    </nav>
     <a class="btn btn-p btn-sm" href={DOWNLOAD_URL}>Download</a>
   </div>
 </header>

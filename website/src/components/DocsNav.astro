@@ -1,0 +1,52 @@
+---
+// The docs sidebar: every page in order, and the current page's sections (and their subsections) under it.
+import { getCollection } from 'astro:content';
+import { docsPath } from '../lib/content';
+
+interface Props {
+  current: string;
+  headings: { depth: number; slug: string; text: string }[];
+}
+
+const { current, headings } = Astro.props;
+const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+// Each h2 with the h3s that follow it.
+const sections: { slug: string; text: string; subsections: { slug: string; text: string }[] }[] = [];
+for (const h of headings) {
+  if (h.depth === 2) sections.push({ slug: h.slug, text: h.text, subsections: [] });
+  else if (h.depth === 3) sections.at(-1)?.subsections.push(h);
+}
+---
+
+<nav class="docs-nav" aria-label="Docs">
+  <span class="eyebrow">Docs</span>
+  <ul class="docs-nav__pages">
+    {
+      pages.map((page) => (
+        <li>
+          <a class="docs-nav__page" href={docsPath(page.id)} aria-current={page.id === current ? 'page' : undefined}>
+            {page.data.nav}
+          </a>
+          {page.id === current && sections.length > 0 && (
+            <ul class="docs-nav__toc">
+              {sections.map((h) => (
+                <li>
+                  <a href={`#${h.slug}`}>{h.text}</a>
+                  {h.subsections.length > 0 && (
+                    <ul class="docs-nav__sub">
+                      {h.subsections.map((sub) => (
+                        <li>
+                          <a href={`#${sub.slug}`}>{sub.text}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+</nav>
