@@ -87,6 +87,16 @@ enum FailurePolicy: String, Codable, CaseIterable {
     case stop
 }
 
+/// One branch of a Route step: Jev picks the route whose `when` fits the input best, then `model` answers with
+/// `prompt` (the same way an LLM step does).
+struct Route: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var name: String
+    var when: String
+    var model: String
+    var prompt: String
+}
+
 enum StepKind: Codable, Hashable {
     // Inputs
     case microphone
@@ -99,6 +109,8 @@ enum StepKind: Codable, Hashable {
 
     // Transform (text -> text)
     case llm(model: String, prompt: String, onFailure: FailurePolicy)
+    /// Jev chooses one of the routes for the input; that route's model and instructions produce the output.
+    case route(routes: [Route])
     case http(url: String, method: String, headers: [String: String], bodyTemplate: String, responseField: String)
     case template(String)
     /// Find-and-replace from the shared vocabulary (Voice Tools → Vocabulary).
@@ -116,14 +128,14 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
+        case .llm, .route, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
         }
     }
 
     var output: DataKind {
         switch self {
         case .microphone: .audio
-        case .text, .parakeet, .openRouterSTT, .llm, .http, .template, .fixWords: .text
+        case .text, .parakeet, .openRouterSTT, .llm, .route, .http, .template, .fixWords: .text
         // Outputs pass their text through so a track can, e.g., paste and then POST.
         case .paste, .copy, .showHUD: .text
         case .speak, .openRouterSpeech, .localSpeech: .none
@@ -134,7 +146,7 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
-        case .llm, .http, .template, .fixWords: "Transform"
+        case .llm, .route, .http, .template, .fixWords: "Transform"
         case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: "Output"
         }
     }
@@ -151,6 +163,7 @@ enum StepKind: Codable, Hashable {
             }
         case .openRouterSTT(let model): model
         case .llm(let model, _, _): "LLM · \(model)"
+        case .route(let routes): "Route · Jev · " + routes.map(\.name).joined(separator: " / ")
         case .http(let url, let method, _, _, _): "\(method) \(URL(string: url)?.host ?? url)"
         case .template: "Text template"
         case .fixWords: "Fix words"
@@ -172,6 +185,7 @@ enum StepKind: Codable, Hashable {
         case .parakeet: "Parakeet"
         case .openRouterSTT(let model): model.split(separator: "/").last.map(String.init) ?? model
         case .llm(let model, _, _): model.split(separator: "/").last.map(String.init) ?? model
+        case .route: "Jev route"
         case .http(_, let method, _, _, _): method
         case .template: "Template"
         case .fixWords: "Fix words"
@@ -193,6 +207,7 @@ enum StepKind: Codable, Hashable {
         case .parakeet, .openRouterSTT: "Transcribe"
         case .speak, .openRouterSpeech, .localSpeech: "Speak"
         case .llm: "LLM · OpenRouter"
+        case .route: "Route · Jev"
         default: title
         }
     }
@@ -203,6 +218,7 @@ enum StepKind: Codable, Hashable {
         .text(sources: [.selection, .page, .clipboard]),
         .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
+        .route(routes: Route.answerRoutes),
         .http(url: "https://", method: "POST", headers: ["Content-Type": "application/json"],
               bodyTemplate: #"{"text": {{input_json}}}"#, responseField: ""),
         .fixWords,
@@ -219,6 +235,9 @@ extension Track {
     var validationError: String? {
         guard let first = steps.first else { return "Add at least one step." }
         if first.kind.input != .none { return "The first step must be an input." }
+        for step in steps {
+            if case .route(let routes) = step.kind, routes.isEmpty { return "Route · Jev needs at least one route." }
+        }
         for (a, b) in zip(steps, steps.dropFirst()) where a.kind.output != b.kind.input {
             return "\(b.kind.title) needs \(b.kind.input.rawValue), but \(a.kind.title) produces \(a.kind.output.rawValue)."
         }
@@ -245,6 +264,24 @@ extension Track {
               triggers: [Trigger(combo: KeyCombo(key: .r, modifiers: [.option]), mode: .toggle)],
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
                       Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))]),
+    ]
+}
+
+extension Route {
+    /// Starting routes for a spoken question: a fast model, a web-search model, a stronger model.
+    static let answerRoutes: [Route] = [
+        Route(name: "quick",
+              when: "A short factual lookup, definition, conversion, spelling or yes/no that a small fast model answers well in a sentence or two.",
+              model: "anthropic/claude-haiku-4.5",
+              prompt: "Answer in one or two short sentences. The answer is read aloud: plain spoken language, no markdown, lists or links."),
+        Route(name: "web",
+              when: "Needs current or live information: news, prices, weather, sports results, today's events, anything that changes over time.",
+              model: "perplexity/sonar",
+              prompt: "Answer from current information in two or three sentences. The answer is read aloud: plain spoken language, no markdown, citations or links."),
+        Route(name: "deep",
+              when: "Needs reasoning, comparison, advice, planning or explaining a complex topic: a longer, considered answer.",
+              model: "anthropic/claude-sonnet-5.5",
+              prompt: "Give a thoughtful, well-reasoned answer in a short paragraph or two. The answer is read aloud: plain spoken language, no markdown, headings or bullet lists."),
     ]
 }
 

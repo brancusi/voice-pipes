@@ -22,7 +22,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `Audio/VocabularyTrainer.swift` | Audio augmentation + transcription to collect mishearings. |
 | Services | `Services/OpenRouterClient.swift` | Transcription (multipart), chat completions, speech (MP3), key validation, connection pre-warm. |
 | | `Services/OpenRouterCatalog.swift` | OpenRouter model list (3 merged queries), daily disk cache, prices, voice labels. |
-| | `Services/JevClient.swift` | TypeSafe Jev: batched yes/no judgments with backoff. |
+| | `Services/JevClient.swift` | TypeSafe Jev: batched yes/no judgments and Route choices, with backoff. |
 | | `Services/HTTPStep.swift` | The HTTP block and `Template`. |
 | | `Services/Keychain.swift` | Generic-password items under `io.github.brancusi.voice-tools`. |
 | System I/O | `IO/Clipboard.swift` | Clipboard history, paste (⌘V) and selection copy (⌘C) via synthetic keystrokes. |
@@ -96,6 +96,13 @@ Speed is applied at playback for every engine, because only some providers honou
   to 16 kHz. Results are normalised (lowercase, punctuation stripped), counted, and compared with the spelling.
 - `JevClient.judgeReplacements` sends each candidate as a Jev *noul* (yes/no) question, 25 per request, requests
   in parallel; `≥ 0.6` is pre-ticked.
+
+## Routing
+
+A `route(routes:)` step sends the text to Jev as one `choice` question: each route's name is an option and its
+*Use when…* text that option's criteria. The chosen route's model and prompt then run through the same call as an
+LLM step (glossary included). The step's title in the live run is replaced with the pick and Jev's time, so the HUD
+and Activity show it. If Jev fails (no key, network), the first route runs.
 
 ## Persistence and migrations
 

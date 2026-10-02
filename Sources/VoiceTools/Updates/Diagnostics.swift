@@ -91,6 +91,11 @@ enum Diagnostics {
             }
         }
 
+        if steps.contains(where: { if case .route = $0 { true } else { false } }), !app.hasJevKey {
+            checks.append(Check(level: .warning, title: "Jev key missing",
+                                detail: "Route steps use their first route until you add a TypeSafe (Jev) key in Setup.", fix: .editTracks))
+        }
+
         for combo in app.unavailableCombos {
             checks.append(Check(level: .warning, title: "\(combo.display) unavailable",
                                 detail: "Another app has this shortcut. Pick a different trigger.", fix: .editTracks))

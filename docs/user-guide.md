@@ -36,6 +36,7 @@ doesn't match the previous block's output. **+ Add step** lists them by category
 | **Transcribe** | audio → text | One block, one model list: **Parakeet v3 on this Mac** or any OpenRouter transcription model. Parakeet has a **Mode** — *On release* (default, most accurate), *Chunk at pauses*, *Streaming*. |
 | **Fix words** | text → text | Instant find-and-replace from your **Vocabulary** (below). |
 | **LLM** | text → text | Any OpenRouter language model with your instructions. `{{input}}` in the instructions places the text; otherwise the text is sent as the user message. Your Vocabulary is added as a glossary. **If this step fails**: pass the input through, or stop. |
+| **Route · Jev** | text → text | Jev reads the text and picks one of your **routes** (about 0.3 s); that route's model answers with that route's instructions, like an LLM step. Each route has a name, a **Use when…** description (what Jev chooses by), a model and instructions. Starts with *quick* (Claude Haiku 4.5), *web* (Perplexity Sonar) and *deep* (Claude Sonnet 5.5). The HUD and Activity show the pick, e.g. `Jev 260 ms → web 100% · sonar`. Without a Jev key, the first route answers. |
 | **HTTP request** | text → text | GET/POST/PUT/PATCH anywhere. `{{input}}` (URL-encoded in the URL) or `{{input_json}}` (a JSON string) in the URL or body; optional dotted path into a JSON response, e.g. `data.text`. |
 | **Text template** | text → text | `{{input}}` / `{{input_json}}` substitution. |
 | **Paste at cursor** | text → text | Pastes into the focused app with ⌘V, then restores your clipboard (optional). Waits for you to let go of the trigger's modifier keys first. |
@@ -118,7 +119,7 @@ The full text and per-step timings of every run are in **Activity**.
   clashes, track errors. **Fix…** on a permission clears any stale entry macOS kept from an older build, asks
   again and opens the right Settings page. **Copy report** puts a plain-text summary on the clipboard.
 - **OpenRouter** — API key (Keychain) and the model list (Reload).
-- **TypeSafe (Jev)** — API key (Keychain), used for vocabulary training.
+- **TypeSafe (Jev)** — API key (Keychain), used by Route steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
 - **Updates** — version and **Check now**.
 

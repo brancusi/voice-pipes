@@ -22,7 +22,8 @@ struct ActiveRun {
     let trackID: Track.ID
     let trackName: String
     let colorHex: String
-    let stepTitles: [String]
+    /// A Route step's title is replaced by the route Jev picked, so the HUD and Activity show it.
+    var stepTitles: [String]
     var phase: Phase
     var currentStep: Int
     var stepMs: [Int?]
@@ -379,16 +380,29 @@ final class AppState {
             return .text(try await OpenRouterClient.shared.transcribe(wav: WAV.encode(samples), model: model))
 
         case .llm(let model, let prompt, _):
+            return .text(try await complete(model: model, prompt: prompt, input: try text(of: payload)))
+
+        case .route(let routes):
             let input = try text(of: payload)
-            // The shared vocabulary rides along as a glossary, so the model keeps your spellings.
-            let glossary = VocabularyStore.shared.glossary
-            let instructions = glossary.isEmpty ? prompt
-                : prompt + "\n\nGlossary (always use these exact spellings): " + glossary.joined(separator: ", ") + "."
-            if prompt.contains("{{input") {
-                return .text(try await OpenRouterClient.shared.complete(
-                    model: model, system: nil, user: Template.render(instructions, input: input)))
+            guard !routes.isEmpty else { throw PipelineError.noRoutes }
+            let t0 = Date()
+            let chosen: Int
+            let label: String
+            do {
+                let pick = try await JevClient.shared.chooseRoute(input: input, routes: routes)
+                chosen = pick.index
+                label = "Jev \(Int(Date().timeIntervalSince(t0) * 1000)) ms → \(routes[chosen].name) \(Int(pick.probability * 100))%"
+            } catch {
+                // Without Jev the first route still answers, so the track keeps working.
+                NSLog("VoiceTools: Jev routing failed, using the first route: \(error)")
+                chosen = 0
+                label = "Jev failed → \(routes[0].name)"
             }
-            return .text(try await OpenRouterClient.shared.complete(model: model, system: instructions, user: input))
+            let route = routes[chosen]
+            if let index = run?.currentStep, run?.trackID == track.id {
+                run?.stepTitles[index] = "\(label) · \(route.model.split(separator: "/").last ?? "")"
+            }
+            return .text(try await complete(model: route.model, prompt: route.prompt, input: input))
 
         case .http(let url, let method, let headers, let body, let field):
             return .text(try await HTTPStep.run(input: try text(of: payload), url: url, method: method,
@@ -445,6 +459,18 @@ final class AppState {
         }
     }
 
+    /// An LLM call as the LLM step makes it: the shared vocabulary rides along as a glossary, so the model keeps
+    /// your spellings; `{{input}}` in the prompt places the text, otherwise it's sent as the user message.
+    private func complete(model: String, prompt: String, input: String) async throws -> String {
+        let glossary = VocabularyStore.shared.glossary
+        let instructions = glossary.isEmpty ? prompt
+            : prompt + "\n\nGlossary (always use these exact spellings): " + glossary.joined(separator: ", ") + "."
+        if prompt.contains("{{input") {
+            return try await OpenRouterClient.shared.complete(model: model, system: nil, user: Template.render(instructions, input: input))
+        }
+        return try await OpenRouterClient.shared.complete(model: model, system: instructions, user: input)
+    }
+
     private func text(of payload: Payload) throws -> String {
         guard let text = payload.text else { throw PipelineError.expected(.text) }
         return text
@@ -468,12 +494,14 @@ enum PipelineError: LocalizedError {
     case misplacedInput
     case noText
     case expected(DataKind)
+    case noRoutes
 
     var errorDescription: String? {
         switch self {
         case .misplacedInput: "Microphone can only be the first step."
         case .noText: "No text found (nothing selected and clipboard empty)."
         case .expected(let kind): "This step expected \(kind.rawValue) input."
+        case .noRoutes: "Route · Jev needs at least one route."
         }
     }
 }
@@ -481,7 +509,7 @@ enum PipelineError: LocalizedError {
 extension StepKind {
     var usesOpenRouter: Bool {
         switch self {
-        case .openRouterSTT, .llm, .openRouterSpeech: true
+        case .openRouterSTT, .llm, .route, .openRouterSpeech: true
         default: false
         }
     }

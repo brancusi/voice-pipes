@@ -1,7 +1,7 @@
 import Foundation
 
 /// TypeSafe's Jev: a fast structured-decision model (https://docs.typesafe.ai/api). Used when training vocabulary,
-/// to judge whether each mishearing is safe to replace everywhere, or is something people actually write.
+/// to judge whether each mishearing is safe to replace everywhere, and by Route steps to pick a model for the input.
 final class JevClient: Sendable {
     static let shared = JevClient()
 
@@ -48,6 +48,46 @@ final class JevClient: Sendable {
             "state": ["task": "Building a personal dictation vocabulary of automatic spelling corrections.", "target": target],
             "questions": questions,
         ]
+        struct Answer: Decodable { let noul: Double? }
+        struct Response: Decodable { let answers: [String: Answer] }
+        let answers = try JSONDecoder().decode(Response.self, from: try await post(body, key: key)).answers
+        var result: [String: Double] = [:]
+        for (i, candidate) in candidates.enumerated() {
+            if let p = answers["c\(i)"]?.noul { result[candidate] = p }
+        }
+        return result
+    }
+
+    /// Picks the route for `input` (a Route step): returns the chosen route's index and its probability.
+    func chooseRoute(input: String, routes: [Route]) async throws -> (index: Int, probability: Double) {
+        guard let key = Keychain.get(SecretKey.typesafe), !key.isEmpty else { throw JevError.missingKey }
+        // Option names are what Jev sees, so keep the route names, made unique and non-empty.
+        var options: [String] = []
+        for (i, route) in routes.enumerated() {
+            let name = route.name.trimmingCharacters(in: .whitespaces)
+            options.append(name.isEmpty || options.contains(name) ? "route \(i + 1)" : name)
+        }
+        var criteria: [String: Any] = [:]
+        for (option, route) in zip(options, routes) {
+            criteria[option] = route.when.isEmpty ? NSNull() : route.when as Any
+        }
+        let body: [String: Any] = [
+            "model": "jev-latest",
+            "state": ["input": input],
+            "questions": ["route": [
+                "type": "choice",
+                "instructions": "Someone dictated `input` and a language model will respond to it. Which route should handle it?",
+                "criteria": criteria,
+            ]],
+        ]
+        struct Answer: Decodable { let choice: String; let probabilities: [String: Double] }
+        struct Response: Decodable { let answers: [String: Answer] }
+        guard let answer = try JSONDecoder().decode(Response.self, from: try await post(body, key: key)).answers["route"],
+              let index = options.firstIndex(of: answer.choice) else { throw JevError.http(200, "No route in Jev's answer") }
+        return (index, answer.probabilities[answer.choice] ?? 0)
+    }
+
+    private func post(_ body: [String: Any], key: String) async throws -> Data {
         var request = URLRequest(url: endpoint, timeoutInterval: 20)
         request.httpMethod = "POST"
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
@@ -60,14 +100,7 @@ final class JevClient: Sendable {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             switch status {
             case 200:
-                struct Answer: Decodable { let noul: Double? }
-                struct Response: Decodable { let answers: [String: Answer] }
-                let answers = try JSONDecoder().decode(Response.self, from: data).answers
-                var result: [String: Double] = [:]
-                for (i, candidate) in candidates.enumerated() {
-                    if let p = answers["c\(i)"]?.noul { result[candidate] = p }
-                }
-                return result
+                return data
             case 401, 403:
                 throw JevError.rejectedKey
             case 429, 529:

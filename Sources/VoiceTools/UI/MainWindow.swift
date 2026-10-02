@@ -197,7 +197,7 @@ private struct SetupView: View {
             } header: {
                 Text("TypeSafe (Jev)")
             } footer: {
-                Text("Used when training vocabulary: Jev judges which mishearings are safe to replace everywhere.")
+                Text("Used by Route steps (Jev picks the model for each request) and when training vocabulary (Jev judges which mishearings are safe to replace everywhere).")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

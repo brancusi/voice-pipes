@@ -141,6 +141,7 @@ private struct StepRow: View {
         case .parakeet: "bolt"
         case .openRouterSTT: "waveform"
         case .llm: "sparkles"
+        case .route: "arrow.triangle.branch"
         case .http: "network"
         case .template: "curlybraces"
         case .fixWords: "character.cursor.ibeam"
@@ -215,6 +216,26 @@ private struct StepConfigView: View {
                     .font(.system(size: 12))
                     .frame(minHeight: 70)
             }
+
+        case .route(let routes):
+            Text("Jev reads the text and picks the route whose description fits best (about 0.3 s); that route's model answers with its instructions. Without a Jev key, the first route is used.")
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
+                RouteEditor(route: Binding {
+                    routes[index]
+                } set: { updated in
+                    var all = routes
+                    all[index] = updated
+                    kind = .route(routes: all)
+                }, onDelete: routes.count > 1 ? {
+                    kind = .route(routes: routes.filter { $0.id != route.id })
+                } : nil)
+            }
+            Button("+ Add route") {
+                kind = .route(routes: routes + [Route(name: "route \(routes.count + 1)", when: "",
+                                                      model: "anthropic/claude-haiku-4.5", prompt: "")])
+            }
+            .buttonStyle(.borderless)
 
         case .http(let url, let method, let headers, let body, let field):
             let set = { (u: String, m: String, h: [String: String], b: String, f: String) in
@@ -429,6 +450,39 @@ private struct LocalPreviewButton: View {
         }
         .buttonStyle(.borderless)
         .help(error ?? "Preview this voice (first use downloads the model)")
+    }
+}
+
+/// One route of a Route step: its name and description (what Jev chooses by), then the model and instructions.
+private struct RouteEditor: View {
+    @Binding var route: Route
+    let onDelete: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TextField("", text: $route.name, prompt: Text("Name"))
+                    .labelsHidden()
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(maxWidth: 160)
+                Spacer()
+                if let onDelete {
+                    Button(action: onDelete) { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless)
+                        .help("Remove this route")
+                }
+            }
+            TextField("", text: $route.when, prompt: Text("Use when… (Jev reads this to choose)"), axis: .vertical)
+                .labelsHidden()
+            LabeledContent("Model") {
+                ModelPicker(capability: .text, modelID: $route.model)
+            }
+            TextField("", text: $route.prompt, prompt: Text("Instructions ({{input}} places the text)"), axis: .vertical)
+                .labelsHidden()
+                .font(.system(size: 12))
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
     }
 }
 
