@@ -6,7 +6,13 @@ const groups = [
   {
     title: 'Transform',
     accent: 'var(--purple)',
-    blocks: [['LLM', 'your instructions'], ['Route · Jev', 'picks the model'], ['Fix words', 'your vocabulary'], ['HTTP request · Template']],
+    blocks: [
+      ['LLM', 'your instructions'],
+      ['Route · Jev', 'picks the model'],
+      ['Branch · Jev', 'picks the path'],
+      ['Fix words', 'your vocabulary'],
+      ['HTTP request · Template'],
+    ],
   },
   {
     title: 'Output',
@@ -22,8 +28,9 @@ const groups = [
       <span class="eyebrow">Building blocks</span>
       <h2 class="display h2">snap the pipes together</h2>
       <p class="lede">
-        Each block says what it takes and what it gives, and the editor won't let you connect two that don't fit.
-        Every model is a choice in one picker: on your Mac first, then anything on OpenRouter.
+        Each block says what it takes and what it gives; +&nbsp;Add step lists what fits next first, and the editor won't
+        let you connect two that don't fit. Every model is a choice in one picker: on your Mac first, then anything on
+        OpenRouter, with what a paragraph costs, its speed on your Mac and a quality rating side by side.
       </p>
     </div>
     <div class="g4">

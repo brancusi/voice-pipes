@@ -6,8 +6,9 @@ order: 0
 ---
 
 Voice Pipes is a Mac menu bar app that runs **tracks**: hotkey-triggered pipelines of blocks that transcribe, fix
-your words, ask a model, paste, speak or call your own endpoint. These docs cover the developer side: installing
-from a terminal, `vp`, the command-line tool, the config file, and the skill that teaches coding agents to use it.
+your words, ask a model, branch on what the text is, paste, speak or call your own endpoint. These docs cover the
+developer side: installing from a terminal, `vp`, the command-line tool, the config file, steering what's read
+aloud, and the skill that teaches coding agents to use it. They match Voice Pipes **1.8.1**.
 
 ```sh
 curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash
@@ -25,8 +26,9 @@ vp
 | --- | --- |
 | [Install](/docs/install) | Requirements, the one-line installer and its options, permissions you grant yourself, linking `vp` to an app you already have, updates and uninstalling |
 | [CLI reference](/docs/cli) | Every `vp` command with its options and output, TOON and JSON, errors and exit codes, and how `vp` talks to the app |
-| [Config file](/docs/config) | `config.toml` and `vocabulary.toml`: tracks, hotkeys, every block, checking, backups and secrets |
-| [Agents](/docs/agents) | The skill for Claude Code, Codex and others, the optional session hook, and patterns for agents |
+| [Config file](/docs/config) | `config.toml` and `vocabulary.toml`: tracks, hotkeys, every block including Branch, the settings, choosing a model, checking, backups and secrets |
+| [Reading aloud](/docs/reading) | The read-along card, jumping between sentences, live speed, the HUD's keys and when it takes them, from the app, `vp` or the config |
+| [Agents](/docs/agents) | The skill for Claude Code, Codex and others, what agents read aloud to you, building tracks from plain language, the optional session hook, and patterns |
 
 ## What vp needs
 
@@ -37,8 +39,8 @@ vp
 - **Your permission** for the microphone and Accessibility, granted once in the app's first-run window. macOS
   doesn't let a script grant them.
 - **Keys only for cloud blocks.** Transcription with Parakeet, Fix words and the Pocket TTS and Supertonic voices
-  run on your Mac with no account. OpenRouter and TypeSafe (Jev) keys unlock the cloud blocks:
-  [what needs a key](/setup#what-needs-a-key).
+  run on your Mac with no account, once their models have downloaded. OpenRouter and TypeSafe (Jev) keys unlock
+  the cloud blocks, including Jev's Route and Branch picks: [what needs a key](/setup#what-needs-a-key).
 
 New here as a user rather than a developer? The [home page](/) shows what tracks do, and [Setup](/setup) covers the
 keys.

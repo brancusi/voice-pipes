@@ -1,5 +1,6 @@
 ---
-// The app's three default tracks (Track.swift, Track.defaults), then a recipe built from the same blocks.
+// The app's three default tracks (Track.swift, Track.defaults; Read aloud's Branch is on new installs since 1.7.0),
+// then a recipe built from the same blocks.
 // Step colours follow the app: input muted, transcription cyan, transforms purple, outputs green.
 const tracks: {
   name: string;
@@ -29,10 +30,10 @@ const tracks: {
   {
     name: 'Read aloud',
     color: 'var(--purple)',
-    steps: [['Selection', 'c-muted'], ['Speak · Pocket TTS', 'c-green']],
-    about: 'Select text, press the key, listen. Press again to pause. Voices run on your Mac.',
+    steps: [['Selection', 'c-muted'], ['Jev branch', 'c-purple'], ['Speak · Pocket TTS', 'c-green']],
+    about: 'Select text, press the key, listen; press again to pause. With Jev and OpenRouter keys, figures and code are rewritten for the ear first.',
     key: '⌥R toggle',
-    note: ['~25 ms to sound', 'c-green'],
+    note: ['voice on your Mac', 'c-green'],
   },
   {
     name: 'Quick answer',

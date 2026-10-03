@@ -105,8 +105,10 @@ macOS doesn't let a script grant Microphone or Accessibility access, so on the f
 
 **Open Settings…** opens the right Privacy & Security page with a small helper beside it. If Voice Pipes isn't in
 the Accessibility list, drag the helper's icon into the list, then switch it on. The same window then downloads the
-on-device models in the background and offers the optional OpenRouter and TypeSafe keys
-([what needs a key](/setup#what-needs-a-key)).
+on-device models in the background, with a progress bar showing the size and speed, then "preparing for this
+Mac…" while a model compiles, and offers the optional OpenRouter and TypeSafe keys
+([what needs a key](/setup#what-needs-a-key)). The on-device models need that one download before they work
+offline; Setup → On this Mac shows the same progress.
 
 Check where things stand from a terminal:
 
@@ -114,7 +116,8 @@ Check where things stand from a terminal:
 vp status
 ```
 
-It lists both permissions, the on-device models, which keys are set (masked) and any problems. Without the app
+It lists both permissions, the on-device models (loaded, downloading with a percentage, or preparing), which keys
+are set (masked) and any problems. Without the app
 running it only reports the config; any command that needs the app starts it.
 
 ## Link vp to an app you already have
@@ -141,7 +144,7 @@ vp --version
 vp
 ```
 
-`vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
+`vp --version` prints the app's version (1.8.1 as of this page). `vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
 next. The [CLI reference](/docs/cli) has every command.
 
 ## Updates

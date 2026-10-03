@@ -44,7 +44,7 @@ const takes: Take[] = [
     track: 'Read aloud',
     color: 'var(--purple)',
     key: '⌥R toggle',
-    steps: [['selection', 'c-muted', 2], ['speak · pocket tts', 'c-green', 25]],
+    steps: [['selection', 'c-muted', 2], ['branch · easy', 'c-purple', 304], ['speak · pocket tts', 'c-green', 25]],
     said: 'the selected paragraph',
     hud: [['VOICE', 'var(--purple)', '···'], ['READ', 'var(--purple)', '12%'], ['READ', 'var(--purple)', '42%']],
   },
@@ -115,7 +115,7 @@ const stages = ['rec', 'proc', 'ok'] as const;
             {take.kind === 'read' && (
               <>
                 <span><mark>Pipelines you play from the keyboard.</mark> Hold a hotkey, talk, let go.</span>
-                <span class="out__note">read in a voice on your Mac; the first sound comes in about 25 ms</span>
+                <span class="out__note">Jev picked easy: plain prose, read as it is by a voice on your Mac</span>
               </>
             )}
             {take.kind === 'ask' && (

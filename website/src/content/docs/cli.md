@@ -1,7 +1,7 @@
 ---
 title: "The vp command"
 nav: "CLI reference"
-description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.6.5."
+description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.8.1."
 order: 2
 ---
 
@@ -9,7 +9,7 @@ order: 2
 manage the config, vocabulary, keys and history. It is built to be driven by agents as well as people: compact
 output, next-step hints, errors on stdout, and no prompts. Not installed yet? See [Install](/docs/install).
 
-This page matches Voice Pipes **1.6.5**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
+This page matches Voice Pipes **1.8.1**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
 one command's usage and flags.
 
 ## At a glance
@@ -23,19 +23,25 @@ vp status
 vp say "Tests passed."
 vp ask "Deploy to staging or production?"
 
-# Read a long text with the follow-along card, and speed it up while it plays
+# Read a long text with the follow-along card, then steer it from another shell
 vp open reading
 printf '%s' "$SUMMARY" | vp say
 vp speed 1.4
+vp next
 
 # Send text through a track (Clean dictation then pastes it at your cursor)
 vp run clean-dictation --text "um so the build is uh green"
 git log -1 --format=%s | vp run read-aloud
 
-# Transcribe a file on this Mac, see recent runs, check the config
+# Transcribe a file on this Mac, see recent runs and one run's log, check the config
 vp transcribe memo.m4a
 vp history --limit 5
+vp history show 1
 vp config check
+
+# What agents read aloud to you unasked, and when the HUD takes the keyboard
+vp agents read-aloud attention
+vp reading keys hover
 ```
 
 The track ids above are the starter tracks'; `vp tracks` lists yours. Clean dictation's cleanup step uses an
@@ -52,14 +58,16 @@ running, `vp` starts it in the background, without taking focus, and waits up to
 | --- | --- |
 | `vp`, `vp help`, `vp --version`, `vp status` (reports the config only) | `run`, `say`, `stop`, `pause`, `resume` |
 | `tracks` (list, show, enable, disable) | `listen`, `ask`, `transcribe`, `watch` |
-| `history` | `vocab train`, `config reload` |
+| `history` (list, show, usage) | `vocab train`, `config reload` |
 | `vocab` (list, add, remove, test) | `models`, `voices` for macOS and OpenRouter voices |
 | `config` (show, path, check, schema, backups, restore, open) | `auth`, `secret` |
 | `voices` for `pocket` and `supertonic` | `open`, `close`, `ui`, `update` |
-| `install`, `agents` | |
+| `reading` (edits config.toml) | |
+| `install`, `agents` (including `read-aloud`, which edits config.toml) | |
 
-`vp speed` is the exception: it changes what's playing, so it never starts the app and fails with `app_not_running`
-when the app isn't running.
+`vp speed`, `vp next` and `vp prev` are the exceptions: they change what's playing, so they never start the app and
+fail with `app_not_running` when it isn't running. Commands that edit config.toml (`tracks enable`, `reading`,
+`agents read-aloud`, `config restore`) work with the app closed; a running app picks the change up within a second.
 
 The app runs one thing at a time. If a track, `vp say`, `vp listen` or a hotkey run is already going, a command that
 needs it fails with `busy`; run `vp stop` or wait.
@@ -90,7 +98,7 @@ vp --version
 ```
 
 ```text
-version: 1.6.5
+version: 1.8.1
 ```
 
 ## Errors and exit codes
@@ -137,9 +145,10 @@ The main codes:
 | `no_such_track`, `invalid_track`, `takes_no_text`, `run_failed` | `vp run` problems; `run_failed` says which block failed |
 | `no_microphone`, `no_speech`, `cancelled` | Recording: no permission or device, nothing heard, or stopped with `vp stop` or Esc |
 | `bad_speed`, `bad_model`, `no_such_voice`, `speak_failed` | `vp say` and `vp ask` |
-| `not_speaking` | `vp speed` when nothing is being read aloud |
+| `not_speaking` | `vp speed`, `vp next` or `vp prev` when nothing is being read aloud |
 | `no_such_file`, `bad_audio` | `vp transcribe` or `vp config check` can't read the file |
 | `config_invalid`, `vocabulary_invalid`, `vocabulary_unreadable` | The file doesn't check out; fix it, then retry |
+| `no_such_backup` | `vp config restore` with a number that isn't in `vp config backups` |
 | `no_such_provider`, `no_login`, `bad_name` | `vp auth` and `vp secret` |
 | `no_such_target`, `no_such_section`, `no_such_field`, `no_such_step`, `no_such_route`, `not_a_route`, `no_such_word`, `no_such_run` | `vp open` can't find what you asked for |
 | `exists` | `vp install` found another program with that name |
@@ -205,9 +214,16 @@ vp tracks disable <id>
 ```
 
 A track is named by its `id` from config.toml, or its name. `show` also says whether the track takes text
-(`takes_text`), so you know whether `vp run <id> --text` will work. `enable` and `disable` edit config.toml (a backup
-is kept first) and answer with `changed: true` or `false`; a disabled track keeps its settings, but its hotkeys do
-nothing.
+(`takes_text`), so you know whether `vp run <id> --text` will work.
+
+A [Branch](/docs/config#branch-one-track-several-paths) block's branches and their blocks are listed under it as
+rows of their own. In the starter Read aloud (new installs since 1.7.0) the Branch is step `2`; its branches are
+`2.easy`, `2.medium` and `2.hard`, each with its `when` (or "passes the text through" when it has no blocks), and
+the block inside the medium branch is `2.medium.1`. A branch inside a branch carries on the same way
+(`2.hard.1.short`).
+
+`enable` and `disable` edit config.toml (a backup is kept first) and answer with `changed: true` or `false`; a
+disabled track keeps its settings, but its hotkeys do nothing.
 
 ### vp run
 
@@ -223,7 +239,8 @@ Runs a track and prints the final text, the track and the total time in `ms`.
   long a pause ends it (default 1.2 s) and `--max` caps the recording (default 30 s). Any other track runs from its
   first block, as its hotkey would.
 - A track that ends in **Paste** pastes at your cursor, wherever it is. A track that ends in **Speak** speaks.
-- Per-block timings land in History: `vp history --limit 1`.
+- How it ran lands in History: `vp history show 1` prints each block's time and output, which branch or route Jev
+  picked, and what the run used and cost.
 
 ```sh
 vp run clean-dictation --text "so um the deploy is uh done"
@@ -254,6 +271,10 @@ follow-along card ([`vp open reading`](#vp-open-vp-close-vp-ui)) shows the whole
 word being spoken underlined (exact with `macos` voices, estimated with the others). Clicking a sentence there reads on
 from it, with any voice, and `vp say` still returns only when the reading ends: when it finishes, or is stopped from
 the HUD or with `vp stop`.
+
+By default the HUD also takes the keyboard while it reads (Esc stops, Space pauses, j/k move a sentence, h/l change
+the speed), without bringing Voice Pipes to the front. [Reading aloud](/docs/reading) has the keys and how to change
+when the HUD takes them.
 
 ### vp listen
 
@@ -318,6 +339,49 @@ vp speed 1.4
 vp speed 0.8
 ```
 
+### vp next, vp prev
+
+```sh
+# Jump to the next sentence of what's being read, or back one
+vp next
+vp prev
+```
+
+The same as clicking a sentence in the follow-along card, from a terminal. They answer with the `sentence` now
+being read, how many there are (`of`) and the current `speed`. Like `vp speed`, they never start the app: they fail
+with `not_speaking` when nothing is being read and `app_not_running` when the app isn't running.
+
+### vp reading
+
+```sh
+# How readings are steered from the keyboard: when the HUD takes the keys, and which keys
+vp reading
+
+# When the HUD takes the keyboard while something is read aloud
+vp reading keys always|hover|click|never
+
+# Clicking another app while the HUD has the keys: carry on reading, or stop
+vp reading click-away keep-reading|stop
+
+# The keys for an action while the HUD has the keyboard (replaces its keys; one or more)
+vp reading key faster period shift+equal
+
+# A shortcut that works in any app, but only while something is read; none removes it
+vp reading shortcut faster control+option+right
+vp reading shortcut faster none
+
+# Every reading setting back to its default, shortcuts included
+vp reading reset
+```
+
+Edits `[settings.reading]` in config.toml (a backup is kept), so it works with the app closed; a running app picks
+it up within a second. Every form answers with the settings as they now are: `keys`, `click_away`, and a
+`bindings` table with each action's keys and its `anywhere` shortcut.
+
+The actions are `stop`, `pause`, `next`, `previous`, `slower`, `faster`, `start` and `end`. Keys are written as in
+[hotkeys](/docs/config#a-track) (`j`, `shift+g`, `equal`, `escape`). A shortcut for `vp reading shortcut` must
+include `control`, `option` or `command`. What each mode does and the default keys: [Reading aloud](/docs/reading).
+
 ### vp watch
 
 ```sh
@@ -332,14 +396,31 @@ error).
 ### vp history
 
 ```sh
+# Recent runs, newest first
 vp history [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]
-vp history show <n>
+
+# One run's log, step by step (1 is the newest)
+vp history show <n> [--full]
+
+# What your runs used and cost: today, 7 days, 30 days
+vp history usage
 ```
 
-Recent runs, newest first, read from the history file (the app keeps the last 1,000). The list shows `n`, when,
-the track, `ms` and the text (10 runs unless `--limit`). `--since` takes a number and `s`, `m`, `h` or `d`.
-`show <n>` (1 is the newest) prints one run in full: what was heard, the text, any failure, and a table of each
-block's time.
+Recent runs, read from the history file (the app keeps the last 1,000). The list shows `n`, when, the track, `ms`,
+`cost` and the text (10 runs unless `--limit`). `cost` is `local` for a run that used nothing in the cloud, and blank
+for runs from before 1.7.2, which have no log. `--since` takes a number and `s`, `m`, `h` or `d`.
+
+`show <n>` prints one run: what was heard, the text, any failure, and its `log`, a row per block with its `ms`,
+what it `used` and what it gave (`out`). Blocks inside a branch are indented under it; a Branch or Route row names
+Jev's pick and the ones not taken. `used` is tokens and cost for LLMs and cloud transcription (as OpenRouter reports
+them), characters and an estimate marked `≈` for cloud speech (priced from OpenRouter's list), and "on this Mac" for
+local blocks. A block that failed says whether it stopped the run or passed its input on. `total` adds the run up.
+Outputs are trimmed to 80 characters; `--full` shows them whole. Runs from before 1.7.2 show only each block's time.
+
+Costs are what OpenRouter calls cost. Jev's picks (billed by TypeSafe) and your own HTTP blocks aren't counted.
+
+`usage` is a table of `runs`, `tokens_in`, `tokens_out`, `cost` (exact) and `speech_estimate` (≈) for today, the
+last 7 days and the last 30 days. It counts what's in History, so clearing History clears it too.
 
 ### vp vocab
 
@@ -493,7 +574,7 @@ open block and the focused field. No screen recording or Accessibility access is
 | `track <id>` | `--step <n>` opens a block; `--route <n>` a route card in a Route block; `--field <name>` puts the cursor in a field (`name`, or a block's `prompt`, `url`, `headers`, `body`, `response_field`, `template`); `--section title\|triggers\|pipeline` |
 | `history` | `--track <id>`, `--search <text>`, `--run <n>` (n from `vp history`) |
 | `vocabulary` | `--word <word>`, `--add` |
-| `setup` | `--section checks\|connections\|cli\|models\|appearance\|updates`, `--field <name>` (such as `openrouter-key`) |
+| `setup` | `--section checks\|connections\|cli\|models\|appearance\|reading\|updates`, `--field <name>` (such as `openrouter-key`) |
 | `onboarding` | `--step welcome\|permissions\|models\|keys\|agents\|try` |
 | `reading` | The HUD's follow-along card: it shows with the current reading, or the next one, and stays open for later readings until closed |
 | `menu`, `about`, `config` | `config` opens config.toml in your editor |
@@ -533,9 +614,20 @@ vp agents uninstall
 
 # The one-line summary the session hook prints
 vp agents context
+
+# What agents read aloud to you without being asked
+vp agents read-aloud [off|long|attention|all] [--long-text <chars>]
 ```
 
 The agent skill and the optional Claude Code session hook. See [Agents](/docs/agents).
+
+`read-aloud` on its own prints the standing preference every agent follows (`read_aloud`, what it `means`, and
+`long_text`); with a mode or `--long-text` it saves it to `[settings.agents]` in config.toml, with the app open or
+closed. The modes are `off` (only when you ask), `long` (long replies: summaries, reports, explanations),
+`attention` (the default: long replies, plus anything that needs you, such as a question, a finished task or a
+problem) and `all` (every reply). `--long-text` is how many characters count as long (default 600, at least 50).
+It's a preference the skill tells agents to follow, not something the app enforces: see
+[what agents read aloud](/docs/agents#what-agents-read-aloud).
 
 ### vp help
 

@@ -401,6 +401,8 @@ a:hover {
 .feature p { margin: 0; font-size: 14px; line-height: 22px; color: var(--fg-muted); }
 .feature .term { margin-top: 4px; }
 .feature .term-body { font-size: 13px; line-height: 22px; padding: 14px 16px; }
+/* A feature's illustration as rows that wrap: the HUD with its keys, a picker's sorts. */
+.feature__keys { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; white-space: normal; }
 .struck { color: var(--red); text-decoration: line-through; }
 .run { margin-top: 4px; background: var(--bg-000); display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
 .run__text { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }

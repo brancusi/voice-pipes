@@ -124,7 +124,7 @@ On-device models download once on first use and load when the app starts if a tr
   phrases you never mean literally.
 
 The **Try it** box shows the result as you type. LLM steps receive the list as a glossary, so cleanup keeps your
-spellings too. The list lives in `~/Library/Application Support/VoiceTools/vocabulary.json`.
+spellings too. The list lives in `~/.config/voice-pipes/vocabulary.toml`.
 
 ### Training a word
 
@@ -222,7 +222,7 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   checked live). A saved key shows masked, e.g. `sk-or-v1-••••••••••••3f9a`. To replace it, click the field and
   paste: the new key is saved to the Keychain at once, with no Save button (or type it and press Return; Esc
   leaves it as it was). **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
-  is used by Route steps and vocabulary training.
+  is used by Route and Branch steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
 - **Updates** — version and **Check now**.
 
@@ -279,7 +279,9 @@ the background.
 | `vp listen` · `vp ask "<question>"` | Record until you stop talking and print the transcript; `ask` speaks the question first |
 | `vp transcribe <file>` | Transcribe an audio file on this Mac (or `--model <openrouter-id>`) |
 | `vp stop` · `pause` · `resume` | Control speech and recording |
-| `vp history [--limit --track --search --since]` · `history show <n>` | Recent runs with timings |
+| `vp speed <0.6–2.0>` · `vp next` · `vp prev` | Steer what's being read aloud |
+| `vp reading [keys / click-away / key / shortcut / reset]` | When the HUD takes the keys while reading, and which keys |
+| `vp history [--limit --track --search --since]` · `history show <n>` · `history usage` | Recent runs with their cost; one run's log; totals |
 | `vp vocab [add/remove/test/train]` | The Fix words list |
 | `vp config [check/schema/backups/restore/reload/open/path]` | The config file |
 | `vp models --capability text\|transcription\|speech` · `vp voices --model <m>` | What you can pick |
@@ -287,9 +289,10 @@ the background.
 | `vp secret [set/remove]` | Your own secrets for http blocks |
 | `vp watch` | Stream run events as they happen |
 | `vp open <target> [--step --route --field --section --track --search --run --word --add --background]` | Show any window, page, block or field: `main`, `menu` (the menu bar panel), `track <id>`, `history`, `vocabulary`, `setup`, `onboarding`, `about`, `config`. What it points at flashes; it answers with what's on screen |
-| `vp close <target>` · `vp ui` | Close `main`, `menu`, `about`, `onboarding`, an open `sheet`, or `all`; print what's on screen |
+| `vp close <target>` · `vp ui` | Close `main`, `menu`, `reading`, `about`, `onboarding`, an open `sheet`, or `all`; print what's on screen |
 | `vp update` | Check for updates |
 | `vp install` · `vp agents install [--hook]` | Put vp on your PATH; install the agent skill |
+| `vp agents read-aloud [off/long/attention/all]` | What agents read aloud to you unasked |
 
 ## Agents
 

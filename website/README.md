@@ -8,7 +8,7 @@ HTML and CSS, served by Cloudflare Workers static assets. The plan, copy and sit
 of the Voice Pipes Website design (a Claude design canvas), built on the Voice Pipes design system (its Philosophy,
 Sundown tokens, components and logo rules) with the system's own logo and mascot files. See `docs/brand.md` for the
 direction. `/setup` is the key setup guide the app links to (`/setup#openrouter`, `/setup#jev`; keep those anchors).
-`/docs` is the developer docs (terminal install, the `vp` reference, config.toml, agents) and `/blog` the blog, both
+`/docs` is the developer docs (terminal install, the `vp` reference, config.toml, reading aloud, agents) and `/blog` the blog, both
 written in Markdown (see Writing below). The other pages in the sitemap aren't designed yet.
 
 This folder is independent of the Mac app: `build.sh`, `Package.swift` and the release workflow never read it, and a

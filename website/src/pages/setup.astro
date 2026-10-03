@@ -53,9 +53,9 @@ const TS = {
             <span class="eyebrow">No key</span>
             <ul class="guide__list">
               <li>Fast dictation: Parakeet on your Mac, Fix words, Paste</li>
-              <li>Read aloud with Pocket TTS, Supertonic-3 or macOS voices</li>
+              <li>Read aloud with Pocket TTS, Supertonic-3 or macOS voices (text is read as it is)</li>
               <li>Train a word (without Jev, likely mishearings are pre-ticked by a simpler rule)</li>
-              <li>History, Vocabulary, the HUD, Template, HTTP request, Copy</li>
+              <li>History, Vocabulary, the HUD and read-along card, Template, HTTP request, Copy</li>
             </ul>
           </div>
           <div class="card block" style="--accent: var(--cyan)">
@@ -63,6 +63,7 @@ const TS = {
             <ul class="guide__list">
               <li>Clean dictation (MAI-Transcribe-2, then a Claude Haiku 4.5 cleanup)</li>
               <li>Any LLM step, and the models Route · Jev sends a question to</li>
+              <li>Read aloud's medium and hard branches, which rewrite figures, code and links for the ear</li>
               <li>Cloud transcription models and OpenRouter voices</li>
             </ul>
           </div>
@@ -70,6 +71,7 @@ const TS = {
             <span class="eyebrow">TypeSafe (Jev) key</span>
             <ul class="guide__list">
               <li>Route · Jev picking the route for each question (without it, the first route answers)</li>
+              <li>Branch · Jev picking the path, such as how hard text is to read aloud (without it, the first branch runs)</li>
               <li>Judging which mishearings are safe to replace when you train a word</li>
             </ul>
           </div>
@@ -117,7 +119,7 @@ const TS = {
           <li>Create a key on the console's <a href={TS.keys}>Keys page</a> and copy it.</li>
           <li>In Voice Pipes, open <strong>Open Voice Pipes…</strong> → <strong>Setup</strong> (or use the first-run window's <strong>API keys (optional)</strong> step).</li>
           <li>Under <strong>Connections → TypeSafe · Jev</strong>, click the field and paste. The status changes from <span class="c-muted">not set</span> to <span class="c-green">saved</span>.</li>
-          <li>The app doesn't test this key when you save it. Run a track with a Route · Jev step: the line under the HUD shows Jev's pick, for example <code>quick → claude-haiku-4.5 · Jev 262 ms 100%</code>.</li>
+          <li>The app doesn't test this key when you save it. Run a track with a Route · Jev or Branch · Jev step: the line under the HUD shows Jev's pick, for example <code>quick → claude-haiku-4.5 · Jev 262 ms 100%</code>, and the run's log in History shows it too.</li>
         </ol>
       </div>
     </section>

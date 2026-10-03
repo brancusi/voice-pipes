@@ -6,7 +6,7 @@ A macOS menu bar app for voice: dictate into any app, have text read aloud, or a
 ```
 ⌥ Space (hold)      Mic → Parakeet v3 (on this Mac) → Fix words → Paste             ~50–150 ms after you let go
 ⌥ ⇧ Space (toggle)  Mic → MAI-Transcribe-2 → Fix words → Claude Haiku cleanup → Paste  (OpenRouter)
-⌥ R (toggle)        Selection / page / clipboard → Speak (Pocket TTS, on this Mac)     pause/resume with ⌥ R
+⌥ R (toggle)        Selection / page / clipboard → Branch · Jev → Speak (Pocket TTS)    pause/resume with ⌥ R
 ```
 
 Every block is swappable: transcription on this Mac or any OpenRouter model, cleanup with any LLM, speech from
@@ -55,7 +55,8 @@ command-line tool), runs tracks, speaks, listens, transcribes and manages keys, 
   (every run's text, kept on disk, searchable and copyable), **Vocabulary** (words transcription gets wrong, with training), **Setup**
   (checks, keys, on-device models, updates). While it's open the app is in the Dock and ⌘Tab.
 - **HUD** — a small translucent tag at the bottom of the screen: `■ REC 00:04`, `PROC 312ms`, `OK 186ms`,
-  `READ 42%`. It ignores the mouse.
+  `READ 42%`. It never takes focus. While something is read aloud it has pause, stop and a read-along card, and
+  takes the keys (Esc, Space, j/k, h/l) without bringing Voice Pipes forward.
 
 ## Documentation
 
