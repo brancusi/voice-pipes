@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.8.2**
+- **Every cloud voice now plays, whatever audio it sends back.** Some voices, like Google's Gemini TTS (one voice that speaks many languages), only send raw audio, and Voice Pipes stopped with an error instead of speaking. It now plays raw audio as well as MP3, WAV, AAC and the rest. A voice that can't send MP3 is asked once for raw audio, and the app remembers that for next time.
+
 **1.8.1**
 - **New defaults: hands on the keyboard, ears on what matters.** While something is read aloud, the HUD now takes the keys straight away (Esc stops, Space pauses, j/k and h/l steer; the app you're in stays in front), and agents read aloud anything that needs your attention: questions they're waiting on, finished tasks, problems, and long replies. If you'd kept the old defaults, you now have these; anything you'd changed yourself stays as it was.
 - **Change it by asking.** Tell your agent "don't take my keys", "only read me long stuff" or "stop reading to me" and it updates the setting for you, or do it yourself: `vp reading keys hover|click|never|always`, `vp agents read-aloud off|long|attention|all`, and `vp reading key faster period` for your own keys. Setup → Reading has the same.

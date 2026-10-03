@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Minimal OpenRouter client: transcription and chat completions over one shared, kept-alive session.
 final class OpenRouterClient: Sendable {
@@ -64,27 +65,43 @@ final class OpenRouterClient: Sendable {
         return response.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Synthesizes speech as MP3. Speed is applied at playback, since only some providers honor it.
+    /// Models that refused MP3 (Gemini TTS only sends PCM), so later requests ask for PCM straight away.
+    private let pcmOnlyModels = OSAllocatedUnfairLock(initialState: Set<String>())
+
+    /// Synthesizes speech and returns audio `AVAudioPlayer` can play. Asks for MP3 (smallest download); a model that
+    /// rejects it is asked for PCM, which is wrapped as WAV. Speed is applied at playback, since only some providers honor it.
     func speech(model: String, voice: String?, text: String) async throws -> Data {
+        let pcmOnly = pcmOnlyModels.withLock { $0.contains(model) }
+        do {
+            return try await speech(model: model, voice: voice, text: text, format: pcmOnly ? "pcm" : "mp3")
+        } catch OpenRouterError.http(400, let body) where !pcmOnly && body.localizedCaseInsensitiveContains("response_format") {
+            pcmOnlyModels.withLock { _ = $0.insert(model) }
+            return try await speech(model: model, voice: voice, text: text, format: "pcm")
+        }
+    }
+
+    private func speech(model: String, voice: String?, text: String, format: String) async throws -> Data {
         struct Request: Encodable {
             let model: String
             let input: String
             let voice: String?
-            let response_format = "mp3"
+            let response_format: String
         }
         var request = URLRequest(url: base.appendingPathComponent("audio/speech"))
         request.httpMethod = "POST"
         request.timeoutInterval = 60
         request.setValue("Bearer \(try apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(Request(model: model, input: text, voice: voice?.isEmpty == true ? nil : voice))
+        request.httpBody = try JSONEncoder().encode(Request(model: model, input: text, voice: voice?.isEmpty == true ? nil : voice,
+                                                            response_format: format))
 
         let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+        let http = response as? HTTPURLResponse
+        if let http, !(200..<300).contains(http.statusCode) {
             throw OpenRouterError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
         }
         guard !data.isEmpty else { throw OpenRouterError.emptyResponse }
-        return data
+        return SpeechAudio.playable(data, contentType: http?.value(forHTTPHeaderField: "Content-Type"))
     }
 
     func complete(model: String, system: String?, user: String) async throws -> String {

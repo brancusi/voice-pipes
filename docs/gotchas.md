@@ -87,8 +87,10 @@ AppKit controls but drops SwiftUI text. Good enough to check layout, not looks.
 - `/api/v1/models` **omits speech and transcription models** unless you ask with `?output_modalities=speech` or
   `?output_modalities=transcription`. The catalog fetches all three and merges them.
 - Speech models list their voices in `supported_voices`; some (Fish Audio, Seed) list none and take free-form ids.
-- `/audio/speech` returns raw audio (`mp3` or `pcm`, default `pcm`); errors are JSON. `speed` is only honoured by
-  some providers — others ignore it or return 400 — so speed is applied at playback.
+- `/audio/speech` returns raw audio (`mp3` or `pcm`, default `pcm`); errors are JSON. Gemini TTS refuses `mp3`
+  (400 naming `response_format`), so `speech()` retries with `pcm` and remembers the model. PCM comes as
+  `audio/pcm;rate=24000;channels=1`, signed 16-bit LE with no header; `SpeechAudio` wraps it as WAV for `AVAudioPlayer`.
+  `speed` is only honoured by some providers — others ignore it or return 400 — so speed is applied at playback.
 - Transcription accepts multipart uploads (`file`, `model`) as well as base64 JSON.
 - Live endpoint latency/throughput stats (`latency_last_30m`) are null without an API key.
 - The `releases/latest/download/…` redirect can serve the previous release for a few seconds after publishing.
