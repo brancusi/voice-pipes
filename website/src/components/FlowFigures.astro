@@ -145,4 +145,68 @@
   .fig__mini-line:nth-child(3) { width: 60%; }
   .fig__mini-line--now { position: relative; background: var(--fg-muted); }
   .fig__mini-line--now::before { content: ''; position: absolute; left: -7px; top: -2px; bottom: -2px; width: 2px; background: var(--purple); }
+
+  /* "Treat audio like a page" (rk-): static frames of the read-along card with the HUD holding the keys, as drawn in
+     HUD.swift (ReadAlongCard's KEYS ON foot, HUDTag's KEYS mark), who has the keyboard in each mode, and
+     Setup → Reading as drawn in SetupView.swift (ReadingSettingsSection). The frames reuse the .ra styles above at
+     data-stage="0". Only that post uses these classes. */
+  .prose kbd:not(.key) { padding: 0 4px; border-radius: 2px; background: var(--bg-300); color: var(--fg); font: inherit; font-size: 0.92em; }
+  .rk-win { padding-block: 14px; -webkit-mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 12px), transparent); mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 12px), transparent); }
+  .rk-ahead { color: rgba(240, 228, 204, 0.82); }
+  .rk-on { flex: none; font-size: 10px; font-weight: 700; color: var(--purple); }
+  .rk-hint { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--fg-muted); }
+  .rk-hint span { color: var(--fg); }
+  .rk-keys { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; margin-left: 2px; box-sizing: border-box; border: 1px solid var(--purple); border-radius: 2px; color: var(--purple); font-size: 9px; font-weight: 700; }
+  .rk-legend .rk-sw { width: 2px; height: 16px; background: var(--purple); }
+  .rk-legend .rk-ul { color: var(--fg); text-decoration: underline 1px var(--purple); text-underline-offset: 3px; }
+  .rk-legend .rk-on { font-size: 11px; }
+  .prose .rk-story { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .prose .rk-story > li { margin: 0; }
+  .rk-scene { min-width: 0; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .rk-scene__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; }
+  .rk-scene__head .key { margin-left: auto; color: var(--fg); }
+  .rk-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 2px; background: var(--purple); color: var(--on-accent); font-size: 11px; font-weight: 700; }
+  .rk-table { overflow-x: auto; }
+  .prose .rk-modes { display: table; width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+  .prose .rk-modes th,
+  .prose .rk-modes td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .prose .rk-modes th { font-size: 12px; letter-spacing: 0; text-transform: none; }
+  .prose .rk-modes thead th { color: var(--fg); text-align: center; vertical-align: bottom; }
+  .prose .rk-modes thead th:first-child,
+  .prose .rk-modes tbody th { color: var(--fg-muted); font-weight: 400; text-align: left; }
+  .prose .rk-modes td { text-align: center; color: var(--fg-muted); }
+  .prose .rk-modes td.rk-hud { color: var(--purple); font-weight: 700; background: rgba(195, 163, 212, 0.14); }
+  .rk-setup { background: var(--bg-100); gap: 6px; }
+  .rk-section { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+  .rk-panel { display: flex; flex-direction: column; gap: 14px; padding: 16px; background: var(--bg-200); border: 1px solid var(--line); border-radius: 6px; }
+  .rk-group { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .rk-strong { font-size: 13px; font-weight: 600; color: var(--fg); }
+  .rk-cap { font-size: 11px; line-height: 16px; color: var(--fg-muted); }
+  .rk-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; background: var(--bg-000); border: 1px solid var(--line); border-radius: 4px; }
+  .rk-seg > span { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 2px; font-size: 12px; color: var(--fg-muted); white-space: nowrap; }
+  .rk-seg > .rk-seg__on { background: var(--purple); color: var(--on-accent); font-weight: 600; }
+  .rk-rule { height: 1px; background: var(--line); }
+  .rk-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+  .rk-reset { font-size: 13px; font-weight: 600; color: var(--comment); }
+  .rk-act { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+  .rk-act__label { font-size: 11px; color: var(--fg-muted); }
+  .rk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rk-chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 4px 0 8px; box-sizing: border-box; background: var(--bg-300); border: 1px solid var(--line); border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--fg); }
+  .rk-chip i { width: 16px; font-style: normal; font-size: 10px; text-align: center; color: var(--fg-muted); }
+  .rk-add { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 2px; font-size: 12px; font-weight: 600; color: var(--purple); }
+  .rk-link { font-size: 13px; font-weight: 600; color: var(--purple); }
+  @media (max-width: 640px) {
+    .prose .rk-story { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 520px) {
+    .prose .rk-modes th,
+    .prose .rk-modes td { padding: 6px 4px; }
+    .prose .rk-modes { font-size: 12px; }
+    .rk-panel { padding: 12px; }
+    .rk-act { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 400px) {
+    .prose .rk-modes th,
+    .prose .rk-modes td { padding: 6px 3px; font-size: 11px; }
+  }
 </style>
