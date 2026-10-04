@@ -15,6 +15,7 @@ struct SetupView: View {
                     connections.vpSetupSection("connections")
                     VPSection("Command line and agents") { Card { CommandLineCard(store: app.store) } }.vpSetupSection("cli")
                     onThisMac.vpSetupSection("models")
+                    microphoneSection.vpSetupSection("microphone")
                     appearanceSection.vpSetupSection("appearance")
                     ReadingSettingsSection(app: app).vpSetupSection("reading")
                     updatesSection.vpSetupSection("updates")
@@ -34,7 +35,7 @@ struct SetupView: View {
     }
 
     /// `vp open setup --section <name>`.
-    static let sections = ["checks", "connections", "cli", "models", "appearance", "reading", "updates"]
+    static let sections = ["checks", "connections", "cli", "models", "microphone", "appearance", "reading", "updates"]
 
     private func takeRequest(_ proxy: ScrollViewProxy) {
         guard let section = UINav.shared.setupSection else { return }
@@ -135,6 +136,23 @@ struct SetupView: View {
                              load: canLoad(state) ? { Task { try? await LocalVoices.shared.prepare(engine) } } : nil,
                              download: state == .loading ? ModelDownloads.shared.status[.init(engine)] ?? .init(total: ModelDownloads.Model(engine).totalBytes) : nil)
                 }
+            }
+        }
+    }
+
+    private var microphoneSection: some View {
+        let choice = Binding { app.store.microphone } set: { app.store.microphone = $0 }
+        return VStack(alignment: .leading, spacing: 6) {
+            SectionLabel("Microphone")
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Keep the microphone ready").font(VPFont.bodyStrong)
+                    VPSegmented(selection: choice, options: MicReadiness.allCases.map { ($0, $0.label) })
+                    Text(choice.wrappedValue.detail + (choice.wrappedValue == .off ? "" : " Bluetooth headsets are never kept open: it would put them in call mode."))
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
             }
         }
     }

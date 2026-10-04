@@ -224,6 +224,11 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   leaves it as it was). **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
   is used by Route and Branch steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
+- **Microphone** — **Keep the microphone ready**: *Always* (the default), *After use* (5 minutes after each take)
+  or *Off*. While the microphone is open, a take starts instantly and includes the half second before you pressed,
+  so your first word isn't clipped. macOS shows its orange mic dot the whole time. With *Off*, the mic opens when
+  you press: 0.15–0.5 s later, depending on the mic. Bluetooth headsets are never kept open, because that would put
+  them in call mode. Same as `microphone` under `[settings]` in config.toml.
 - **Updates** — version and **Check now**.
 
 ## The config file

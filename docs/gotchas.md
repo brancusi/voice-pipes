@@ -57,6 +57,15 @@ permission, but can't register modifier-only keys. Registering Esc globally woul
 registered only while recording. While recording a new shortcut in the editor, all hotkeys are suspended so the
 old binding doesn't fire.
 
+**Opening the microphone is slow, and speech in that gap is lost.** `AVAudioEngine.start()` blocks for as long
+as the device takes to start: ~430 ms for the Studio Display mic, ~40 ms for the MacBook mic. The first buffer
+arrives ~100 ms after that. With a cold engine the first word was clipped. → `AudioRecorder` keeps the engine
+running between takes (`[settings] microphone`, default `always`) and adds the last 0.5 s from before the press,
+which gives a 0 ms start. `pause()` doesn't help (still ~550 ms). Bluetooth inputs are never kept open, because an
+open Bluetooth mic holds the headset in call mode. A default-device change stops the engine
+(`AVAudioEngineConfigurationChange`), so a fresh engine is built on the new device. Bench with a scratch binary
+that times `start()` → first tap buffer.
+
 **Apple Foundation Models** reports `appleIntelligenceNotEnabled` until Apple Intelligence is switched on, then
 `modelNotReady` while the model downloads.
 

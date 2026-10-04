@@ -427,6 +427,7 @@ enum VPCommands {
                 ("schema", .string(ConfigPaths.tilde(ConfigPaths.directory.appendingPathComponent("config.schema.json")))),
                 ("health", .string(issueSummary(issues))),
                 ("appearance", .string(config?.appearance.rawValue ?? "?")),
+                ("microphone", .string(config?.microphone.rawValue ?? "?")),
                 ("tracks", .int(config?.tracks.count ?? 0)),
             ]), help: ["vp config check", "vp help config   (the block reference)", "vp config backups"])
         case "path":

@@ -408,7 +408,7 @@ enum AgentsInstaller {
           `url`, `headers`, `body`, `response_field`, `template`; a route's `name`, `when`, `prompt`).
           `--section title|triggers|pipeline` scrolls to a part.
         - `vp open history [--track <id>] [--search "…"] [--run <n>]`, `vp open vocabulary [--word "…"] [--add]`,
-          `vp open setup [--section checks|connections|cli|models|appearance|updates] [--field openrouter-key]`,
+          `vp open setup [--section checks|connections|cli|models|microphone|appearance|reading|updates] [--field openrouter-key]`,
           `vp open onboarding [--step welcome|permissions|models|keys|agents|try]`, `vp open menu` (the menu bar
           panel), `vp open about`.
         - `--background` shows a window without taking the keyboard from the user's current app.

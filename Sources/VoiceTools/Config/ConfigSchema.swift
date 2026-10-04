@@ -18,7 +18,8 @@ enum ConfigSchema {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "appearance": { "enum": ["auto", "daylight", "sundown"], "default": "auto", "description": "auto follows macOS; the HUD stays dark either way." }
+            "appearance": { "enum": ["auto", "daylight", "sundown"], "default": "auto", "description": "auto follows macOS; the HUD stays dark either way." },
+            "microphone": { "enum": ["always", "after-use", "off"], "default": "always", "description": "Keep the microphone open between takes so a take starts instantly and keeps the half second before the press: always, for 5 minutes after each take, or off (opened per take). Bluetooth mics are never kept open." }
           }
         },
         "track": { "type": "array", "items": { "$ref": "#/$defs/track" } }

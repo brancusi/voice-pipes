@@ -197,6 +197,9 @@ final class AppState {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
             if !TextCapture.isTrusted { TextCapture.promptForAccessibility() }
         }
+        // After the permission prompt, so an open microphone can't ask for it first. (Without permission it stays
+        // closed; the first take after the setup window grants it opens it.)
+        observeMicrophone()
         if store.tracks.contains(where: { $0.allSteps.contains { if case .parakeet = $0.kind { true } else { false } } }) {
             parakeetState = .loading
             refreshChecks()
@@ -310,6 +313,14 @@ final class AppState {
             registerHotkeys(for: store.tracks)
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTracks() }
+        }
+    }
+
+    private func observeMicrophone() {
+        withObservationTracking {
+            recorder.readiness = store.microphone
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeMicrophone() }
         }
     }
 
@@ -455,8 +466,8 @@ final class AppState {
         run?.processingStarted = Date()
         setStepMs(0, Int(Date().timeIntervalSince(capture.started) * 1000), for: capture.track)
 
-        // Ignore accidental taps.
-        guard samples.count > Int(AudioRecorder.sampleRate * 0.25) else {
+        // Ignore accidental taps. (By how long the key was held: an open microphone adds the half second before it.)
+        guard Date().timeIntervalSince(capture.started) > 0.25, samples.count > Int(AudioRecorder.sampleRate * 0.1) else {
             run = nil
             return
         }

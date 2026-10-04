@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.8.3**
+- **Hotkeys start recording instantly, and your first word is no longer cut off.** Before, the microphone switched on only when you pressed, which takes up to half a second on some mics (about 0.45 s on a Studio Display), and anything you said in that gap was lost. Voice Pipes now keeps the microphone ready, so a take starts the moment you press and includes the half second before it. macOS shows its orange mic dot while the mic is open. The audio stays in memory until you press, and is never saved.
+- **Choose how ready it stays** in Setup → Microphone: *Always* (the default), *After use* (open for 5 minutes after each take), or *Off* (the old behaviour). Or set `microphone` under `[settings]` in config.toml. Bluetooth headsets are never kept open, because that would switch them into low-quality call audio.
+
 **1.8.2**
 - **Every cloud voice now plays, whatever audio it sends back.** Some voices, like Google's Gemini TTS (one voice that speaks many languages), only send raw audio, and Voice Pipes stopped with an error instead of speaking. It now plays raw audio as well as MP3, WAV, AAC and the rest. A voice that can't send MP3 is asked once for raw audio, and the app remembers that for next time.
 
