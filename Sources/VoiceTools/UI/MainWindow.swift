@@ -22,6 +22,7 @@ struct MainWindowView: View {
         } detail: {
             detail.scrollsSidewaysBelow(Self.detailMinWidth)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { VersionFooter() }
         .frame(minWidth: 420, minHeight: 320)
         // Small minimums on purpose: tiling window managers (yabai, Stage Manager, split screen) size the window
         // to its tile, and a window that refuses to shrink spills into the neighbouring one.
@@ -684,4 +685,51 @@ enum HistoryPreview {
     #else
     static let open: Set<RunRecord.ID> = []
     #endif
+}
+
+/// The window's bottom bar: which version is running, and whether it's the newest (Check now / Install…).
+struct VersionFooter: View {
+    @EnvironmentObject var updates: Updates
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Hairline()
+            HStack(spacing: 0) {
+                Text("Voice Pipes \(updates.version)").foregroundStyle(Palette.fgMuted)
+                status
+                Spacer(minLength: 12)
+                action
+            }
+            .font(VPFont.caption).lineLimit(1)
+            .padding(.horizontal, 16)
+            .frame(height: 28)
+            .background(Palette.bg000)
+        }
+        .onAppear { updates.poll() }
+    }
+
+    @ViewBuilder private var status: some View {
+        if let available = updates.available {
+            Text(" · \(available) available").foregroundStyle(Palette.purple)
+        } else if !updates.enabled {
+            Text(" · updates off in this build").foregroundStyle(Palette.comment).help(Updates.noFeed)
+        } else if updates.checking {
+            Text(" · checking…").foregroundStyle(Palette.comment)
+        } else if let checked = updates.checkedAt {
+            Text(" · up to date").foregroundStyle(Palette.comment)
+                .help("Up to date as of \(checked.formatted(date: .omitted, time: .shortened))")
+        }
+    }
+
+    @ViewBuilder private var action: some View {
+        if updates.available != nil {
+            Button("Install…") { updates.check() }.buttonStyle(.plain)
+                .font(VPFont.label).foregroundStyle(Palette.purple)
+                .help("Downloads, checks the signature and relaunches; takes a few seconds")
+        } else if updates.enabled {
+            Button("Check now") { updates.poll(force: true) }.buttonStyle(.plain)
+                .font(VPFont.label).foregroundStyle(updates.checking ? Palette.comment : Palette.purple)
+                .disabled(updates.checking)
+        }
+    }
 }

@@ -18,6 +18,11 @@ final class Updates: NSObject, ObservableObject, SPUStandardUserDriverDelegate, 
     private var timer: Timer?
     private var notified: String?          // the version we've already posted a notification for
     private var lastPoll = Date.distantPast
+    /// When the feed was last read and showed nothing newer ("Up to date as of …").
+    @Published var checkedAt: Date?
+    /// A check the user asked for (the window's footer) is reading the feed.
+    @Published var checking = false
+    static let noFeed = "This build has no update feed, so it can't check. Install a release build to get updates."
 
     /// Builds without a feed or key (local development) have updates turned off.
     var enabled: Bool { controller != nil }
@@ -45,17 +50,22 @@ final class Updates: NSObject, ObservableObject, SPUStandardUserDriverDelegate, 
     }
 
     /// Quietly reads the feed's newest version. Called on a timer and when the panel opens (at most once a minute).
-    func poll() {
-        guard let feedURL, Date().timeIntervalSince(lastPoll) > 60 else { return }
+    /// `force` (Check now) skips the once-a-minute limit and shows `checking` while it reads.
+    func poll(force: Bool = false) {
+        guard let feedURL, force || Date().timeIntervalSince(lastPoll) > 60 else { return }
         lastPoll = Date()
+        if force { checking = true }
         var request = URLRequest(url: feedURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 20)
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         Task {
+            defer { if force { checking = false } }
             guard let (data, response) = try? await URLSession.shared.data(for: request),
                   (response as? HTTPURLResponse)?.statusCode == 200,
-                  let latest = Self.feedVersion(String(decoding: data, as: UTF8.self)),
-                  SUStandardVersionComparator.default.compareVersion(version, toVersion: latest) == .orderedAscending
-            else { return }
+                  let latest = Self.feedVersion(String(decoding: data, as: UTF8.self)) else { return }
+            guard SUStandardVersionComparator.default.compareVersion(version, toVersion: latest) == .orderedAscending else {
+                checkedAt = Date()  // read the feed: nothing newer
+                return
+            }
             available = latest
             if notified != latest {
                 notified = latest
