@@ -146,6 +146,11 @@ struct SetupView: View {
             SectionLabel("Microphone")
             Card {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("Input").font(VPFont.bodyStrong)
+                    InputPicker(selection: Binding { app.store.input } set: { app.store.input = $0 ?? AudioInputs.system })
+                    Text("What tracks record from. A track can use another mic: open its Microphone block.")
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+                    Hairline().padding(.vertical, 6)
                     Text("Keep the microphone ready").font(VPFont.bodyStrong)
                     VPSegmented(selection: choice, options: MicReadiness.allCases.map { ($0, $0.label) })
                     Text(choice.wrappedValue.detail + (choice.wrappedValue == .off ? "" : " Bluetooth headsets are never kept open: it would put them in call mode."))

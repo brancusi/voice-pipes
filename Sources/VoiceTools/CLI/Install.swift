@@ -378,7 +378,8 @@ enum AgentsInstaller {
 
         Choosing blocks:
         - Voice in: `microphone` then `transcribe` (`model = "parakeet"` on this Mac, fast and private; or an
-          OpenRouter id for cloud accuracy), usually `fix-words` next (their vocabulary).
+          OpenRouter id for cloud accuracy), usually `fix-words` next (their vocabulary). `microphone` takes
+          `input = "<name>"` for a specific mic (`vp inputs`); without it, [settings] input.
         - Text in: `text` with `sources` (selection, page, clipboard; first with text wins).
         - Change the text: `llm` (any OpenRouter model, `vp models --capability text --search <name>`; `{{input}}` in
           the prompt places the text; `on_failure = "pass-through"` keeps a track working offline), `template`, `http`.

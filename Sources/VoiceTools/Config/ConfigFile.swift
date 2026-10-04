@@ -5,6 +5,8 @@ import TOMLDecoder
 struct AppConfig: Equatable {
     var appearance: AppearanceChoice = .auto
     var microphone: MicReadiness = .always
+    /// Which mic tracks record from, unless their Microphone block names one: `AudioInputs.system` or a name.
+    var input = AudioInputs.system
     var reading = ReadingSettings()
     var agents = AgentSettings()
     var tracks: [Track]
@@ -290,12 +292,16 @@ enum ConfigFile {
         }
         var appearance = AppearanceChoice.auto
         var microphone = MicReadiness.always
+        var input = AudioInputs.system
         var reading = ReadingSettings()
         var agents = AgentSettings()
         if case .table(let settingsTable)? = top.raw("settings") {
             var settings = TableReader(settingsTable, path: "settings")
             if let a = settings.choice("appearance", AppearanceChoice.allCases.map(\.rawValue)) { appearance = AppearanceChoice(rawValue: a) ?? .auto }
             if let m = settings.choice("microphone", MicReadiness.allCases.map(\.rawValue)) { microphone = MicReadiness(rawValue: m) ?? .always }
+            if let i = settings.string("input") {
+                if i.trimmingCharacters(in: .whitespaces).isEmpty { settings.error("input", "should be \"system\" or a mic's name (`vp inputs` lists them)") } else { input = i }
+            }
             if case .table(let readingTable)? = settings.raw("reading") {
                 var r = TableReader(readingTable, path: "settings.reading")
                 reading = readReading(&r)
@@ -312,7 +318,7 @@ enum ConfigFile {
                 a.finish(known: ["read_aloud", "long_text"])
                 settings.issues += a.issues
             }
-            settings.finish(known: ["appearance", "microphone", "reading", "agents"])
+            settings.finish(known: ["appearance", "microphone", "input", "reading", "agents"])
             top.issues += settings.issues
         } else if root["settings"] != nil {
             top.error("settings", "should be a table: [settings]")
@@ -337,7 +343,7 @@ enum ConfigFile {
 
         let errors = top.issues.filter { $0.severity == .error }
         let warnings = top.issues.filter { $0.severity == .warning }
-        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, reading: reading, agents: agents, tracks: tracks) : nil, errors: errors, warnings: warnings)
+        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, input: input, reading: reading, agents: agents, tracks: tracks) : nil, errors: errors, warnings: warnings)
     }
 
     /// [settings.reading]: when the HUD takes the keyboard, click-away, its keys, and [settings.reading.global].
@@ -448,7 +454,12 @@ enum ConfigFile {
         var known = ["type"]
         switch type {
         case "microphone":
-            kind = .microphone
+            known += ["input"]
+            let input = s.string("input")
+            if let input, input.trimmingCharacters(in: .whitespaces).isEmpty {
+                s.error("input", "should be \"system\" or a mic's name (`vp inputs` lists them); leave it out for [settings] input")
+            }
+            kind = .microphone(input: input)
         case "text":
             known += ["sources"]
             var sources: [TextSource] = []
@@ -577,6 +588,7 @@ enum ConfigFile {
         out += "[settings]\n"
         out += "appearance = \(quote(config.appearance.rawValue))  # auto (follow macOS) | daylight | sundown\n"
         out += "microphone = \(quote(config.microphone.rawValue))  # always | after-use | off: kept open between takes, so a take starts instantly\n"
+        out += "input = \(quote(config.input))  # \"system\" (follows macOS) or a mic's name (`vp inputs`); a track's Microphone block can name its own\n"
         out += "\n[settings.agents]  # what agents (Claude Code, Codex, …) read aloud to you without being asked\n"
         out += "read_aloud = \(quote(config.agents.readAloud.rawValue))  # off | long (summaries, reports) | attention (long text + anything that needs you) | all\n"
         out += "long_text = \(config.agents.longText)  # characters; longer than this counts as long\n"
@@ -636,8 +648,9 @@ enum ConfigFile {
         }
         let inner = indent + "  "
         switch kind {
-        case .microphone:
+        case .microphone(let input):
             add("type", quote("microphone"))
+            if let input { add("input", quote(input) + "  # \"system\" or a mic's name (`vp inputs`); leave out for [settings] input") }
         case .text(let sources):
             add("type", quote("text"))
             add("sources", "[" + sources.map { s in quote(textSources.first { $0.1 == s }?.0 ?? "selection") }.joined(separator: ", ") + "]",
@@ -806,7 +819,7 @@ enum ConfigFile {
         #              inputs give audio or text, transcribe turns audio into text, the rest take text.
         #
         #  Blocks ([[track.step]] type = …)                                     takes → gives
-        #    microphone                                                          — → audio
+        #    microphone   input = "system" | a mic's name (`vp inputs`); default: [settings] input   — → audio
         #    text         sources = ["selection", "page", "clipboard",          — → text
         #                            "previous-clipboard"]  (first with text wins)
         #    transcribe   model = "parakeet" (on this Mac) | an OpenRouter id   audio → text
@@ -837,6 +850,7 @@ enum ConfigFile {
         #  Settings (top of the file)
         #    [settings]          appearance = auto | daylight | sundown
         #                        microphone = always | after-use | off (kept open between takes: instant start)
+        #                        input = "system" | a mic's name (`vp inputs`): which mic tracks record from
         #    [settings.agents]   read_aloud = off | long | attention | all · long_text = characters (default 600)
         #                        what agents read aloud without being asked (`vp agents read-aloud <mode>` sets it)
         #    [settings.reading]  take_keys = always | hover | click | never · click_away = keep-reading | stop

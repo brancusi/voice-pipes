@@ -102,7 +102,9 @@ struct Route: Codable, Hashable, Identifiable {
 
 enum StepKind: Codable, Hashable {
     // Inputs
-    case microphone
+    /// `input`: a mic's name or `AudioInputs.system`; nil = the app's input (Setup → Microphone). Optional so tracks
+    /// saved before 1.10.0 still load.
+    case microphone(input: String?)
     case text(sources: [TextSource])
 
     // Transcribe (audio -> text)
@@ -129,6 +131,8 @@ enum StepKind: Codable, Hashable {
     case openRouterSpeech(model: String, voice: String, rate: Float)
     case localSpeech(engine: LocalVoiceEngine, voice: String, rate: Float)
     case showHUD
+
+    var isMicrophone: Bool { if case .microphone = self { true } else { false } }
 
     var input: DataKind {
         switch self {
@@ -227,7 +231,7 @@ enum StepKind: Codable, Hashable {
 
     /// Catalog for the "Add step" menu.
     static let catalog: [StepKind] = [
-        .microphone,
+        .microphone(input: nil),
         .text(sources: [.selection, .page, .clipboard]),
         .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
@@ -291,11 +295,11 @@ extension Track {
     static let defaults: [Track] = [
         Track(name: "Fast dictation", colorHex: "#F0A35E",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option]), mode: .hold)],
-              steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
+              steps: [Step(kind: .microphone(input: nil)), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
                       Step(kind: .fixWords), Step(kind: .paste(restoreClipboard: true))]),
         Track(name: "Clean dictation", colorHex: "#8FB8D6",
               triggers: [Trigger(combo: KeyCombo(key: .space, modifiers: [.option, .shift]), mode: .toggle)],
-              steps: [Step(kind: .microphone), Step(kind: .openRouterSTT(model: "microsoft/mai-transcribe-2")), Step(kind: .fixWords),
+              steps: [Step(kind: .microphone(input: nil)), Step(kind: .openRouterSTT(model: "microsoft/mai-transcribe-2")), Step(kind: .fixWords),
                       Step(kind: .llm(model: "anthropic/claude-haiku-4.5", prompt: cleanupPrompt, onFailure: .passThrough)),
                       Step(kind: .paste(restoreClipboard: true))]),
         Track(name: "Read aloud", colorHex: "#C3A3D4",

@@ -138,6 +138,7 @@ struct MainWindowView: View {
                     app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .track(id)
                 }
                 .id(id)
+                .environment(\.appInput, app.store.input)
                 .navigationTitle(app.store.tracks[index].name)
             } else {
                 WranglerEmptyState(headline: "no pipes laid", pose: .sing,
@@ -165,7 +166,7 @@ struct MainWindowView: View {
     private func newTrack() {
         let track = Track(name: "New track", colorHex: Palette.trackSwatches[app.store.tracks.count % Palette.trackSwatches.count].hex,
                           triggers: [],
-                          steps: [Step(kind: .microphone), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
+                          steps: [Step(kind: .microphone(input: nil)), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
                                   Step(kind: .paste(restoreClipboard: true))])
         app.store.tracks.append(track)
         app.mainSection = .track(track.id)
@@ -607,7 +608,7 @@ private struct VocabularyView: View {
         }
         .sheet(isPresented: Binding { training != nil } set: { if !$0 { training = nil } }) {
             if let index = store.entries.firstIndex(where: { $0.id == training }) {
-                TrainWordSheet(parakeet: parakeet, entry: $store.entries[index])
+                TrainWordSheet(parakeet: parakeet, entry: $store.entries[index], input: app.store.input)
             }
         }
     }

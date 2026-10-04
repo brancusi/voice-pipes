@@ -355,6 +355,7 @@ extension AppState {
         let meter = LevelGate(silence: silence)
         beginAgentRecording()
         defer { endAgentRecording() }
+        let recorder = recorder(for: track.map(input(for:)) ?? store.input)
         recorder.onSamples = nil
         recorder.onLevel = { [weak self] level in
             meter.add(level)

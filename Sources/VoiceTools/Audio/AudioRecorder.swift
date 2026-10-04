@@ -34,8 +34,85 @@ enum MicReadiness: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Captures the default microphone as 16 kHz mono Float32, the format Parakeet and the cloud STT want.
-/// Between takes it can keep the microphone open (`readiness`), holding the last half second for the next take.
+/// The Mac's microphones, by name (what config.toml and the pickers use; names survive reconnects and read well).
+enum AudioInputs {
+    /// `input = "system"`: whatever macOS has as its input (System Settings → Sound), following it when it changes.
+    static let system = "system"
+
+    struct Device: Hashable {
+        let id: AudioDeviceID
+        let name: String
+        let bluetooth: Bool
+    }
+
+    /// Every device that can record, in the order macOS lists them.
+    static func all() -> [Device] {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else { return [] }
+        var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids) == noErr else { return [] }
+        return ids.compactMap { id in
+            guard hasInput(id), let name = name(id) else { return nil }
+            return Device(id: id, name: name, bluetooth: isBluetooth(id))
+        }
+    }
+
+    /// The device a setting means now: a named mic if it's connected, otherwise the system's input.
+    static func resolve(_ input: String) -> Device? {
+        if input != system, let device = all().first(where: { $0.name == input }) { return device }
+        return systemDevice()
+    }
+
+    /// Is a named mic connected? (`system` always is.)
+    static func isConnected(_ input: String) -> Bool { input == system || all().contains { $0.name == input } }
+
+    static func systemDevice() -> Device? {
+        var id = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id) == noErr, id != 0,
+              let name = name(id) else { return nil }
+        return Device(id: id, name: name, bluetooth: isBluetooth(id))
+    }
+
+    /// "System (MacBook Pro Microphone)", or the mic's own name.
+    static func label(_ input: String) -> String {
+        guard input == system else { return isConnected(input) ? input : "\(input) (not connected)" }
+        return systemDevice().map { "System (\($0.name))" } ?? "System"
+    }
+
+    private static func hasInput(_ id: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: kAudioDevicePropertyScopeInput,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        return AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr && size > 0
+    }
+
+    private static func name(_ id: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioObjectPropertyName, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var name: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &name) == noErr, let value = name?.takeRetainedValue() else { return nil }
+        return value as String
+    }
+
+    private static func isBluetooth(_ id: AudioDeviceID) -> Bool {
+        var transport = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType, mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &transport) == noErr else { return false }
+        return transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE
+    }
+}
+
+/// Captures a microphone (`input`: the system's, or one by name) as 16 kHz mono Float32, the format Parakeet and the
+/// cloud STT want. Between takes it can keep the microphone open (`readiness`), holding the last half second for the
+/// next take.
 final class AudioRecorder: @unchecked Sendable {
     static let sampleRate: Double = 16_000
     /// Audio from before the press that an open microphone adds to a take: you tend to start talking as you press.
@@ -65,7 +142,13 @@ final class AudioRecorder: @unchecked Sendable {
         didSet { if readiness != oldValue { settle() } }
     }
 
-    init() { observeConfiguration() }
+    /// `AudioInputs.system` or a mic's name. A named mic that isn't connected records from the system's input.
+    let input: String
+
+    init(input: String = AudioInputs.system) {
+        self.input = input
+        observeConfiguration()
+    }
 
     deinit {
         if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
@@ -133,12 +216,17 @@ final class AudioRecorder: @unchecked Sendable {
     /// call mode, which makes everything it plays sound like a phone call. And nothing opens without permission.
     private var keepOpen: MicReadiness {
         guard readiness != .off, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-              !Self.defaultInputIsBluetooth() else { return .off }
+              AudioInputs.resolve(input)?.bluetooth != true else { return .off }
         return readiness
     }
 
     private func startEngine() throws {
         let input = engine.inputNode
+        if self.input != AudioInputs.system, var device = AudioInputs.resolve(self.input)?.id, let unit = input.audioUnit {
+            // A named mic (when it's not connected, `resolve` gives the system's input and nothing needs setting).
+            AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device,
+                                 UInt32(MemoryLayout<AudioDeviceID>.size))
+        }
         let inputFormat = input.outputFormat(forBus: 0)
         converter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
@@ -170,6 +258,9 @@ final class AudioRecorder: @unchecked Sendable {
     }
 
     private func configurationChanged() {
+        // Picking a named mic posts this too, with the engine still running on it: nothing to do. A real change (a
+        // device unplugged, a new format) stops the engine first.
+        guard !engine.isRunning else { return }
         let wasRunning = running
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -184,19 +275,6 @@ final class AudioRecorder: @unchecked Sendable {
             try? startEngine()
             settle()
         }
-    }
-
-    private static func defaultInputIsBluetooth() -> Bool {
-        var device = AudioDeviceID(0)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice,
-                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr else { return false }
-        var transport = UInt32(0)
-        size = UInt32(MemoryLayout<UInt32>.size)
-        address.mSelector = kAudioDevicePropertyTransportType
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &transport) == noErr else { return false }
-        return transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE
     }
 
     private func process(_ buffer: AVAudioPCMBuffer) {

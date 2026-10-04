@@ -22,6 +22,11 @@ final class TrackStore {
         didSet { if !applyingFile, microphone != oldValue { save() } }
     }
 
+    /// Which mic tracks record from unless their Microphone block names one ([settings] input).
+    var input = AudioInputs.system {
+        didSet { if !applyingFile, input != oldValue { save() } }
+    }
+
     /// Keyboard control while reading ([settings.reading]); Setup edits it, the file can too.
     var reading = ReadingSettings() {
         didSet { if !applyingFile, reading != oldValue { save() } }
@@ -58,6 +63,7 @@ final class TrackStore {
         var loadedReading = ReadingSettings()
         var loadedAgents = AgentSettings()
         var loadedMicrophone = MicReadiness.always
+        var loadedInput = AudioInputs.system
         let disk = DiskText.read(configURL)
         switch disk {
         case .text(let content):
@@ -69,6 +75,7 @@ final class TrackStore {
                 loadedReading = config.reading
                 loadedAgents = config.agents
                 loadedMicrophone = config.microphone
+                loadedInput = config.input
             } else {
                 // A broken file at launch: run the last good tracks and leave the file for its author to fix.
                 loaded = cached ?? Track.defaults
@@ -115,6 +122,7 @@ final class TrackStore {
         reading = loadedReading
         agents = loadedAgents
         microphone = loadedMicrophone
+        input = loadedInput
         issues = found
         diskText = text
         createdFresh = fresh
@@ -173,6 +181,7 @@ final class TrackStore {
             reading = config.reading
             agents = config.agents
             microphone = config.microphone
+            input = config.input
             applyingFile = false
             writeCache()
             if !changes.isEmpty { onExternalChanges(changes) }
@@ -293,7 +302,7 @@ final class TrackStore {
             tracks = slugged
             applyingFile = false
         }
-        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, microphone: microphone, reading: reading, agents: agents, tracks: tracks))
+        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, microphone: microphone, input: input, reading: reading, agents: agents, tracks: tracks))
         guard text != diskText else { return }
         do {
             try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)

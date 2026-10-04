@@ -19,6 +19,7 @@ enum ConfigSchema {
           "additionalProperties": false,
           "properties": {
             "appearance": { "enum": ["auto", "daylight", "sundown"], "default": "auto", "description": "auto follows macOS; the HUD stays dark either way." },
+            "input": { "type": "string", "minLength": 1, "default": "system", "description": "Which mic tracks record from: \"system\" (follows macOS) or a mic's name (`vp inputs`). A track's Microphone block can name its own." },
             "microphone": { "enum": ["always", "after-use", "off"], "default": "always", "description": "Keep the microphone open between takes so a take starts instantly and keeps the half second before the press: always, for 5 minutes after each take, or off (opened per take). Bluetooth mics are never kept open." }
           }
         },
@@ -59,7 +60,7 @@ enum ConfigSchema {
           "required": ["type"],
           "properties": { "type": { "enum": ["microphone", "text", "transcribe", "llm", "route", "branch", "http", "template", "fix-words", "paste", "copy", "speak", "show-hud"] } },
           "oneOf": [
-            { "properties": { "type": { "const": "microphone" } }, "additionalProperties": false, "description": "Records the default input. — → audio" },
+            { "properties": { "type": { "const": "microphone" }, "input": { "type": "string", "description": "\"system\" (follows macOS) or a mic's name (`vp inputs`). Leave out to use [settings] input. Bluetooth mics are never kept open, so they start a little later." } }, "additionalProperties": false, "description": "Records a microphone. — → audio" },
             { "properties": { "type": { "const": "text" }, "sources": { "type": "array", "items": { "enum": ["selection", "page", "clipboard", "previous-clipboard"] } } }, "additionalProperties": false, "description": "The first source with text. — → text" },
             { "properties": { "type": { "const": "transcribe" }, "model": { "type": "string", "default": "parakeet", "description": "\"parakeet\" (on this Mac) or an OpenRouter transcription model id." }, "mode": { "enum": ["on-release", "pause-chunks", "streaming"], "default": "on-release" }, "pause_ms": { "type": "integer", "minimum": 300, "maximum": 1200, "default": 500 } }, "additionalProperties": false, "description": "audio → text" },
             { "properties": { "type": { "const": "llm" }, "model": { "type": "string", "description": "An OpenRouter model id." }, "prompt": { "type": "string", "description": "Instructions; {{input}} places the text, otherwise it's the user message." }, "on_failure": { "enum": ["pass-through", "stop"], "default": "pass-through" } }, "required": ["model"], "additionalProperties": false, "description": "text → text" },

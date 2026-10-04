@@ -66,6 +66,11 @@ open Bluetooth mic holds the headset in call mode. A default-device change stops
 (`AVAudioEngineConfigurationChange`), so a fresh engine is built on the new device. Bench with a scratch binary
 that times `start()` → first tap buffer.
 
+**Picking a mic posts `AVAudioEngineConfigurationChange`.** Setting `kAudioOutputUnitProperty_CurrentDevice` on the
+input node's audio unit posts the notification ~170 ms later with the engine still running; rebuilding on it looped
+forever and recorded nothing. → Ignore it while `engine.isRunning`: a real change (unplugged, new format) stops the
+engine first.
+
 **History in SQLite (1.9.0).** The JSON file was rewritten whole on every run and lived in memory. → `history.sqlite`
 via the system `SQLite3` module (no package). Measured with 50,000 runs (164 MB): 0.2 ms to add a run, 2 ms for a page,
 25 ms for the widest search ("um", 5,200 matches). FTS5's `trigram` tokenizer gives substring search, but only for 3+

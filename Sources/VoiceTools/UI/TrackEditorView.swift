@@ -457,11 +457,14 @@ private struct StepConfigView: View {
     @Binding var kind: StepKind
     let stepID: Step.ID
     let speaker: Speaker
+    @Environment(\.appInput) private var appInput
 
     var body: some View {
         switch kind {
-        case .microphone:
-            Text("Default input device · 16 kHz mono").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+        case .microphone(let input):
+            ConfigRow("Input") {
+                InputPicker(selection: Binding { input } set: { kind = .microphone(input: $0) }, appDefault: appInput)
+            }
 
         case .text(let sources):
             VStack(alignment: .leading, spacing: 4) {

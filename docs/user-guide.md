@@ -224,11 +224,15 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   leaves it as it was). **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
   is used by Route and Branch steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
-- **Microphone** — **Keep the microphone ready**: *Always* (the default), *After use* (5 minutes after each take)
+- **Microphone** — **Input**: which mic tracks record from, *System* (follows macOS's input) or a mic by name.
+  A track can record from another mic: open its **Microphone** block and pick one (*App default* follows this
+  setting). A named mic that isn't plugged in records from the system input until it's back. **Keep the microphone ready**: *Always* (the default), *After use* (5 minutes after each take)
   or *Off*. While the microphone is open, a take starts instantly and includes the half second before you pressed,
   so your first word isn't clipped. macOS shows its orange mic dot the whole time. With *Off*, the mic opens when
   you press: 0.15–0.5 s later, depending on the mic. Bluetooth headsets are never kept open, because that would put
-  them in call mode. Same as `microphone` under `[settings]` in config.toml.
+  them in call mode, so a track set to a headset starts a moment after you press; a track on the laptop's mic stays
+  instant. Every mic an enabled track uses is kept ready. Same as `input` and `microphone` under `[settings]` in
+  config.toml, and `input = "…"` in a track's microphone block; `vp inputs` lists the names.
 - **Updates** — version and **Check now**. The bar along the bottom of the main window shows the same: the version,
   *up to date* (hover for when it last checked) with **Check now**, or *x.y.z available* with **Install…**.
   The menu bar panel's last line shows it too.

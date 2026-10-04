@@ -83,7 +83,9 @@ final class AppState {
 
     @ObservationIgnored let parakeet = ParakeetService()
     @ObservationIgnored private let hotkeys = HotkeyManager()
-    @ObservationIgnored let recorder = AudioRecorder()
+    /// One recorder per mic in use (`AudioInputs.system` or a name), made on first use; `observeMicrophone` keeps the
+    /// ones enabled tracks use ready and closes the rest.
+    @ObservationIgnored private var recorders: [String: AudioRecorder] = [:]
     @ObservationIgnored var capture: Capture?
     @ObservationIgnored private var cancelHotkey: UInt32?
     @ObservationIgnored private var speakingTrack: Track.ID?
@@ -95,6 +97,20 @@ final class AppState {
         let mode: Trigger.Mode
         let live: LiveTranscriber?
         let started: Date
+        let recorder: AudioRecorder
+    }
+
+    func recorder(for input: String) -> AudioRecorder {
+        if let existing = recorders[input] { return existing }
+        let made = AudioRecorder(input: input)
+        recorders[input] = made
+        return made
+    }
+
+    /// The mic a track records from: its Microphone block's, or the app's ([settings] input).
+    func input(for track: Track) -> String {
+        if case .microphone(let input)? = track.steps.first?.kind, let input { return input }
+        return store.input
     }
 
     /// `startServices: false` builds the state without hotkeys, the HUD, the microphone or models (for rendering
@@ -318,7 +334,13 @@ final class AppState {
 
     private func observeMicrophone() {
         withObservationTracking {
-            recorder.readiness = store.microphone
+            // Every mic an enabled track records from, and the app's own (`vp listen`, training a word).
+            let used = Set(store.tracks.filter { $0.enabled && $0.steps.first?.kind.isMicrophone == true }.map(input(for:)) + [store.input])
+            for input in used { recorder(for: input).readiness = store.microphone }
+            for (input, unused) in recorders where !used.contains(input) {
+                unused.readiness = .off
+                if capture?.recorder !== unused { recorders[input] = nil }
+            }
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeMicrophone() }
         }
@@ -424,6 +446,7 @@ final class AppState {
         }
         if track.allSteps.contains(where: \.kind.usesOpenRouter) { OpenRouterClient.shared.prewarm() }
 
+        let recorder = recorder(for: input(for: track))
         recorder.onSamples = live.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
         recorder.onLevel = { [weak self] level in
             Task { @MainActor in self?.run?.level = level }
@@ -434,7 +457,7 @@ final class AppState {
             show(failure: "Microphone unavailable: \(error.localizedDescription)", for: track)
             return
         }
-        capture = Capture(track: track, mode: mode, live: live, started: Date())
+        capture = Capture(track: track, mode: mode, live: live, started: Date(), recorder: recorder)
         run?.phase = .recording
         run?.recordingStarted = Date()
         cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
@@ -444,8 +467,9 @@ final class AppState {
 
     func cancelCapture() {
         if agentRecording { agentCancelled = true }
-        guard let live = capture.map({ $0.live }) else { return }
-        _ = recorder.stop()
+        guard let current = capture else { return }
+        let live = current.live
+        _ = current.recorder.stop()
         live?.cancel()
         endCaptureHotkeys()
         capture = nil
@@ -461,7 +485,7 @@ final class AppState {
         guard let capture else { return }
         self.capture = nil
         endCaptureHotkeys()
-        let samples = recorder.stop()
+        let samples = capture.recorder.stop()
         run?.phase = .processing
         run?.processingStarted = Date()
         setStepMs(0, Int(Date().timeIntervalSince(capture.started) * 1000), for: capture.track)
@@ -654,7 +678,7 @@ final class AppState {
         guard start > 0 else { return [] }
         var entries: [RunRecord.LogEntry] = []
         let recorded = run.map { $0.processingStarted.timeIntervalSince($0.recordingStarted) } ?? 0
-        if track.steps.first?.kind == .microphone {
+        if track.steps.first?.kind.isMicrophone == true {
             entries.append(RunRecord.LogEntry(title: "Microphone", category: "Input", depth: 0, ms: Int(max(0, recorded) * 1000),
                                               output: String(format: "audio · %.1f s", max(0, recorded)), usage: RunRecord.Usage(local: true),
                                               status: .ok, message: "recorded while the hotkey was held or toggled"))
@@ -694,7 +718,7 @@ final class AppState {
         guard let text = run?.liveText, !text.isEmpty, run?.trackID == track.id else { return total }
         let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().flatMap { index, pair -> [RunRecord.StepTiming] in
             // The microphone's time is how long you spoke, not processing.
-            guard let ms = pair.1, !(index == 0 && track.steps.first?.kind == .microphone) else { return [] }
+            guard let ms = pair.1, !(index == 0 && track.steps.first?.kind.isMicrophone == true) else { return [] }
             return [RunRecord.StepTiming(title: pair.0, ms: ms, category: track.steps[safe: index]?.kind.category)]
                 + (run?.branchDetail[index]?.steps ?? [])
         }

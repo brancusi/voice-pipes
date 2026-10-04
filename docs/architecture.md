@@ -17,7 +17,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `Model/KeyCombo.swift` | Hotkeys as Carbon key codes + modifiers; layout-aware key names; key code for a character. |
 | Engine | `Pipeline/AppState.swift` | The runtime: hotkey registration, trigger semantics, mic capture, step execution, checks. |
 | Hotkeys | `Hotkeys/HotkeyManager.swift` | Carbon `RegisterEventHotKey` (press *and* release events, no Accessibility needed). |
-| Audio | `Audio/AudioRecorder.swift` | `AVAudioEngine` input tap → 16 kHz mono Float32; `MicReadiness` keeps the mic open between takes with a 0.5 s preroll; `cut()` for back-to-back takes; WAV encoder. |
+| Audio | `Audio/AudioRecorder.swift` | `AVAudioEngine` input tap → 16 kHz mono Float32; `AudioInputs` lists mics by name; one recorder per mic in use (`AppState.recorders`), each kept open between takes with a 0.5 s preroll (`MicReadiness`); `cut()` for back-to-back takes; WAV encoder. |
 | | `Audio/ParakeetService.swift` | Parakeet v3 load/transcribe; `LiveTranscriber` protocol with `ChunkedTranscriber` and `StreamingTranscriber`. |
 | | `Audio/PauseChunker.swift` | Splits live audio at pauses (pure logic). |
 | | `Audio/LocalVoices.swift` | Pocket TTS and Supertonic-3: lazy load, streaming synthesis, Supertonic voice downloads. |

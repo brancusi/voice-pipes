@@ -7,7 +7,14 @@ struct TrainWordSheet: View {
     @Binding var entry: VocabularyEntry
     @Environment(\.dismiss) private var dismiss
 
-    @State private var recorder = AudioRecorder()
+    /// `input`: the mic to record from (the app's, so words are trained on the mic you dictate with).
+    init(parakeet: ParakeetService, entry: Binding<VocabularyEntry>, input: String = AudioInputs.system) {
+        self.parakeet = parakeet
+        _entry = entry
+        _recorder = State(initialValue: AudioRecorder(input: input))
+    }
+
+    @State private var recorder: AudioRecorder
     @State private var takes: [[Float]] = []
     @State private var recording = false
     @State private var takeStarted = Date()
@@ -45,6 +52,7 @@ struct TrainWordSheet: View {
          preview: (VocabularyTrainer.Report, [String: Double], Int, Double)) {
         self.parakeet = parakeet
         _entry = entry
+        _recorder = State(initialValue: AudioRecorder())
         _report = State(initialValue: preview.0)
         _verdicts = State(initialValue: preview.1)
         _takes = State(initialValue: Array(repeating: [], count: preview.2))
@@ -52,11 +60,6 @@ struct TrainWordSheet: View {
         _selected = State(initialValue: Set(preview.1.filter { $0.value >= 0.6 }.map(\.key)))
     }
     #endif
-
-    init(parakeet: ParakeetService, entry: Binding<VocabularyEntry>) {
-        self.parakeet = parakeet
-        _entry = entry
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

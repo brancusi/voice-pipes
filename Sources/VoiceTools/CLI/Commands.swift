@@ -47,6 +47,8 @@ enum VPCommands {
                     summary: "config.toml: check, schema, backups, reload", handler: config),
         CommandSpec(name: "models", usage: "vp models [--capability text|transcription|speech] [--search <text>] [--limit <n>]",
                     summary: "OpenRouter models for a job, with prices", values: ["capability", "search", "limit"], handler: models),
+        CommandSpec(name: "inputs", usage: "vp inputs", summary: "Microphones on this Mac, by the names config.toml's `input` takes",
+                    handler: inputs),
         CommandSpec(name: "voices", usage: "vp voices [--model pocket|supertonic|macos|<openrouter-id>]", summary: "Voices for a speech model",
                     values: ["model"], handler: voices),
         CommandSpec(name: "auth", usage: "vp auth [login openrouter [--headless | --code <code>] | set <provider> [--key <key> | piped] | remove <provider>]",
@@ -457,6 +459,7 @@ enum VPCommands {
                 ("health", .string(issueSummary(issues))),
                 ("appearance", .string(config?.appearance.rawValue ?? "?")),
                 ("microphone", .string(config?.microphone.rawValue ?? "?")),
+                ("input", .string(config?.input ?? "?")),
                 ("tracks", .int(config?.tracks.count ?? 0)),
             ]), help: ["vp config check", "vp help config   (the block reference)", "vp config backups"])
         case "path":
@@ -528,6 +531,31 @@ enum VPCommands {
             ("models", .table(["id", "name", "price"], list.prefix(limit).map { [.string($0["id"] as? String ?? ""), .string($0["name"] as? String ?? ""), .string($0["price"] as? String ?? "")] })),
             ("on_this_mac", .string(capability == "transcription" ? "parakeet" : capability == "speech" ? "pocket, supertonic, macos" : "none")),
         ]), help: ["vp models --capability \(capability) --search <text>"])
+    }
+
+    static func inputs(_ parsed: Parsed, _ out: Output) throws {
+        let system = AudioInputs.systemDevice()?.name
+        let (config, _) = loadConfig()
+        let appInput = config?.input ?? AudioInputs.system
+        var used: [String: [String]] = [:]
+        for track in config?.tracks ?? [] {
+            guard case .microphone(let input)? = track.steps.first?.kind else { continue }
+            used[input ?? appInput, default: []].append(ConfigFile.slug(track.name))
+        }
+        var rows: [[Out]] = [[.string(AudioInputs.system), .string(system.map { "follows macOS, now \($0)" } ?? "follows macOS"),
+                              .bool(true), .string((used[AudioInputs.system] ?? []).joined(separator: " "))]]
+        for device in AudioInputs.all() {
+            rows.append([.string(device.name), .string(device.bluetooth ? "Bluetooth: starts a moment after the press (not kept ready)" : "kept ready"),
+                         .bool(true), .string((used[device.name] ?? []).joined(separator: " "))])
+        }
+        for (name, tracks) in used where name != AudioInputs.system && !AudioInputs.isConnected(name) {
+            rows.append([.string(name), .string("not connected: records from the system input"), .bool(false), .string(tracks.joined(separator: " "))])
+        }
+        out.emit(.object([
+            ("app_input", .string(appInput)),
+            ("inputs", .table(["input", "note", "connected", "tracks"], rows)),
+        ]), help: ["the app's mic: [settings] input = \"<input>\" in config.toml",
+                   "one track's: input = \"<input>\" in its microphone block, then vp config check"])
     }
 
     static func voices(_ parsed: Parsed, _ out: Output) throws {

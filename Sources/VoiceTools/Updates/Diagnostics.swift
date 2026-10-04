@@ -54,6 +54,12 @@ enum Diagnostics {
                                     detail: "Click Fix to have macOS ask again.",
                                     fix: .microphoneSettings))
             }
+            let missing = Set(tracks.filter { $0.steps.first?.kind.isMicrophone == true }.map(app.input(for:)))
+                .filter { !AudioInputs.isConnected($0) }.sorted()
+            if !missing.isEmpty {
+                checks.append(Check(level: .info, title: missing.count == 1 ? "\(missing[0]) isn't connected" : "\(missing.count) mics aren't connected",
+                                    detail: "Tracks that use \(missing.count == 1 ? "it" : missing.joined(separator: ", ")) record from \(AudioInputs.label(AudioInputs.system)) until it's back."))
+            }
         }
 
         checks.append(AXIsProcessTrusted()
