@@ -1,0 +1,73 @@
+---
+// What this website measures, kept apart from what the app does with your data (that's the home page's #local).
+// The analytics is Cloudflare Web Analytics, injected by Cloudflare on voicepipes.app; README → Analytics has the
+// setting and its sources (checked 2026-10-04). Change this page whenever that setting changes.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { RELEASES_URL } from '../site';
+
+const CF = {
+  analytics: 'https://www.cloudflare.com/web-analytics/',
+  privacy: 'https://www.cloudflare.com/privacypolicy/',
+};
+const GH_PRIVACY = 'https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement';
+---
+
+<Base
+  title="Privacy · Voice Pipes"
+  description="What the Voice Pipes website measures (Cloudflare Web Analytics, no cookies) and what it doesn't, kept apart from the app's own privacy."
+>
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="band">
+      <div class="wrap guide__intro">
+        <span class="eyebrow c-purple">Privacy</span>
+        <h1 class="display hero__title">what we count<span class="c-pink">.</span></h1>
+        <p class="lede hero__lede">
+          Two different things: the app on your Mac, and this website. The app's fast path never leaves your Mac. This
+          website counts visits with Cloudflare Web Analytics, which sets no cookies.
+        </p>
+        <nav class="actions" aria-label="On this page">
+          <a class="btn btn-s" href="#website">This website</a>
+          <a class="btn btn-s" href="#downloads">Downloads</a>
+          <a class="btn btn-s" href="/#local">The app</a>
+        </nav>
+      </div>
+    </section>
+
+    <section id="website" class="sec">
+      <div class="wrap split split--top">
+        <div class="stack">
+          <span class="eyebrow">This website</span>
+          <h2 class="display h2">Cloudflare Web Analytics</h2>
+          <p class="lede">
+            Cloudflare hosts this site and adds its <a href={CF.analytics}>Web Analytics</a> script to each page,
+            except for visitors in the EU, who aren't measured.
+          </p>
+          <p class="guide__source">Cloudflare's own terms: <a href={CF.privacy}>Cloudflare's privacy policy</a>.</p>
+        </div>
+        <ul class="card guide__steps guide__steps--plain">
+          <li><strong>Counted:</strong> page views and visits, the page's path, the referring site, country, browser, operating system and device type, and how fast the page loaded.</li>
+          <li><strong>Not used:</strong> cookies, local storage, or anything that follows you from site to site. The dashboard keeps six months of totals.</li>
+          <li><strong>Not counted:</strong> what you click or copy, what you type, whether you download or install the app, or how you use it.</li>
+          <li>Blocking <code>static.cloudflareinsights.com</code> (most ad blockers do) turns it off; the site works the same.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="downloads" class="sec">
+      <div class="wrap split split--top">
+        <div class="stack">
+          <span class="eyebrow">Downloads</span>
+          <h2 class="display h2">served by GitHub</h2>
+        </div>
+        <ul class="card guide__steps guide__steps--plain">
+          <li>Download buttons and the <code>curl</code> installer fetch the app from <a href={RELEASES_URL}>GitHub Releases</a>, not from this website.</li>
+          <li>GitHub keeps a running total of downloads for each release file. That total is all we see; it doesn't say who downloaded. GitHub's <a href={GH_PRIVACY}>privacy statement</a> covers those requests.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>

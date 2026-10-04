@@ -35,6 +35,7 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 | --- | --- |
 | `src/pages/` | One file per URL. `features/speed.astro` builds to `features/speed.html`, served at `/features/speed` |
 | `src/components/` | The home page's sections, in page order from `SiteHeader` to `SiteFooter`; `HeroDemo` is the illustrative demo |
+| `src/pages/privacy.astro` | What this website measures (Cloudflare Web Analytics) and doesn't, apart from the app's privacy (`/#local`) |
 | `src/pages/setup.astro` | The key setup guide: what needs which key, OpenRouter and TypeSafe steps, where keys go in the app |
 | `src/content/docs/` | The developer docs, one Markdown file per page; `src/pages/docs/[...slug].astro` renders them with the sidebar |
 | `src/content/blog/` | Blog posts, one Markdown file each; `src/pages/blog/` has the index, the post page and `rss.xml`; `FlowFigures.astro` steps a post's animated figures |
@@ -112,7 +113,9 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 ## Keeping it fast
 
 - **Almost no client JavaScript:** the hero demo's sequencer (about 2 kB), the docs' Copy buttons, the blog
-  figures' stepper and the header's Product menu (closing it; it opens without JavaScript), all inline. `npm run payload` holds each page to 3 kB. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
+  figures' stepper and the header's Product menu (closing it; it opens without JavaScript), all inline. `npm run payload` holds each page to 3 kB and fails on any script from another host, which it can't
+  measure. Cloudflare's Web Analytics beacon (below) is the one exception: Cloudflare injects it on voicepipes.app, so
+  it's never in `dist/`. It's about 30 kB (10 kB gzip), loaded separately, and the payload report prints it apart. Everything else is CSS: the notes, the Wrangler's bob and the cursor are stepped CSS animations, still
   under reduced motion, and the demo shows a finished take without JavaScript.
 - **CSS inlined** in each page (`build.inlineStylesheets: 'always'`) and the illustrations are inline SVG, so a page
   is its HTML plus the two fonts.
@@ -152,6 +155,50 @@ Still to set up when the site goes live:
 - **Automatic deploys** (optional). Workers Builds can build and deploy on push: connect this repository in the
   Cloudflare dashboard with root directory `website`, build command `npm run build` and deploy command
   `npx wrangler deploy`.
+
+## Analytics
+
+The site has no tracking code of its own. **Cloudflare Web Analytics** is on for the `voicepipes.app` zone in the
+Cloudflare account, with automatic setup **excluding visitor data in the EU**. Cloudflare turned it on when the zone was
+added (2026-10-02). For visitors outside the EU, Cloudflare injects its beacon into each HTML page and reports to
+`voicepipes.app/cdn-cgi/rum`. EU visitors get no beacon. `/privacy` describes this to visitors. **Change that page
+whenever this setting changes.**
+
+- **Where to look:** Cloudflare dashboard → account Cloudflare → **Web Analytics** → `voicepipes.app`. **Manage site**
+  holds the setting.
+- **What it gives:** visits, page views, path, referrer host, country, browser, OS, device type, page load time and
+  Core Web Vitals. Bots can be excluded. The dashboard keeps six months, and data older than 7 days is sampled.
+  ([Cloudflare's docs](https://developers.cloudflare.com/web-analytics/data-metrics/))
+- **What it doesn't:**
+  - custom events, so there are no download clicks or copies of the install command;
+  - query strings or UTM tags;
+  - EU visitors;
+  - visitors whose ad blocker blocks `static.cloudflareinsights.com`;
+  - installs or use of the app.
+- **Previews aren't measured.** Their `workers.dev` hosts aren't in the zone, so nothing is injected there.
+  Production's `workers.dev` host is off.
+- **Changing it** (a privacy change, so update `/privacy` in the same release):
+  - Including EU visitors, or switching to a hand-installed snippet, is a **Manage site** option.
+  - A snippet in `Base.astro` would also need the payload check's external-script rule lifted for that one host.
+
+### Downloads
+
+Download buttons and the installer fetch files from GitHub Releases (`brancusi/voice-tools-releases`), so the website
+never sees a download. GitHub's per-file `download_count` is the downloads baseline:
+
+```sh
+gh api repos/brancusi/voice-tools-releases/releases --paginate \
+  --jq '.[] | .tag_name as $t | .assets[] | "\($t)\t\(.name)\t\(.download_count)"'
+```
+
+Read it with care:
+
+- Counts are per release and cumulative, so sum across releases.
+- `Voice-Pipes.dmg` counts the buttons and `curl … install.sh | bash`, since the installer fetches the DMG too.
+- `install.sh` counts terminal installs. The versioned zip and `appcast.xml` are mostly Sparkle update checks and
+  updates from installed apps, not new users.
+- Bots, mirrors, retries and links shared elsewhere count too. A download isn't an install, and nothing here measures
+  use.
 
 ## Previews
 

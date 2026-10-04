@@ -6,6 +6,9 @@ import { extname, join, relative } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 const JS_BUDGET = 3 * 1024; // bytes of client JavaScript per page, inline and external together, before compression
+// Not in dist/ and not in the budget: Cloudflare injects its Web Analytics beacon on voicepipes.app for visitors
+// outside the EU (README → Analytics). Measured 2026-10-04 from static.cloudflareinsights.com; re-measure if it grows.
+const CF_BEACON = { raw: 30294, gzip: 10126 };
 const dist = new URL('../dist/', import.meta.url).pathname;
 const kb = (n) => `${(n / 1024).toFixed(1)} kB`.padStart(9);
 
@@ -31,6 +34,9 @@ for (const file of files) {
     );
     let js = 0;
     for (const [, attrs, inline] of scripts) {
+      // A script from another host can't be measured here, so it would slip past the budget.
+      const external = attrs.match(/src="((?:https?:)?\/\/[^"]+)"/)?.[1];
+      if (external) problems.push(`${path}: loads ${external}, which this budget can't measure`);
       const src = attrs.match(/src="\/([^"]+)"/)?.[1];
       js += src ? (await readFile(join(dist, src))).length : Buffer.byteLength(inline);
     }
@@ -45,7 +51,11 @@ for (const file of files) {
 }
 
 if (problems.length) {
-  console.error(`\nOver budget:\n  ${problems.join('\n  ')}`);
+  console.error(`\nOver budget or unmeasurable:\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
 console.log(`\nClient JavaScript within ${JS_BUDGET} B per page.`);
+console.log(
+  `Plus, on voicepipes.app outside the EU only, Cloudflare's injected Web Analytics beacon: ` +
+    `${CF_BEACON.raw} B (${CF_BEACON.gzip} B gzip), loaded separately and not counted above.`,
+);
