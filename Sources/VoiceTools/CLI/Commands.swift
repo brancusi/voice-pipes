@@ -39,8 +39,8 @@ enum VPCommands {
                     values: ["max", "silence", "voice", "voice-model", "listen-model", "speed"], handler: ask),
         CommandSpec(name: "transcribe", usage: "vp transcribe <audio-file> [--model parakeet|<openrouter-id>]",
                     summary: "Transcribe an audio file (on this Mac by default)", values: ["model"], handler: transcribe),
-        CommandSpec(name: "history", usage: "vp history [show <n> | usage] [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
-                    summary: "Recent runs and their logs: what was said, each step, Jev's picks, tokens and cost", values: ["limit", "track", "search", "since"], handler: history),
+        CommandSpec(name: "history", usage: "vp history [show <n> | usage | export] [--limit <n> | --all] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
+                    summary: "Every run ever and its log: what was said, each step, Jev's picks, tokens and cost", values: ["limit", "track", "search", "since"], switches: ["all"], handler: history),
         CommandSpec(name: "vocab", usage: "vp vocab [add <word> --heard \"a, b\" [--exact] | remove <word> | test \"<sentence>\" | train <word>]",
                     summary: "The words Fix words corrects", values: ["heard"], switches: ["exact"], handler: vocab),
         CommandSpec(name: "config", usage: "vp config [check [file] | schema [vocabulary] | backups | restore <n> | reload | open | path]",
@@ -279,13 +279,33 @@ enum VPCommands {
     // MARK: History
 
     static func history(_ parsed: Parsed, _ out: Output) throws {
-        let records = (try? Data(contentsOf: HistoryStore.defaultURL)).flatMap { try? JSONDecoder().decode([RunRecord].self, from: $0) } ?? []
+        // The app's own file, read directly: every run ever, app running or not.
+        let db: HistoryDatabase
+        do { db = try HistoryDatabase() } catch {
+            throw AppClient.Failure(code: "history_unavailable", message: "Can't open History: \(error)", hint: "check ~/Library/Application Support/VoiceTools/history.sqlite")
+        }
+        var query = HistoryDatabase.Query()
+        if let track = parsed["track"]?.lowercased() {
+            // A track id (its slug) or its name; runs keep the name the track had when it ran.
+            let names = db.trackNames().filter { ConfigFile.slug($0) == track || $0.lowercased() == track }
+            guard let name = names.first else {
+                throw AppClient.Failure(code: "no_such_track", message: "No runs from a track '\(track)'.",
+                                        hint: "tracks in History: " + db.trackNames().map(ConfigFile.slug).joined(separator: ", "))
+            }
+            query.track = name
+        }
+        query.search = parsed["search"] ?? ""
+        if let since = parsed["since"] {
+            guard let seconds = durationSeconds(since) else { throw UsageError("bad_value", "--since takes 30m, 2h, 3d…") }
+            query.since = Date().addingTimeInterval(-seconds)
+        }
+        let total = db.count()
+
         if parsed.positionals.first == "show" {
             let n = Int(try parsed.positional(1, "n", usage: "vp history show <n>   (1 = newest)")) ?? 0
-            guard n >= 1, n <= records.count else {
-                throw AppClient.Failure(code: "no_such_run", message: "There are \(records.count) runs; ask for 1–\(records.count).", hint: "vp history")
+            guard let r = db.run(number: n) else {
+                throw AppClient.Failure(code: "no_such_run", message: "There are \(total) runs; ask for 1–\(total).", hint: "vp history")
             }
-            let r = records[n - 1]
             var pairs: [(String, Out)] = [("n", .int(n)), ("track", .string(r.trackName)), ("at", .string(ISO8601DateFormatter().string(from: r.date))),
                                           ("ms", .int(r.totalMs))]
             if let heard = r.heard { pairs.append(("heard", .string(heard))) }
@@ -308,8 +328,9 @@ enum VPCommands {
         }
         if parsed.positionals.first == "usage" {
             let now = Date()
+            let month = db.runs(since: now.addingTimeInterval(-30 * 86_400))
             func summary(_ label: String, _ within: TimeInterval?) -> [Out] {
-                let picked = records.filter { within == nil ? Calendar.current.isDateInToday($0.date) : now.timeIntervalSince($0.date) < within! }
+                let picked = month.filter { within == nil ? Calendar.current.isDateInToday($0.date) : now.timeIntervalSince($0.date) < within! }
                 let s = UsageSummary(picked)
                 return [.string(label), .int(s.runs), .int(s.promptTokens), .int(s.completionTokens),
                         .string(RunLogFormat.cost(s.exact)), .string(s.estimated > 0 ? "≈" + RunLogFormat.cost(s.estimated) : "0")]
@@ -318,28 +339,36 @@ enum VPCommands {
                                                       [summary("today", nil), summary("7 days", 7 * 86_400), summary("30 days", 30 * 86_400)]))]),
                             help: ["vp history show <n>   (one run's log and cost)"])
         }
-        var shown = Array(records.enumerated())
-        if let track = parsed["track"]?.lowercased() {
-            shown = shown.filter { ConfigFile.slug($0.element.trackName) == track || $0.element.trackName.lowercased() == track }
+        if parsed.positionals.first == "export" {
+            // Every matching run, whole (text, heard, timings, the step-by-step log), one JSON object per line, oldest first.
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            for (n, record) in db.numberedRuns(query, limit: nil).reversed() {
+                guard var line = (try? encoder.encode(record)).map({ String(decoding: $0, as: UTF8.self) }) else { continue }
+                line = "{\"n\":\(n)," + line.dropFirst()
+                print(line)
+            }
+            return
         }
-        if let search = parsed["search"] {
-            shown = shown.filter { $0.element.text.localizedCaseInsensitiveContains(search) || ($0.element.heard?.localizedCaseInsensitiveContains(search) ?? false) }
+        let limit: Int? = parsed.has("all") ? nil : try parsed.int("limit") ?? 10
+        let matching = db.count(query)
+        let shown = db.numberedRuns(query, limit: limit)
+        var rows: [[Out]] = []
+        for (n, r) in shown {
+            let usage = UsageSummary([r])
+            let cost = r.log == nil ? "" : usage.usedCloud ? RunLogFormat.cost(usage.exact + usage.estimated) : "local"
+            let text = out.trim(r.text, 100) + (r.failure.map { " · failed: \($0)" } ?? "")
+            rows.append([.int(n), .string(r.date.shortAgo), .string(r.trackName), .int(r.totalMs), .string(cost), .string(text)])
         }
-        if let since = parsed["since"] {
-            guard let seconds = durationSeconds(since) else { throw UsageError("bad_value", "--since takes 30m, 2h, 3d…") }
-            shown = shown.filter { Date().timeIntervalSince($0.element.date) <= seconds }
-        }
-        let limit = try parsed.int("limit") ?? 10
-        let matching = shown.count
-        shown = Array(shown.prefix(limit))
+        var help = shown.isEmpty ? ["vp run <id> --text \"…\""]
+            : ["vp history show <n>   (the run's log: every step, Jev's picks, tokens, cost)", "vp history usage   (today, 7 and 30 days)"]
+        if shown.count < matching { help.append("vp history --all   (\(matching - shown.count) more match; or --limit <n>)") }
+        if !shown.isEmpty { help.append("vp history export [--track/--search/--since]   (whole runs as JSON lines)") }
         out.emit(.object([
-            ("count", .string("\(shown.count) of \(matching) matching (\(records.count) total)")),
-            ("runs", .table(["n", "at", "track", "ms", "cost", "text"], shown.map { index, r in
-                [.int(index + 1), .string(r.date.shortAgo), .string(r.trackName), .int(r.totalMs),
-                 .string(r.log == nil ? "" : UsageSummary([r]).usedCloud ? RunLogFormat.cost(UsageSummary([r]).exact + UsageSummary([r]).estimated) : "local"),
-                 .string(out.trim(r.text, 100) + (r.failure.map { " · failed: \($0)" } ?? ""))]
-            })),
-        ]), help: shown.isEmpty ? ["vp run <id> --text \"…\""] : ["vp history show <n>   (the run's log: every step, Jev's picks, tokens, cost)", "vp history usage   (today, 7 and 30 days)"])
+            ("count", .string("\(shown.count) of \(matching) matching (\(total) total)")),
+            ("runs", .table(["n", "at", "track", "ms", "cost", "text"], rows)),
+        ]), help: help)
     }
 
     static func durationSeconds(_ text: String) -> TimeInterval? {

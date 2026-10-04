@@ -349,7 +349,8 @@ enum AgentsInstaller {
           (e.g. a cleanup track returns cleaned text; a notes track posts to its endpoint). A track that ends in
           paste pastes at the user's cursor, so prefer tracks without paste unless the user asked.
         - `vp transcribe recording.m4a` transcribes a file on the Mac (Parakeet, fast, private).
-        - `vp history --limit 5` shows recent runs (what was said, what came out, timings); `vp history show <n>`.
+        - `vp history --limit 5` shows recent runs (what was said, what came out, timings); `vp history show <n>`. History
+          goes back to the first run: `--search`, `--track`, `--since 3d`, `--all`, and `vp history export` for whole runs as JSON lines.
         - `vp watch` streams run events as they happen.
 
         ## Build or change a pipeline for the user

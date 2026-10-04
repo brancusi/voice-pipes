@@ -198,8 +198,8 @@ field) is never lost. The menu bar panel shows the last three runs with a copy b
 each step's time. A run that failed partway keeps the text it had, marked with what went wrong. When later steps
 changed what you said (a question and its answer, dictation and its cleanup), what transcription heard is shown
 above the result. Runs are grouped by day; the chips next to the search box filter by track, and each run's steps
-are listed in order with their times, coloured by kind (transcription blue, transforms lavender, outputs green). The
-last 1,000 runs are kept; **Clear history…** removes them all.
+are listed in order with their times, coloured by kind (transcription blue, transforms lavender, outputs green).
+Every run is kept, for good (in a small database; the window loads older runs as you scroll); **Clear history…** removes them all.
 
 
 **Run log.** Click **▸** (or the run's header) to open its log: each step with its time and output (**more**
@@ -288,7 +288,7 @@ the background.
 | `vp stop` · `pause` · `resume` | Control speech and recording |
 | `vp speed <0.6–2.0>` · `vp next` · `vp prev` | Steer what's being read aloud |
 | `vp reading [keys / click-away / key / shortcut / reset]` | When the HUD takes the keys while reading, and which keys |
-| `vp history [--limit --track --search --since]` · `history show <n>` · `history usage` | Recent runs with their cost; one run's log; totals |
+| `vp history [--limit n \| --all] [--track --search --since]` · `history show <n>` · `history usage` · `history export` | Any run ever with its cost; one run's log; totals; whole runs as JSON lines |
 | `vp vocab [add/remove/test/train]` | The Fix words list |
 | `vp config [check/schema/backups/restore/reload/open/path]` | The config file |
 | `vp models --capability text\|transcription\|speech` · `vp voices --model <m>` | What you can pick |
@@ -332,7 +332,7 @@ what changed and opens a single new or changed block, so you can watch a track b
 | `~/.config/voice-pipes/config.toml` | Tracks, hotkeys, settings (see above) |
 | `~/.config/voice-pipes/vocabulary.toml` | The Vocabulary list |
 | `~/.config/voice-pipes/backups/` | Earlier versions of both |
-| `~/Library/Application Support/VoiceTools/history.json` | History: the last 1,000 runs' text, what was heard, timings. **Clear history…** empties it |
+| `~/Library/Application Support/VoiceTools/history.sqlite` | History: every run's text, what was heard, timings and log, kept for good. **Clear history…** empties it. (`history.json` beside it is the pre-1.9 history, imported once and kept as a backup) |
 | `~/Library/Application Support/VoiceTools/tracks.json`, `vocabulary.json` | Last-good copies the app falls back on |
 | `~/Library/Application Support/VoiceTools/models-cache.json` | OpenRouter's model list (refreshed daily) |
 | `~/Library/Application Support/VoiceTools/control.sock` | How `vp` talks to the app (only you can open it) |

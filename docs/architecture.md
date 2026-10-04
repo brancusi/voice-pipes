@@ -11,7 +11,8 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | App | `App/VoiceToolsApp.swift` | Scenes: `MenuBarExtra` (panel) and the `Window("Voice Pipes")`. Menu bar icon reflects the run state / an update. |
 | Model | `Model/Track.swift` | `Track`, `Trigger`, `Step`, `StepKind` (every block, with input/output `DataKind`, titles, catalog, defaults), `ParakeetMode`, `LocalVoiceEngine`. |
 | | `Model/TrackStore.swift` | Loads/saves `tracks.json`; one-time migrations; trigger conflict detection. |
-| | `Model/HistoryStore.swift` | `RunRecord` and `history.json`: the last 1,000 runs (text, heard, failure, timings), written off the main thread. |
+| | `Model/HistoryStore.swift` | `RunRecord`; `HistoryStore` keeps the newest 200 runs in memory and the count. |
+| | `Model/HistoryDatabase.swift` | `history.sqlite`: every run ever (the record as JSON + filter columns), FTS5 trigram search, `step_models` for measured speeds; WAL so `vp` reads while the app writes; imports `history.json` once. |
 | | `Model/Vocabulary.swift` | `VocabularyEntry`, `VocabularyStore` (`vocabulary.json`), `FixWords` (the replacement algorithm). |
 | | `Model/KeyCombo.swift` | Hotkeys as Carbon key codes + modifiers; layout-aware key names; key code for a character. |
 | Engine | `Pipeline/AppState.swift` | The runtime: hotkey registration, trigger semantics, mic capture, step execution, checks. |

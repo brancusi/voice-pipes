@@ -427,8 +427,10 @@ extension AppState {
             if args["track"] != nil { request.track = store.tracks[try trackIndex(args)].name }
             request.search = args["search"] as? String
             if let n = try int("run") {
-                guard history.indices.contains(n - 1) else { throw AgentError("no_such_run", "History has \(history.count) runs.", hint: "vp history") }
-                request.run = history[n - 1].id
+                guard let run = historyStore.database?.run(number: n) else {
+                    throw AgentError("no_such_run", "History has \(historyStore.count) runs.", hint: "vp history")
+                }
+                request.run = run.id
             }
             nav.history = request
             if args["field"] as? String == "search" { nav.focusField("search") }

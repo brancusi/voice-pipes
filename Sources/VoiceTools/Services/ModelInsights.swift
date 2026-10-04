@@ -100,7 +100,7 @@ enum ModelInsights {
 
     /// Log entries for a model, newest first (History keeps the newest first).
     private static func recentEntries(_ id: String) -> [RunRecord.LogEntry] {
-        (historyStore?.records ?? []).flatMap { ($0.log ?? []).filter { $0.model == id && $0.status == .ok } }
+        historyStore?.database?.entries(model: id, limit: 100) ?? []
     }
 
     /// History, set by AppState at launch.

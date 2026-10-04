@@ -118,50 +118,59 @@ final class UsageMeter: @unchecked Sendable {
     }
 }
 
-/// Every run's text, kept on disk (`history.json` beside the tracks) so a dictation that went nowhere — focus
-/// moved, paste failed — can be found and copied again, even after a restart.
+/// Every run, kept on disk for good (`HistoryDatabase`, history.sqlite) so a dictation that went nowhere — focus
+/// moved, paste failed — can be found and copied again, even years later. Only the newest runs stay in memory
+/// (`recent`); History's page, search and the model pickers' measurements query the database.
 @MainActor
 @Observable
 final class HistoryStore {
-    static let limit = 1000
-    nonisolated static let defaultURL = TrackStore.defaultURL.deletingLastPathComponent().appendingPathComponent("history.json")
+    /// How many of the newest runs stay in memory.
+    static let recentLimit = 200
 
-    private(set) var records: [RunRecord] = []
-    @ObservationIgnored private let fileURL: URL
-    @ObservationIgnored private let writer = DispatchQueue(label: "VoiceTools.history")
+    /// The newest runs, newest first.
+    private(set) var recent: [RunRecord] = []
+    /// Every run on disk.
+    private(set) var count = 0
+    /// Goes up whenever History changes, so pages that queried it ask again.
+    private(set) var revision = 0
+    @ObservationIgnored let database: HistoryDatabase?
+    @ObservationIgnored private var weekCache: (revision: Int, at: Date, runs: [RunRecord])?
 
-    init(fileURL: URL = HistoryStore.defaultURL) {
-        self.fileURL = fileURL
-        guard let data = try? Data(contentsOf: fileURL) else { return }
+    init(url: URL = HistoryDatabase.defaultURL, legacyJSON: URL? = HistoryDatabase.legacyURL) {
         do {
-            records = try JSONDecoder().decode([RunRecord].self, from: data)
+            database = try HistoryDatabase(url: url, legacyJSON: legacyJSON)
         } catch {
-            // Never overwrite history we can't read: keep it aside and start a new file.
-            let backup = fileURL.deletingPathExtension()
-                .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
-            try? FileManager.default.moveItem(at: fileURL, to: backup)
-            NSLog("VoiceTools: couldn't read history (\(error)); moved it to \(backup.lastPathComponent)")
+            NSLog("VoiceTools: history unavailable: \(error)")
+            database = nil
         }
+        reload()
     }
 
     func add(_ record: RunRecord) {
-        records.insert(record, at: 0)
-        if records.count > Self.limit { records.removeLast(records.count - Self.limit) }
-        save()
+        do { try database?.insert(record) } catch { NSLog("VoiceTools: couldn't save a run to history: \(error)") }
+        recent.insert(record, at: 0)
+        if recent.count > Self.recentLimit { recent.removeLast(recent.count - Self.recentLimit) }
+        count += 1
+        revision += 1
     }
 
     func clear() {
-        records = []
-        save()
+        try? database?.clear()
+        reload()
     }
 
-    /// Writes off the main thread, in order, atomically.
-    private func save() {
-        guard let data = try? JSONEncoder().encode(records) else { return }
-        let url = fileURL
-        writer.async {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: url, options: .atomic)
-        }
+    /// Re-reads the newest runs and the count (another process, `vp`, never writes history, so only at launch).
+    private func reload() {
+        recent = database?.runs(limit: Self.recentLimit).map(\.record) ?? []
+        count = database?.count() ?? 0
+        revision += 1
+    }
+
+    /// Runs from the last 7 days (History's totals strip), cached until History changes or a minute passes.
+    var lastWeek: [RunRecord] {
+        if let cache = weekCache, cache.revision == revision, Date().timeIntervalSince(cache.at) < 60 { return cache.runs }
+        let runs = database?.runs(since: Date().addingTimeInterval(-7 * 86_400)) ?? []
+        weekCache = (revision, Date(), runs)
+        return runs
     }
 }

@@ -190,7 +190,7 @@ struct MenuView: View {
             HStack {
                 SectionLabel("History")
                 Spacer()
-                Button("All \(app.history.count) →") { openMain(.activity) }
+                Button("All \(app.historyStore.count.formatted()) →") { openMain(.activity) }
                     .buttonStyle(.plain).font(VPFont.caption).foregroundStyle(Palette.purple)
             }
             .padding(.horizontal, 4)

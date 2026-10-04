@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.9.0**
+- **History keeps everything, for good.** Every dictation, answer and read-aloud is kept, not just the last 1,000, in a small database on your Mac. Saving a run no longer rewrites the whole history file, and the app holds only your newest runs in memory: the History window loads older ones as you scroll and searches all of them. A search across 50,000 runs takes a few hundredths of a second.
+- **Your agents can read all of it.** `vp history` reaches back to your first run, whether the app is open or not: `--search`, `--track`, `--since 3d`, `--all`, and `vp history export` gives whole runs (text, what was heard, every step, cost) as JSON lines.
+- Your existing history moves over by itself on first launch, and the old `history.json` stays where it was as a backup.
+
 **1.8.5**
 - **The version is in the menu bar panel too**, on its last line: up to date with **Check now**, or the new version with **Install…**.
 

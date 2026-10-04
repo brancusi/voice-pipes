@@ -182,22 +182,36 @@ private struct HistoryView: View {
     @State private var confirmingClear = false
     /// Runs whose log is open (several can be).
     @State private var open: Set<RunRecord.ID> = HistoryPreview.open
+    /// What's loaded from the database so far, newest first; more loads as the end scrolls into view.
+    @State private var loaded: [(seq: Int64, record: RunRecord)] = []
+    @State private var matching = 0
+    @State private var presentTracks: [String] = []
+    private static let pageSize = 100
 
-    private var records: [RunRecord] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        return app.history.filter { record in
-            (trackFilter == nil || record.trackName == trackFilter)
-                && (q.isEmpty || record.text.localizedCaseInsensitiveContains(q)
-                    || (record.heard?.localizedCaseInsensitiveContains(q) ?? false)
-                    || record.trackName.localizedCaseInsensitiveContains(q))
-        }
-    }
+    private var records: [RunRecord] { loaded.map(\.record) }
+    private var history: HistoryStore { app.historyStore }
+    private var dbQuery: HistoryDatabase.Query { HistoryDatabase.Query(track: trackFilter, search: query) }
 
     /// Track names that appear in History, in the sidebar's order, then any others (renamed or deleted tracks).
     private var trackNames: [String] {
-        let present = Set(app.history.map(\.trackName))
+        let present = Set(presentTracks)
         let ordered = app.store.tracks.map(\.name).filter(present.contains)
         return ordered + present.subtracting(ordered).sorted()
+    }
+
+    /// The first page again (filters changed, a run was added). Keeps at least as many as were showing.
+    private func reload(atLeast: Int = 0) {
+        let limit = max(Self.pageSize, atLeast, loaded.count)
+        loaded = history.database?.runs(dbQuery, limit: limit) ?? []
+        matching = history.database?.count(dbQuery) ?? 0
+        presentTracks = history.database?.trackNames() ?? []
+    }
+
+    private func loadMore() {
+        guard loaded.count < matching, let last = loaded.last?.seq else { return }
+        var next = dbQuery
+        next.before = last
+        loaded += history.database?.runs(next, limit: Self.pageSize) ?? []
     }
 
     private var days: [(String, [RunRecord])] {
@@ -214,7 +228,7 @@ private struct HistoryView: View {
 
     var body: some View {
         Group {
-            if app.history.isEmpty {
+            if history.count == 0 {
                 let hotkey = app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty }?.triggers.first?.combo.display
                 WranglerEmptyState(headline: "quiet on the range",
                                    message: hotkey.map { "No runs yet. Hold \($0) and say something; every run lands here so you can copy it again." }
@@ -226,7 +240,7 @@ private struct HistoryView: View {
                 ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        UsageTotalsStrip(records: app.history)
+                        UsageTotalsStrip(records: history.lastWeek)
                         filters(narrow: page.size.width - 56 < 600)
                         if records.isEmpty {
                             Text("Nothing matches. Try fewer words, or All.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
@@ -239,6 +253,11 @@ private struct HistoryView: View {
                                     runCard(record, narrow: narrow).id("run-\(record.id)").vpFlash("run-\(record.id)", cornerRadius: 6)
                                 }
                             }
+                        }
+                        if loaded.count < matching {
+                            // Reaching the end loads the next page.
+                            Text("Loading older runs…").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                                .onAppear(perform: loadMore)
                         }
                     }
                     .padding(.horizontal, 28).padding(.vertical, 24)
@@ -257,10 +276,11 @@ private struct HistoryView: View {
             }
         }
         .background(Palette.bg100)
-        .onAppear(perform: report)
-        .onChange(of: trackFilter) { _, _ in report() }
-        .onChange(of: query) { _, _ in report() }
-        .confirmationDialog("Clear all \(app.history.count) runs from History?", isPresented: $confirmingClear) {
+        .onAppear { reload(); report() }
+        .onChange(of: trackFilter) { _, _ in loaded = []; reload(); report() }
+        .onChange(of: query) { _, _ in loaded = []; reload(); report() }
+        .onChange(of: history.revision) { _, _ in reload() }
+        .confirmationDialog("Clear all \(history.count.formatted()) runs from History?", isPresented: $confirmingClear) {
             Button("Clear history", role: .destructive) { app.historyStore.clear() }
         } message: {
             Text("This can't be undone.")
@@ -273,9 +293,15 @@ private struct HistoryView: View {
         UINav.shared.history = nil
         trackFilter = request.track
         query = request.search ?? ""
+        loaded = []
+        reload()
         guard let run = request.run else { return }
-        // A run outside the filter isn't shown: show everything so it is.
-        if !records.contains(where: { $0.id == run }) { trackFilter = nil; query = "" }
+        // A run outside the filter isn't shown: show everything so it is. An older one: load down to it.
+        if !records.contains(where: { $0.id == run }) {
+            trackFilter = nil
+            query = ""
+            reload(atLeast: (history.database?.position(of: run) ?? 0) + 20)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo("run-\(run)", anchor: .center) }
             UINav.shared.highlight("run-\(run)")
@@ -306,7 +332,7 @@ private struct HistoryView: View {
                 search.frame(maxWidth: 300)
                 chips
                 Spacer(minLength: 8)
-                Text("\(app.history.count.formatted()) runs · on this Mac").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                Text(matching == history.count ? "\(history.count.formatted()) runs · on this Mac" : "\(matching.formatted()) of \(history.count.formatted()) runs").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     .lineLimit(1).fixedSize()
             }
         }

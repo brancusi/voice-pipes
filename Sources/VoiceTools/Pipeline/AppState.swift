@@ -61,8 +61,8 @@ final class AppState {
     private(set) var lassoFrame = 0
     @ObservationIgnored private var lassoTimer: Timer?
     let historyStore: HistoryStore
-    /// Every run's text, newest first, kept on disk.
-    var history: [RunRecord] { historyStore.records }
+    /// The newest runs, newest first (all of them are on disk: `historyStore.database`).
+    var history: [RunRecord] { historyStore.recent }
     private(set) var parakeetState: ParakeetService.State = .notLoaded
     private(set) var localVoiceStates: [LocalVoiceEngine: LocalVoices.State] = [:]
     private(set) var unavailableCombos: [KeyCombo] = []
