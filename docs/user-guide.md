@@ -231,6 +231,7 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   them in call mode. Same as `microphone` under `[settings]` in config.toml.
 - **Updates** — version and **Check now**. The bar along the bottom of the main window shows the same: the version,
   *up to date* (hover for when it last checked) with **Check now**, or *x.y.z available* with **Install…**.
+  The menu bar panel's last line shows it too.
 
 ## The config file
 

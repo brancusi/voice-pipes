@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.8.5**
+- **The version is in the menu bar panel too**, on its last line: up to date with **Check now**, or the new version with **Install…**.
+
 **1.8.4**
 - **See which version you're running at a glance.** The main window has a bar along the bottom with the version and whether it's up to date. **Check now** looks for a new version straight away; when there is one, it says so and **Install…** installs it (a few seconds, then the app relaunches).
 

@@ -687,24 +687,32 @@ enum HistoryPreview {
     #endif
 }
 
-/// The window's bottom bar: which version is running, and whether it's the newest (Check now / Install…).
+/// The window's bottom bar: the version line on a 28-point strip.
 struct VersionFooter: View {
-    @EnvironmentObject var updates: Updates
-
     var body: some View {
         VStack(spacing: 0) {
             Hairline()
-            HStack(spacing: 0) {
-                Text("Voice Pipes \(updates.version)").foregroundStyle(Palette.fgMuted)
-                status
-                Spacer(minLength: 12)
-                action
-            }
-            .font(VPFont.caption).lineLimit(1)
-            .padding(.horizontal, 16)
-            .frame(height: 28)
-            .background(Palette.bg000)
+            VersionLine()
+                .padding(.horizontal, 16)
+                .frame(height: 28)
+                .background(Palette.bg000)
         }
+    }
+}
+
+/// Which version is running, and whether it's the newest (Check now / Install…). The window's bottom bar and the
+/// menu bar panel's last line.
+struct VersionLine: View {
+    @EnvironmentObject var updates: Updates
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text("Voice Pipes \(updates.version)").foregroundStyle(Palette.fgMuted)
+            status
+            Spacer(minLength: 12)
+            action
+        }
+        .font(VPFont.caption).lineLimit(1)
         .onAppear { updates.poll() }
     }
 

@@ -17,6 +17,7 @@ struct MenuView: View {
             if app.worstCheck >= .warning { issuesCard }
             Rectangle().fill(Palette.line).frame(height: 1)
             footer
+            VersionLine().padding(.horizontal, 4)
         }
         .padding(14)
         .frame(width: 360)
