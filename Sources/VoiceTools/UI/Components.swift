@@ -449,13 +449,14 @@ struct VPSwitchStyle: ToggleStyle {
         let on = configuration.isOn
         return Button { configuration.isOn.toggle() } label: {
             ZStack(alignment: on ? .trailing : .leading) {
-                Capsule().fill(on ? Palette.purple : Palette.bg300)
-                    .overlay(Capsule().strokeBorder(on ? Color.clear : Palette.line, lineWidth: 1))
+                // .circular: the default continuous capsule draws its ends flattened at this size.
+                Capsule(style: .circular).fill(on ? Palette.purple : Palette.bg300)
+                    .overlay(Capsule(style: .circular).strokeBorder(on ? Color.clear : Palette.line, lineWidth: 1))
                 Circle().fill(on ? Palette.onAccent : Palette.fgMuted).padding(3)
             }
             .frame(width: 34, height: 20)
             .animation(.easeOut(duration: 0.12), value: on)
-            .contentShape(Capsule())
+            .contentShape(Capsule(style: .circular))
         }
         .buttonStyle(.plain)
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
