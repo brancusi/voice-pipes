@@ -7,6 +7,21 @@ struct TrainWordSheet: View {
     @Binding var entry: VocabularyEntry
     @Environment(\.dismiss) private var dismiss
 
+    #if SNAPSHOTS
+    /// Harness only: before training, with sentences already written.
+    static func setupPreview() -> some View {
+        var sheet = TrainWordSheet(parakeet: ParakeetService(), entry: .constant(VocabularyEntry(write: "TUI", heardAs: [])))
+        sheet._sentences = State(initialValue: ["I prefer using a TUI because it's faster than clicking through menus.",
+                                                "The TUI application loaded instantly on my terminal this morning.",
+                                                "I don't want to go back to graphical apps after using this TUI.",
+                                                "This TUI makes it easy to navigate without touching the mouse.",
+                                                "TUI tools feel lighter than most desktop apps I've used.",
+                                                "Can you show me how to build a simple TUI?"])
+        sheet._hint = State(initialValue: "terminal user interface")
+        return sheet
+    }
+    #endif
+
     /// `input`: the mic to record from (the app's, so words are trained on the mic you dictate with).
     init(parakeet: ParakeetService, entry: Binding<VocabularyEntry>, input: String = AudioInputs.system) {
         self.parakeet = parakeet
@@ -16,6 +31,12 @@ struct TrainWordSheet: View {
 
     @State private var recorder: AudioRecorder
     @State private var takes: [VocabularyTrainer.Take] = []
+    /// The sentences to read: written for this word by `TrainingSentences`, else the built-in ones.
+    @State private var sentences: [String] = []
+    @State private var writingSentences = false
+    /// What the word is, in your words: helps the sentences when it has several meanings ("terminal user interface").
+    @State private var hint = ""
+    @State private var sentencesNote: String?
     /// Jev's probability from which a result is ticked (the slider); kept between sessions. 30%: measured 2026-10-05,
     /// Jev's numbers run low, and 30% ticked 29 of 32 real garbles and 3 of 19 real words (60% ticked only 6 garbles).
     @AppStorage("vocabulary.threshold") private var threshold = 0.3
@@ -89,6 +110,7 @@ struct TrainWordSheet: View {
         .frame(minHeight: 300)
         .background(Palette.bg100)
         .vpWindow()
+        .onAppear { if sentences.isEmpty, report == nil { writeSentences() } }
         .onDisappear { if recording { _ = recorder.stop() } }
     }
 
@@ -96,7 +118,7 @@ struct TrainWordSheet: View {
     private var setup: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Train “\(spelling)”").font(VPFont.title)
-            Text("Click **Start takes** and read the sentence out loud, the way you'd dictate it; **Next take** shows another. About five takes. Words are misheard differently in a sentence than on their own, so only the part where “\(spelling)” was is kept. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
+            Text("Click **Start takes** and read the sentence out loud, the way you'd dictate it; **Next take** shows the next one. About five takes. Words are misheard differently in a sentence than on their own, so only the part where “\(spelling)” was is kept. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
                 .font(VPFont.caption).lineSpacing(2).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -112,11 +134,12 @@ struct TrainWordSheet: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(Palette.bg200))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.red.opacity(0.6), lineWidth: 1))
             }
+            if !recording { sentencesCard }
             recordingControls
 
             HStack(spacing: 8) {
                 VPCheckbox(isOn: $useVoices, label: "Also have other voices say it").disabled(busy)
-                Text("Also have other voices say it (\(LocalVoiceEngine.allCases.map(\.voices.count).reduce(0, +)) on-device voices and the Mac's English voices, two sentences each)")
+                Text("Also have other voices read them (on-device and Mac voices, two sentences each)")
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     .onTapGesture { if !busy { useVoices.toggle() } }
             }
@@ -185,7 +208,7 @@ struct TrainWordSheet: View {
             } else {
                 Button { startTakes() } label: { Label(takes.isEmpty ? "Start takes" : "Record more takes", systemImage: "mic") }
                     .buttonStyle(.vpSecondary)
-                    .disabled(busy)
+                    .disabled(busy || writingSentences)
                 ForEach(takes.indices, id: \.self) { i in
                     HStack(spacing: 4) {
                         Text("\(i + 1) · \(String(format: "%.1f", Double(takes[i].samples.count) / 16_000))s")
@@ -230,7 +253,79 @@ struct TrainWordSheet: View {
     }
 
     /// The sentence to read for the take being recorded.
-    private var currentSentence: String { VocabularyTrainer.sentence(spelling, takes.count) }
+    private var currentSentence: String {
+        let list = sentences.isEmpty ? VocabularyTrainer.builtInSentences(spelling) : sentences
+        return list[takes.count % list.count]
+    }
+
+    /// Asks the LLM for sentences that fit the word (about 2 s); the built-in ones meanwhile, and if it can't.
+    private func writeSentences() {
+        guard TrainingSentences.available, !spelling.isEmpty else {
+            sentences = VocabularyTrainer.builtInSentences(spelling)
+            sentencesNote = "Built-in sentences. With an OpenRouter key (Setup), they're written to fit the word."
+            return
+        }
+        writingSentences = true
+        sentencesNote = nil
+        let term = spelling, hint = hint
+        let vocabulary = VocabularyStore.shared.entries.map(\.write)
+        Task {
+            do {
+                let written = try await TrainingSentences.make(term: term, hint: hint, vocabulary: vocabulary)
+                if written.count >= 3 {
+                    sentences = written
+                } else {
+                    sentences = VocabularyTrainer.builtInSentences(term)
+                    sentencesNote = "Couldn't write sentences that fit; using the built-in ones."
+                }
+            } catch {
+                sentences = VocabularyTrainer.builtInSentences(term)
+                sentencesNote = "Couldn't write sentences (\(error.localizedDescription)); using the built-in ones."
+            }
+            writingSentences = false
+        }
+    }
+
+    /// The sentences you'll read: the next one marked; a hint and new ones on request.
+    private var sentencesCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                SectionLabel("You'll read")
+                if writingSentences {
+                    ProgressView().controlSize(.small)
+                    Text("Writing sentences that fit “\(spelling)”…").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                }
+                Spacer()
+                if TrainingSentences.available {
+                    Button("↻ New sentences") { writeSentences() }.buttonStyle(.vpGhost).disabled(writingSentences || recording || busy)
+                }
+            }
+            if !writingSentences {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(sentences.enumerated()), id: \.offset) { i, sentence in
+                        let next = i == takes.count % max(1, sentences.count)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\(i + 1)").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.comment).frame(width: 14, alignment: .trailing)
+                            Text(sentence).font(VPFont.body).foregroundStyle(next ? Palette.fg : Palette.fgMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            if TrainingSentences.available {
+                HStack(spacing: 8) {
+                    VPTextField("What is it? (optional, e.g. terminal user interface)", text: $hint, onSubmit: writeSentences)
+                        .frame(maxWidth: 380)
+                    Text("Return writes new ones").font(VPFont.caption).foregroundStyle(Palette.comment)
+                }
+                .disabled(recording || busy)
+            }
+            if let sentencesNote { Text(sentencesNote).font(VPFont.caption).foregroundStyle(Palette.fgMuted) }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .vpCard()
+    }
 
     private func keep(_ samples: [Float]) {
         let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
@@ -252,10 +347,10 @@ struct TrainWordSheet: View {
         verdicts = [:]
         message = nil
         let trainer = VocabularyTrainer(parakeet: parakeet, spelling: spelling)
-        let takes = takes, useVoices = useVoices, target = spelling
+        let takes = takes, useVoices = useVoices, target = spelling, sentences = sentences
         let started = Date()
         Task {
-            let result = await trainer.run(takes: takes, useVoices: useVoices) { done, total in
+            let result = await trainer.run(takes: takes, sentences: sentences, useVoices: useVoices) { done, total in
                 self.done = done
                 self.total = total
             }

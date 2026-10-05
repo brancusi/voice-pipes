@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.12.0**
+- **Training sentences are written for your word.** When you train a word, Voice Pipes now writes six natural sentences for it, in the sense you use it (a terminal user interface, not the travel company), instead of the stiff built-in ones. They're quicker to read the way you'd really dictate. If a word has several meanings, type what it is in **What is it?** and you get new ones; **New sentences** writes another set. It takes about two seconds with an OpenRouter key; without one, the built-in sentences are used.
+- The other voices read the same sentences you do.
+- The website's install page links straight to the agent's instructions, so you can read exactly what your agent will do before pasting the link.
+
 **1.11.0**
 - **Training a word finds the mishearings that really happen.** Training now has you read the word in a short sentence, the way you'd dictate it, and keeps only the part where the word was. Said on its own, a word gets misheard in ways real dictation never produces (Parakeet would sometimes answer in another language), which is where odd entries like Cyrillic spellings came from. Results in another script are now left out.
 - **More voices join in.** Besides your takes, the Mac's English voices now read the sentences too, along with the on-device ones. In tests they found most of the mishearings that turned up in real dictation.

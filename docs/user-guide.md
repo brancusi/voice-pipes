@@ -133,7 +133,11 @@ spellings too. The list lives in `~/.config/voice-pipes/vocabulary.toml`.
 1. **Start takes**, say the word; **Next take** (Space) ends that take and starts the next with the microphone
    still open; **Finish** (Return) ends the last. About five takes, varied a little, works well. A level meter shows
    it's hearing you; silent or too-short takes are rejected.
-   Each take shows a short sentence with the word in it: read it out the way you'd dictate it. Words are misheard
+   Each take shows a short sentence with the word in it: read it out the way you'd dictate it. With an OpenRouter
+   key, the sentences are written for the word when the sheet opens (Claude Haiku 4.5, about 2 s), so they read
+   naturally and use it the way you do; your other vocabulary tells the model what you mean, and **What is it?**
+   (optional) settles a word with several meanings. **New sentences** writes another set. Without a key, built-in
+   sentences are used. Words are misheard
    differently in a sentence than on their own (on its own, a word often comes back in another language), so only
    the part of the transcript where the word was is kept.
 2. Optionally have other voices say it too: the on-device voices and the Mac's English voices, two sentences each.

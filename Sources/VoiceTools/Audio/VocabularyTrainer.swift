@@ -17,7 +17,8 @@ struct VocabularyTrainer {
         var sentence: String
     }
 
-    /// Sentences to read, with the word in different places. `{w}` is the word.
+    /// Built-in sentences, when none were written for the word (`TrainingSentences`): the word in different places.
+    /// `{w}` is the word.
     static let carriers = [
         "I had a quick chat with {w} today.",
         "Can you look at {w} for me?",
@@ -27,9 +28,9 @@ struct VocabularyTrainer {
         "I still need to check {w} before Friday.",
     ]
 
-    /// The sentence for the `index`th take (or voice), cycling through `carriers`.
-    static func sentence(_ word: String, _ index: Int) -> String {
-        carriers[index % carriers.count].replacingOccurrences(of: "{w}", with: word)
+    /// The built-in sentences for a word.
+    static func builtInSentences(_ word: String) -> [String] {
+        carriers.map { $0.replacingOccurrences(of: "{w}", with: word) }
     }
 
     struct Result: Identifiable, Hashable {
@@ -60,7 +61,9 @@ struct VocabularyTrainer {
     }
 
     /// Runs every variation. `progress` gets (done, total) on the main actor.
-    func run(takes: [Take], useVoices: Bool, progress: @escaping @MainActor (Int, Int) -> Void) async -> Report {
+    /// `sentences`: what the voices read (the same ones the user reads), two each.
+    func run(takes: [Take], sentences: [String], useVoices: Bool, progress: @escaping @MainActor (Int, Int) -> Void) async -> Report {
+        let sentences = sentences.isEmpty ? Self.builtInSentences(spelling) : sentences
         var clips: [(samples: [Float], sentence: String)] = []
         for take in takes {
             for variant in Self.variations(of: take.samples) { clips.append((variant, take.sentence)) }
@@ -71,7 +74,9 @@ struct VocabularyTrainer {
             voices += await MainActor.run { Self.macVoices().map(Voice.macos) }
         }
         // Each voice reads two of the sentences.
-        let voiceJobs = voices.enumerated().flatMap { i, voice in [(voice, Self.sentence(spelling, 2 * i)), (voice, Self.sentence(spelling, 2 * i + 1))] }
+        let voiceJobs = voices.enumerated().flatMap { i, voice in
+            [(voice, sentences[(2 * i) % sentences.count]), (voice, sentences[(2 * i + 1) % sentences.count])]
+        }
 
         let total = clips.count + voiceJobs.count
         var heard: [String: (you: Int, voices: Int)] = [:]
