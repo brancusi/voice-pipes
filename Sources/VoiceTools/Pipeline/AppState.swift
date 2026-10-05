@@ -72,6 +72,51 @@ final class AppState {
     var hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
     /// What the main window shows; the menu bar panel sets it to jump straight to Setup.
     var mainSection: MainSection?
+    /// Enabling this track would clash with another enabled track's hotkey: the main window asks what to do.
+    var pendingEnable: Track.ID?
+    /// Delete this track? (Asked by the main window: from the sidebar's menu and the Track menu.)
+    var pendingDelete: Track.ID?
+
+    /// The track the main window shows, if it shows one.
+    var selectedTrackID: Track.ID? {
+        if case .track(let id)? = mainSection, store.tracks.contains(where: { $0.id == id }) { return id }
+        return nil
+    }
+
+    /// Turns a track on or off. Turning it on when another enabled track has one of its hotkeys asks first
+    /// (`pendingEnable`): two enabled tracks on one hotkey means only the first would run.
+    func setEnabled(_ id: Track.ID, _ on: Bool) {
+        guard let index = store.tracks.firstIndex(where: { $0.id == id }) else { return }
+        if on, !store.clashes(for: id).isEmpty {
+            pendingEnable = id
+            return
+        }
+        store.tracks[index].enabled = on
+    }
+
+    /// The answer to `pendingEnable`: turn the clashing tracks off and this one on, or leave it off.
+    func resolveEnable(disablingOthers: Bool) {
+        guard let id = pendingEnable else { return }
+        pendingEnable = nil
+        guard disablingOthers else { return }
+        let others = Set(store.clashes(for: id).map(\.track.id))
+        for i in store.tracks.indices where others.contains(store.tracks[i].id) { store.tracks[i].enabled = false }
+        if let i = store.tracks.firstIndex(where: { $0.id == id }) { store.tracks[i].enabled = true }
+    }
+
+    /// Copies a track (disabled, named "… copy") and shows the copy.
+    func duplicateTrack(_ id: Track.ID) {
+        if let copy = store.duplicate(id) { mainSection = .track(copy) }
+    }
+
+    func deleteTrack(_ id: Track.ID) {
+        guard let index = store.tracks.firstIndex(where: { $0.id == id }) else { return }
+        store.tracks.remove(at: index)
+        // Showing it: show the next one. With no tracks left, stay: that page offers to lay a new one.
+        if mainSection == .track(id) {
+            mainSection = store.tracks[safe: min(index, store.tracks.count - 1)].map { .track($0.id) } ?? .track(id)
+        }
+    }
     /// The HUD's read-along card is open; remembered, so the next read-aloud opens the same way.
     var readAlong = UserDefaults.standard.bool(forKey: "hud.readAlong") {
         didSet { UserDefaults.standard.set(readAlong, forKey: "hud.readAlong") }

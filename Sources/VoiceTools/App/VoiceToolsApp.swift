@@ -42,7 +42,10 @@ struct VoiceToolsApp: App {
         }
         .defaultSize(width: 1100, height: 760)
         .windowResizability(.contentMinSize)
-        .commands { AboutCommand() }
+        .commands {
+            AboutCommand()
+            TrackCommands(app: app)
+        }
 
         Window("About Voice Pipes", id: "about") {
             AboutView(app: app).environmentObject(updates)
@@ -63,6 +66,29 @@ struct VoiceToolsApp: App {
             } else {
                 Image(nsImage: MenuBarGlyph.image(updates.available != nil && app.run == nil ? .update : .idle))
             }
+        }
+    }
+}
+
+/// The Track menu: acts on the track the main window shows.
+private struct TrackCommands: Commands {
+    let app: AppState
+
+    var body: some Commands {
+        CommandMenu("Track") {
+            let id = app.selectedTrackID
+            let track = app.store.tracks.first { $0.id == id }
+            Button("Run Now") { if let track { app.start(track) } }
+                .keyboardShortcut("r", modifiers: [.command])
+                .disabled(track == nil)
+            Button("Duplicate") { if let id { app.duplicateTrack(id) } }
+                .keyboardShortcut("d", modifiers: [.command])
+                .disabled(id == nil)
+            Button(track?.enabled == false ? "Enable" : "Disable") { if let track { app.setEnabled(track.id, !track.enabled) } }
+                .disabled(track == nil)
+            Divider()
+            Button("Delete…") { app.pendingDelete = id }
+                .disabled(id == nil)
         }
     }
 }

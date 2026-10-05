@@ -49,8 +49,18 @@ A track can have any number of hotkeys, each one of:
 - **Press & hold** — records while held; releasing stops it.
 
 Esc cancels a recording. Pressing a track's trigger while it's **speaking** pauses, and again resumes from the
-same word. A trigger that another app already owns, or that two tracks share, shows a warning in the editor and in
-Setup → Checks. Modifier-only keys (like Right ⌘ alone) aren't supported.
+same word. A trigger that another app already owns, or that two tracks share, shows a warning in the editor (naming
+the other track) and in Setup → Checks. Modifier-only keys (like Right ⌘ alone) aren't supported.
+
+### Duplicating, turning tracks on and off
+
+Right-click a track in the sidebar for **Run now**, **Duplicate**, **Enable**/**Disable** and **Delete…**; the same
+are in the **Track** menu in the menu bar (**Duplicate** is ⌘D, **Run Now** ⌘R), and the editor has **Duplicate**
+beside **Delete track**. A copy is named "… copy", sits right below the original, and starts **off**, so its hotkeys
+don't clash with the original's: give it its own hotkey, then switch it on. Turning on a track whose hotkey an enabled
+track already uses asks first, naming both: turn the other one off, or leave this one off. A track that's off is
+dimmed in the sidebar and its hotkeys do nothing. From a terminal: `vp tracks duplicate <id> [--name "…"]`, and
+`vp tracks enable <id>` refuses a clash (`hotkey_clash`, naming the other track) unless you add `--force`.
 
 ### Building blocks
 
@@ -292,7 +302,7 @@ the background.
 |---|---|
 | `vp` | Live state: the app, config health, tracks, what to run next |
 | `vp status` | Permissions, on-device models, keys (masked), problems |
-| `vp tracks` · `tracks show <id>` · `tracks enable/disable <id>` | List, inspect, switch tracks on or off |
+| `vp tracks` · `tracks show <id>` · `tracks enable/disable <id>` · `tracks duplicate <id>` | List, inspect, switch tracks on or off (enable refuses a hotkey clash without `--force`), copy one (starts off) |
 | `vp run <id> [--text "…"]` | Run a track. Text (or piped text) starts at its first block that takes text; a microphone track without text records until you stop talking. Prints the final text |
 | `vp say "…" [--model --voice --speed]` | Speak (default Pocket TTS on this Mac) |
 | `vp listen` · `vp ask "<question>"` | Record until you stop talking and print the transcript; `ask` speaks the question first |

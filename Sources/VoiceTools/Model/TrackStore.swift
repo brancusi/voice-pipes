@@ -282,6 +282,30 @@ final class TrackStore {
         tracks.append(contentsOf: added)
     }
 
+    /// Copies a track (named "… copy", disabled) right after it; returns the copy's id.
+    @discardableResult
+    func duplicate(_ id: Track.ID) -> Track.ID? {
+        guard let index = tracks.firstIndex(where: { $0.id == id }) else { return nil }
+        let names = Set(tracks.map(\.name))
+        var name = "\(tracks[index].name) copy", n = 2
+        while names.contains(name) { name = "\(tracks[index].name) copy \(n)"; n += 1 }
+        let copy = tracks[index].copied(named: name)
+        tracks.insert(copy, at: index + 1)
+        return copy.id
+    }
+
+    /// The enabled tracks (other than this one) that already use one of this track's hotkeys.
+    func clashes(for id: Track.ID) -> [(combo: KeyCombo, track: Track)] {
+        guard let track = tracks.first(where: { $0.id == id }) else { return [] }
+        var found: [(KeyCombo, Track)] = []
+        for combo in Set(track.triggers.map(\.combo)) {
+            for other in tracks where other.id != id && other.enabled && other.triggers.contains(where: { $0.combo == combo }) {
+                found.append((combo, other))
+            }
+        }
+        return found.sorted { $0.0.display < $1.0.display }
+    }
+
     /// Triggers bound to more than one place, keyed by combo.
     var conflicts: Set<KeyCombo> {
         var seen = Set<KeyCombo>(), dupes = Set<KeyCombo>()

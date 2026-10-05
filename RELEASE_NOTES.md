@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.13.0**
+- **Duplicate a track.** Right-click a track in the sidebar for Duplicate, Enable or Disable, Run now and Delete. The same are in a new **Track** menu in the menu bar (Duplicate is ⌘D), and the editor has a Duplicate button. The copy appears right below the original and starts switched off, so it doesn't fight the original for its hotkey: give it its own, then turn it on.
+- **No more silent hotkey clashes.** Turning on a track whose hotkey another enabled track already uses now asks you first, naming both tracks: turn the other one off, or leave this one off. The editor's warning names the other track too.
+- For agents: `vp tracks duplicate <id>`, and `vp tracks enable` refuses a clash unless you add `--force`.
+
 **1.12.0**
 - **Training sentences are written for your word.** When you train a word, Voice Pipes now writes six natural sentences for it, in the sense you use it (a terminal user interface, not the travel company), instead of the stiff built-in ones. They're quicker to read the way you'd really dictate. If a word has several meanings, type what it is in **What is it?** and you get new ones; **New sentences** writes another set. It takes about two seconds with an OpenRouter key; without one, the built-in sentences are used.
 - The other voices read the same sentences you do.

@@ -32,11 +32,54 @@ struct MainWindowView: View {
         // away. While this window is open the app acts like a regular app; when it closes, menu-bar-only again.
         .onAppear { WindowBehavior.opened() }
         .onDisappear { WindowBehavior.closed() }
+        .alert(enableAlertTitle, isPresented: Binding { app.pendingEnable != nil } set: { if !$0 { app.pendingEnable = nil } }) {
+            Button("Turn off \(clashingNames) and enable") { app.resolveEnable(disablingOthers: true) }
+            Button("Leave it off", role: .cancel) { app.resolveEnable(disablingOthers: false) }
+        } message: {
+            Text(enableAlertMessage)
+        }
+        .confirmationDialog(deleteTitle, isPresented: Binding { app.pendingDelete != nil } set: { if !$0 { app.pendingDelete = nil } }) {
+            Button("Delete track", role: .destructive) {
+                if let id = app.pendingDelete { app.deleteTrack(id) }
+                app.pendingDelete = nil
+            }
+        } message: {
+            Text("Its hotkeys stop working. Its runs stay in History.")
+        }
         .onAppear {
             if app.mainSection == nil { app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .setup }
             app.refreshChecks()
             OpenRouterCatalog.shared.refreshIfStale()
         }
+    }
+
+    // MARK: Enable and delete prompts
+
+    private var enableClashes: [(combo: KeyCombo, track: Track)] {
+        app.pendingEnable.map { app.store.clashes(for: $0) } ?? []
+    }
+
+    /// "“Fast dictation”" or "“Fast dictation” and “Notes”".
+    private var clashingNames: String {
+        var names: [String] = []
+        for clash in enableClashes where !names.contains("“\(clash.track.name)”") { names.append("“\(clash.track.name)”") }
+        return names.count <= 2 ? names.joined(separator: " and ") : "\(names.count) tracks"
+    }
+
+    private var enableAlertTitle: String {
+        let combos = Array(Set(enableClashes.map(\.combo.display))).sorted()
+        return combos.count == 1 ? "\(combos[0]) is already in use" : "\(combos.joined(separator: ", ")) are already in use"
+    }
+
+    private var enableAlertMessage: String {
+        let name = app.store.tracks.first { $0.id == app.pendingEnable }?.name ?? "This track"
+        let lines = enableClashes.map { "\($0.combo.display) runs “\($0.track.name)”" }
+        return "“\(name)” uses the same hotkey as an enabled track: \(lines.joined(separator: "; ")). "
+            + "With both on, only one would run. Turn the other off, or leave this one off and change its hotkey."
+    }
+
+    private var deleteTitle: String {
+        "Delete “\(app.store.tracks.first { $0.id == app.pendingDelete }?.name ?? "track")”?"
     }
 
     #if SNAPSHOTS
@@ -67,7 +110,9 @@ struct MainWindowView: View {
                             if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
                         }
                         .opacity(track.enabled ? 1 : 0.4)
+                        .help(track.enabled ? track.name : "\(track.name) (off)")
                     }
+                    .contextMenu { trackMenu(track) }
                 }
                 .onMove { app.store.tracks.move(fromOffsets: $0, toOffset: $1) }
                 Button { newTrack() } label: {
@@ -103,6 +148,15 @@ struct MainWindowView: View {
         .onKeyPress(.upArrow) { moveSection(-1); return .handled }
     }
 
+    /// Right-click on a track in the sidebar.
+    @ViewBuilder private func trackMenu(_ track: Track) -> some View {
+        Button("Run now") { app.start(track) }
+        Button("Duplicate") { app.duplicateTrack(track.id) }
+        Button(track.enabled ? "Disable" : "Enable") { app.setEnabled(track.id, !track.enabled) }
+        Divider()
+        Button("Delete…", role: .destructive) { app.pendingDelete = track.id }
+    }
+
     private var sidebarOrder: [MainSection] {
         app.store.tracks.map { MainSection.track($0.id) } + [.activity, .vocabulary, .setup]
     }
@@ -133,9 +187,7 @@ struct MainWindowView: View {
         case .track(let id):
             if let index = app.store.tracks.firstIndex(where: { $0.id == id }) {
                 TrackDetailView(app: app, track: Bindable(app.store).tracks[index]) {
-                    app.store.tracks.remove(at: index)
-                    // With no tracks left, stay here: the page below offers to lay a new one.
-                    app.mainSection = app.store.tracks.first.map { .track($0.id) } ?? .track(id)
+                    app.deleteTrack(id)
                 }
                 .id(id)
                 .environment(\.appInput, app.store.input)

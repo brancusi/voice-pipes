@@ -540,3 +540,41 @@ extension Track {
         return step
     }
 }
+
+// MARK: - Copies
+
+extension Track {
+    /// A copy with new identities throughout (track, triggers, steps, branches, routes), so editing it never touches
+    /// the original. Disabled, so its hotkeys don't clash with the original's until you change them.
+    func copied(named name: String) -> Track {
+        var copy = self
+        copy.id = UUID()
+        copy.slug = nil
+        copy.name = name
+        copy.enabled = false
+        copy.triggers = triggers.map { var t = $0; t.id = UUID(); return t }
+        copy.steps = steps.map { $0.copied() }
+        return copy
+    }
+}
+
+extension Step {
+    func copied() -> Step {
+        var step = self
+        step.id = UUID()
+        switch kind {
+        case .route(let routes):
+            step.kind = .route(routes: routes.map { var r = $0; r.id = UUID(); return r })
+        case .branch(let question, let branches):
+            step.kind = .branch(question: question, branches: branches.map { b in
+                var copy = b
+                copy.id = UUID()
+                copy.steps = b.steps.map { $0.copied() }
+                return copy
+            })
+        default:
+            break
+        }
+        return step
+    }
+}

@@ -12,7 +12,7 @@ enum VPCommands {
 
     static let table: [CommandSpec] = [
         CommandSpec(name: "status", usage: "vp status", summary: "App, permissions, models, keys, checks and config health", handler: status),
-        CommandSpec(name: "tracks", usage: "vp tracks [show <id> | enable <id> | disable <id>]", summary: "List tracks, show one, or switch one on or off", handler: tracks),
+        CommandSpec(name: "tracks", usage: "vp tracks [show <id> | enable <id> [--force] | disable <id> | duplicate <id> [--name \"…\"]]", summary: "List tracks, show one, switch one on or off, or copy one (the copy starts off)", values: ["name"], switches: ["force"], handler: tracks),
         CommandSpec(name: "run", usage: "vp run <id> [--text \"…\" | piped text] [--max <s>] [--silence <s>]",
                     summary: "Run a track: text starts at its first text block; a mic track records until you stop talking",
                     values: ["text", "max", "silence"], handler: runTrack),
@@ -152,11 +152,36 @@ enum VPCommands {
             let id = try parsed.positional(1, "id", usage: "vp tracks \(parsed.positionals[0]) <id>")
             let index = try config.tracks.firstIndex(of: findTrack(config.tracks, id))!
             let changed = config.tracks[index].enabled != on
+            if on, changed, !parsed.has("force") {
+                // Two enabled tracks on one hotkey: only one would run. Same rule as the app's switch.
+                let combos = Set(config.tracks[index].triggers.map(\.combo))
+                let clashes = config.tracks.enumerated().filter { i, t in
+                    i != index && t.enabled && t.triggers.contains { combos.contains($0.combo) }
+                }.map(\.element)
+                if let other = clashes.first {
+                    let combo = other.triggers.first { combos.contains($0.combo) }!.combo
+                    throw AppClient.Failure(code: "hotkey_clash",
+                                            message: "\(KeyNames.format(combo)) already runs “\(other.name)”; with both enabled, only one would run.",
+                                            hint: "vp tracks disable \(other.slug ?? ConfigFile.slug(other.name)) first, change this track's hotkey, or add --force")
+                }
+            }
             config.tracks[index].enabled = on
             if changed { try writeConfig(config) }
             out.emit(.object([("track", .string(config.tracks[index].slug ?? id)), ("enabled", .bool(on)), ("changed", .bool(changed))]), help: ["vp tracks"])
+        case "duplicate":
+            let id = try parsed.positional(1, "id", usage: "vp tracks duplicate <id> [--name \"…\"]")
+            let index = try config.tracks.firstIndex(of: findTrack(config.tracks, id))!
+            let names = Set(config.tracks.map(\.name))
+            var name = parsed["name"] ?? "\(config.tracks[index].name) copy", n = 2
+            if parsed["name"] == nil { while names.contains(name) { name = "\(config.tracks[index].name) copy \(n)"; n += 1 } }
+            config.tracks.insert(config.tracks[index].copied(named: name), at: index + 1)
+            ConfigFile.assignSlugs(&config.tracks)
+            try writeConfig(config)
+            let copy = config.tracks[index + 1]
+            out.emit(.object([("track", .string(copy.slug ?? "")), ("name", .string(copy.name)), ("enabled", .bool(false))]),
+                     help: ["edit its hotkeys in \(ConfigPaths.tilde(ConfigPaths.config)) (id = \"\(copy.slug ?? "")\"), then vp tracks enable \(copy.slug ?? "")"])
         default:
-            throw UsageError("unknown_subcommand", "vp tracks takes list, show, enable or disable.", hint: "vp tracks --help")
+            throw UsageError("unknown_subcommand", "vp tracks takes list, show, enable, disable or duplicate.", hint: "vp tracks --help")
         }
     }
 

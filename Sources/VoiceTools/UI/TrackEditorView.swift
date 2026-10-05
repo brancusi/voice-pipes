@@ -32,6 +32,8 @@ struct TrackDetailView: View {
                         Text("Saved").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                             .help("Changes save as you make them")
                         Spacer()
+                        Button("Duplicate") { app.duplicateTrack(track.id) }.buttonStyle(.vpSecondary)
+                            .help("A copy of this track, turned off, right below it (⌘D)")
                         Button("Delete track") { confirmingDelete = true }.buttonStyle(.vpDanger)
                     }
                 }
@@ -111,7 +113,10 @@ struct TrackDetailView: View {
     }
 
     @ViewBuilder private func triggerWarning(_ combo: KeyCombo) -> some View {
-        if app.store.conflicts.contains(combo) {
+        if let other = app.store.clashes(for: track.id).first(where: { $0.combo == combo })?.track {
+            Text(track.enabled ? "WARN · also runs “\(other.name)”" : "also on “\(other.name)”: enabling asks")
+                .font(VPFont.caption).foregroundStyle(track.enabled ? Palette.orange : Palette.fgMuted).lineLimit(1)
+        } else if app.store.conflicts.contains(combo) {
             Text("WARN · also used by another trigger").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
         } else if app.unavailableCombos.contains(combo) {
             Text("WARN · taken by another app").font(VPFont.caption).foregroundStyle(Palette.orange).lineLimit(1)
@@ -123,7 +128,8 @@ struct TrackDetailView: View {
     }
 
     private var enabledSwitch: some View {
-        Toggle("Enabled", isOn: $track.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        Toggle("Enabled", isOn: Binding { track.enabled } set: { app.setEnabled(track.id, $0) })
+            .labelsHidden().toggleStyle(.switch).controlSize(.small)
     }
 
     private var triggers: some View {
