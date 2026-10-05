@@ -47,6 +47,10 @@ A track can have any number of hotkeys, each one of:
 
 - **Toggle** — press to start, press again to stop.
 - **Press & hold** — records while held; releasing stops it.
+- **Once** — each press runs the track once, from the start. A microphone track records until you pause (about
+  1.2 s of quiet; a second press ends it sooner, and it gives up if you say nothing for 8 s). A track that starts from
+  text (read the page aloud, summarize what's selected) runs again on each press: pressing while it reads stops that
+  and starts over with whatever is selected now, where Toggle would pause.
 
 Esc cancels a recording. Pressing a track's trigger while it's **speaking** pauses, and again resumes from the
 same word. A trigger that another app already owns, or that two tracks share, shows a warning in the editor (naming
@@ -54,7 +58,8 @@ the other track) and in Setup → Checks. Modifier-only keys (like Right ⌘ alo
 
 ### Duplicating, turning tracks on and off
 
-Right-click a track in the sidebar for **Run now**, **Duplicate**, **Enable**/**Disable** and **Delete…**; the same
+Right-click (or Control-click) a track in the sidebar for **Run now**, **Duplicate**, **Enable**/**Disable** and
+**Delete…** (↑↓ and Return work too); the same
 are in the **Track** menu in the menu bar (**Duplicate** is ⌘D, **Run Now** ⌘R), and the editor has **Duplicate**
 beside **Delete track**. A copy is named "… copy", sits right below the original, and starts **off**, so its hotkeys
 don't clash with the original's: give it its own hotkey, then switch it on. Turning on a track whose hotkey an enabled

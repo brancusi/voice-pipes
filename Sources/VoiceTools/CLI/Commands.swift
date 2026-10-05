@@ -188,7 +188,7 @@ enum VPCommands {
     static func trackTable(_ tracks: [Track]) -> Out {
         .table(["id", "name", "hotkeys", "enabled"], tracks.map { track in
             [.string(track.slug ?? ConfigFile.slug(track.name)), .string(track.name),
-             .string(track.triggers.map { "\(KeyNames.format($0.combo)) \($0.mode == .hold ? "hold" : "toggle")" }.joined(separator: " / ")),
+             .string(track.triggers.map { "\(KeyNames.format($0.combo)) \($0.mode.rawValue)" }.joined(separator: " / ")),
              .bool(track.enabled)]
         })
     }
@@ -198,7 +198,7 @@ enum VPCommands {
             ("id", .string(track.slug ?? "")),
             ("name", .string(track.name)),
             ("enabled", .bool(track.enabled)),
-            ("hotkeys", .list(track.triggers.map { .string("\(KeyNames.format($0.combo)) \($0.mode == .hold ? "hold" : "toggle")") })),
+            ("hotkeys", .list(track.triggers.map { .string("\(KeyNames.format($0.combo)) \($0.mode.rawValue)") })),
             ("steps", .table(["n", "block", "takes", "gives"], stepRows(track.steps, prefix: "", out: out))),
             ("takes_text", .bool(track.steps.contains { $0.kind.input == .text })),
         ])

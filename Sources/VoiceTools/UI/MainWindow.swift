@@ -112,7 +112,9 @@ struct MainWindowView: View {
                         .opacity(track.enabled ? 1 : 0.4)
                         .help(track.enabled ? track.name : "\(track.name) (off)")
                     }
-                    .contextMenu { trackMenu(track) }
+                    .overlay(RightClickArea { point in
+                        VPMenuPanel.shared.show(trackMenu(track), header: trackMenuHeader(track), at: point)
+                    })
                 }
                 .onMove { app.store.tracks.move(fromOffsets: $0, toOffset: $1) }
                 Button { newTrack() } label: {
@@ -148,13 +150,21 @@ struct MainWindowView: View {
         .onKeyPress(.upArrow) { moveSection(-1); return .handled }
     }
 
-    /// Right-click on a track in the sidebar.
-    @ViewBuilder private func trackMenu(_ track: Track) -> some View {
-        Button("Run now") { app.start(track) }
-        Button("Duplicate") { app.duplicateTrack(track.id) }
-        Button(track.enabled ? "Disable" : "Enable") { app.setEnabled(track.id, !track.enabled) }
-        Divider()
-        Button("Delete…", role: .destructive) { app.pendingDelete = track.id }
+    /// Right-click on a track in the sidebar (in our own menu: see VPMenu). Shortcuts show only for the track the
+    /// window shows, since that's the one the Track menu's shortcuts act on.
+    private func trackMenu(_ track: Track) -> [VPMenuEntry] {
+        let shown = app.selectedTrackID == track.id
+        return [
+            .item(VPMenuItem(title: "Run now", shortcut: shown ? "⌘R" : nil) { app.start(track) }),
+            .item(VPMenuItem(title: "Duplicate", shortcut: shown ? "⌘D" : nil) { app.duplicateTrack(track.id) }),
+            .item(VPMenuItem(title: track.enabled ? "Disable" : "Enable") { app.setEnabled(track.id, !track.enabled) }),
+            .divider,
+            .item(VPMenuItem(title: "Delete…", destructive: true) { app.pendingDelete = track.id }),
+        ]
+    }
+
+    private func trackMenuHeader(_ track: Track) -> VPMenuHeader {
+        VPMenuHeader(title: track.name, color: Palette.track(track.colorHex), detail: track.enabled ? track.triggers.first?.combo.display : "off")
     }
 
     private var sidebarOrder: [MainSection] {

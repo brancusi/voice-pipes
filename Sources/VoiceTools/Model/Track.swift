@@ -20,6 +20,17 @@ struct Trigger: Codable, Identifiable, Hashable {
         case toggle
         /// Runs while held; releasing ends capture.
         case hold
+        /// Each press runs the track once from the start: a microphone track records until you pause (or press
+        /// again); a text track starts over (pressing while it reads stops that and reads again).
+        case once
+
+        var label: String {
+            switch self {
+            case .toggle: "Toggle"
+            case .hold: "Press & hold"
+            case .once: "Once"
+            }
+        }
     }
 
     var id = UUID()

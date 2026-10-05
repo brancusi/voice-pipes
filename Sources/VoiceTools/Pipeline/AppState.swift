@@ -426,7 +426,7 @@ final class AppState {
 
         // A capture for this track is in progress: this press/release may end it.
         if let capture, capture.track.id == trackID {
-            let ends = (mode == .hold && !pressed) || (mode == .toggle && pressed)
+            let ends = (mode == .hold && !pressed) || (mode != .hold && pressed)
             if ends { Task { await finishCapture() } }
             return
         }
@@ -434,8 +434,11 @@ final class AppState {
         if agentRecording { return }
         guard pressed else { return }
 
-        // Pressing a speaking track's trigger pauses or resumes it.
-        if speakingTrack == trackID, speaker.state != .idle {
+        // Once: each press runs it again from the start (what it's reading stops; the new selection is read).
+        if mode == .once, speakingTrack == trackID, speaker.state != .idle {
+            speaker.clear()
+        } else if speakingTrack == trackID, speaker.state != .idle {
+            // Pressing a speaking track's trigger pauses or resumes it.
             // Still fetching the first passage: a second press means "never mind".
             speaker.state == .loading ? speaker.clear() : speaker.togglePause()
             return
@@ -493,7 +496,10 @@ final class AppState {
 
         let recorder = recorder(for: input(for: track))
         recorder.onSamples = live.map { transcriber in { @Sendable samples in transcriber.feed(samples) } }
+        // Once: the take ends at a pause (or a second press).
+        let pause = mode == .once ? LevelGate(silence: Self.oncePause) : nil
         recorder.onLevel = { [weak self] level in
+            pause?.add(level)
             Task { @MainActor in self?.run?.level = level }
         }
         do {
@@ -502,12 +508,35 @@ final class AppState {
             show(failure: "Microphone unavailable: \(error.localizedDescription)", for: track)
             return
         }
-        capture = Capture(track: track, mode: mode, live: live, started: Date(), recorder: recorder)
+        let started = Date()
+        capture = Capture(track: track, mode: mode, live: live, started: started, recorder: recorder)
+        if let pause { endAtPause(pause, started: started) }
         run?.phase = .recording
         run?.recordingStarted = Date()
         cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
             if pressed { self?.cancelCapture() }
         })
+    }
+
+    /// How long a pause ends a Once take.
+    static let oncePause: TimeInterval = 1.2
+
+    /// Ends a Once take when you stop talking; cancels it if nothing was said within 8 s; stops at 2 minutes.
+    private func endAtPause(_ gate: LevelGate, started: Date) {
+        Task { @MainActor [weak self] in
+            while let self, let capture = self.capture, capture.started == started {
+                let elapsed = Date().timeIntervalSince(started)
+                if gate.done || elapsed > 120 {
+                    await self.finishCapture()
+                    return
+                }
+                if !gate.heardSpeech, elapsed > 8 {
+                    self.cancelCapture()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
     }
 
     func cancelCapture() {

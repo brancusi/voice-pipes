@@ -48,7 +48,7 @@ enum ConfigSchema {
                 "required": ["keys"],
                 "properties": {
                   "keys": { "type": "string", "description": "Modifiers then one key, joined with +: \"option+space\", \"control+shift+r\", \"command+f5\"." },
-                  "mode": { "enum": ["hold", "toggle"], "default": "toggle" }
+                  "mode": { "enum": ["hold", "toggle", "once"], "default": "toggle", "description": "hold: runs while held. toggle: press to start and stop. once: each press runs it once (a microphone track records until you pause)." }
                 }
               }
             },

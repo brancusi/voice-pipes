@@ -167,7 +167,7 @@ extension AppState {
             "id": track.slug ?? ConfigFile.slug(track.name),
             "name": track.name,
             "enabled": track.enabled,
-            "hotkeys": track.triggers.map { "\(KeyNames.format($0.combo)) \($0.mode == .hold ? "hold" : "toggle")" },
+            "hotkeys": track.triggers.map { "\(KeyNames.format($0.combo)) \($0.mode.rawValue)" },
             "steps": track.steps.map(\.kind.chip),
             "takesText": track.steps.contains { $0.kind.input == .text },
         ]

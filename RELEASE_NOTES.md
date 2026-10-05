@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.14.0**
+- **A new trigger: Once.** Each press runs the track once, from the start. It suits tracks like "read this page aloud" or "summarize what I've selected": press again while it's reading and it starts over with whatever is selected now (Toggle would pause instead). On a microphone track, one press records until you pause, so there's nothing to hold or press again. Pick it next to Toggle and Press & hold in a track's Triggers, or `mode = "once"` in config.toml.
+- **The right-click menu matches the rest of the app.** Right-click (or Control-click) a track in the sidebar for a menu in Voice Pipes' own style, headed by the track's colour, name and hotkey: Run now, Duplicate, Enable or Disable, and Delete. The arrow keys and Return work in it, and Esc closes it.
+
 **1.13.0**
 - **Duplicate a track.** Right-click a track in the sidebar for Duplicate, Enable or Disable, Run now and Delete. The same are in a new **Track** menu in the menu bar (Duplicate is ⌘D), and the editor has a Duplicate button. The copy appears right below the original and starts switched off, so it doesn't fight the original for its hotkey: give it its own, then turn it on.
 - **No more silent hotkey clashes.** Turning on a track whose hotkey another enabled track already uses now asks you first, naming both tracks: turn the other one off, or leave this one off. The editor's warning names the other track too.

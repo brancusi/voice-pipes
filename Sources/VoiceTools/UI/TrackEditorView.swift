@@ -137,7 +137,7 @@ struct TrackDetailView: View {
             ForEach($track.triggers) { $trigger in
                 if trigger.id != track.triggers.first?.id { Hairline() }
                 let recorder = KeyRecorder(combo: $trigger.combo, app: app)
-                let mode = VPSegmented(selection: $trigger.mode, options: [(.toggle, "Toggle"), (.hold, "Press & hold")])
+                let mode = VPSegmented(selection: $trigger.mode, options: Trigger.Mode.allCases.map { ($0, $0.label) })
                 let remove = Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.vpIcon).help("Remove this trigger")
                 let warning = triggerWarning(trigger.combo)

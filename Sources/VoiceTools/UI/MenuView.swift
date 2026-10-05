@@ -245,7 +245,7 @@ private struct TrackRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .help(track.steps.map(\.kind.chip).joined(separator: " › ")
-              + track.triggers.map { "\n\($0.combo.display): \($0.mode == .hold ? "hold" : "press to start and stop")" }.joined())
+              + track.triggers.map { "\n\($0.combo.display): \($0.mode == .hold ? "hold" : $0.mode == .once ? "press once" : "press to start and stop")" }.joined())
     }
 }
 

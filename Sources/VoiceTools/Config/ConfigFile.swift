@@ -426,8 +426,8 @@ enum ConfigFile {
             if let keys = h.string("keys", required: true) {
                 do {
                     let combo = try KeyNames.parse(keys)
-                    let mode = h.choice("mode", ["hold", "toggle"], default: "toggle") ?? "toggle"
-                    triggers.append(Trigger(combo: combo, mode: mode == "hold" ? .hold : .toggle))
+                    let mode = h.choice("mode", Trigger.Mode.allCases.map(\.rawValue), default: "toggle") ?? "toggle"
+                    triggers.append(Trigger(combo: combo, mode: Trigger.Mode(rawValue: mode) ?? .toggle))
                 } catch {
                     h.error("keys", "'\(keys)' \(error)")
                 }
@@ -612,7 +612,7 @@ enum ConfigFile {
         } else {
             out += "hotkeys = [\n"
             for trigger in track.triggers {
-                out += "  { keys = \(quote(KeyNames.format(trigger.combo))), mode = \(quote(trigger.mode == .hold ? "hold" : "toggle")) },\n"
+                out += "  { keys = \(quote(KeyNames.format(trigger.combo))), mode = \(quote(trigger.mode.rawValue)) },\n"
             }
             out += "]\n"
         }
@@ -810,7 +810,7 @@ enum ConfigFile {
         #    name      required · shown in the menu bar, HUD and History
         #    color     apricot | dusk-blue | lavender | sage | marigold | rose | red-rock | "#RRGGBB"
         #    enabled   true | false · a disabled track keeps its settings but its hotkeys do nothing
-        #    hotkeys   [ { keys = "option+space", mode = "hold" }, … ]
+        #    hotkeys   [ { keys = "option+space", mode = "hold" }, … ]   mode: hold | toggle | once (each press runs it once)
         #              keys: modifiers (control, option, shift, command) then one key, joined with +:
         #                    a–z, 0–9, space, return, tab, escape, delete, f1–f20, left, right, up, down,
         #                    minus, equal, comma, period, slash, semicolon, quote, backslash, grave, …
