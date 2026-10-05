@@ -8,6 +8,7 @@ struct KeyCombo: Codable, Hashable {
 
         static let space = Key(code: UInt32(kVK_Space))
         static let r = Key(code: UInt32(kVK_ANSI_R))
+        static let q = Key(code: UInt32(kVK_ANSI_Q))
         static let n = Key(code: UInt32(kVK_ANSI_N))
         static let escape = Key(code: UInt32(kVK_Escape))
     }
@@ -56,12 +57,17 @@ struct KeyCombo: Codable, Hashable {
 
     static func name(for code: UInt32) -> String {
         if let named = specialNames[Int(code)] { return named }
-        return characterName(for: code) ?? "Key \(code)"
+        // A key the layout only gives a control character for would show as nothing.
+        if let name = characterName(for: code), name.unicodeScalars.contains(where: { !CharacterSet.controlCharacters.union(.whitespaces).contains($0) }) {
+            return name
+        }
+        return "Key \(code)"
     }
 
     private static let specialNames: [Int: String] = [
         kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥", kVK_Escape: "Esc", kVK_Delete: "⌫",
         kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+        kVK_ForwardDelete: "⌦", kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟", kVK_Help: "Help",
         kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6",
         kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
         kVK_F13: "F13", kVK_F14: "F14", kVK_F15: "F15", kVK_F16: "F16", kVK_F17: "F17",

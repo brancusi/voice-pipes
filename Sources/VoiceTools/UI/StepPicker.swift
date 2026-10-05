@@ -268,10 +268,7 @@ struct StepPicker: View {
         if let reason = entry.reason {
             Text(reason).font(VPFont.caption).foregroundStyle(Palette.orange).fixedSize()
         } else if let tag = entry.keyTag {
-            Text(tag).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(0.6)
-                .foregroundStyle(Palette.orange)
-                .padding(.horizontal, 5).padding(.vertical, 1)
-                .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.orange, lineWidth: 1))
+            KeyTag(text: tag)
                 .fixedSize()
         } else if !(entry.kind.input == .text && entry.kind.output == .text) {
             Text("\(entry.kind.input.rawValue == "none" ? "—" : entry.kind.input.rawValue) → \(entry.kind.output.rawValue == "none" ? "—" : entry.kind.output.rawValue)")

@@ -423,3 +423,21 @@ struct FlowLayout: Layout {
         }
     }
 }
+
+/// An orange outlined tag for something a key is missing for ("NEEDS OPENROUTER KEY"), as in the block picker.
+struct KeyTag: View {
+    let text: String
+
+    var body: some View {
+        Text(text).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(0.6)
+            .foregroundStyle(Palette.orange)
+            .lineLimit(1).fixedSize()
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.orange, lineWidth: 1))
+    }
+}
+
+extension Track {
+    /// Any of its blocks runs on OpenRouter.
+    var usesOpenRouter: Bool { allSteps.contains { $0.kind.usesOpenRouter } }
+}

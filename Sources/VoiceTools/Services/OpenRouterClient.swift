@@ -147,7 +147,7 @@ enum OpenRouterError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingKey: "No OpenRouter API key. Add one in Tracks → Connections."
+        case .missingKey: "No OpenRouter key. Add a key in Setup → Connections."
         case .emptyResponse: "OpenRouter returned an empty response."
         case .http(let code, let body): "OpenRouter error \(code): \(body.prefix(300))"
         }

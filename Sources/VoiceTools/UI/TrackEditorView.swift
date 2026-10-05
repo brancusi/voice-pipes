@@ -88,8 +88,24 @@ struct TrackDetailView: View {
         UINav.shared.expandedStep = track.steps.firstIndex { $0.id == expandedStep }.map { $0 + 1 }
     }
 
-    /// Colour, name, Enabled and Run now.
+    /// Colour, name, Enabled and Run now; under them, a missing OpenRouter key if this track needs one.
     private var titleRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            titleControls
+            if track.usesOpenRouter, !app.hasOpenRouterKey {
+                HStack(spacing: 10) {
+                    KeyTag(text: "NEEDS OPENROUTER KEY")
+                    Button("Add a key in Setup →") {
+                        UINav.shared.setupSection = "connections"
+                        app.mainSection = .setup
+                    }
+                    .buttonStyle(.plain).font(VPFont.caption).foregroundStyle(Palette.purple)
+                }
+            }
+        }
+    }
+
+    private var titleControls: some View {
         HStack(spacing: 12) {
             TrackColorMenu(hex: $track.colorHex)
             TextField("", text: $track.name, prompt: Text("Track name").foregroundStyle(Palette.fgMuted))

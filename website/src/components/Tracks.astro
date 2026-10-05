@@ -1,6 +1,6 @@
 ---
-// The app's three default tracks (Track.swift, Track.defaults; Read aloud's Branch is on new installs since 1.7.0),
-// then a recipe built from the same blocks.
+// The app's four default tracks (Track.swift, Track.defaults; Read aloud's Branch is on new installs since 1.7.0,
+// Quick answer since 1.15.0).
 // Step colours follow the app: input muted, transcription cyan, transforms purple, outputs green.
 const tracks: {
   name: string;
@@ -37,11 +37,10 @@ const tracks: {
   },
   {
     name: 'Quick answer',
-    recipe: true,
     color: 'var(--green)',
-    steps: [['Mic', 'c-muted'], ['Parakeet', 'c-cyan'], ['Jev route', 'c-purple'], ['Speak', 'c-green']],
-    about: 'Ask out loud, hear the answer. Jev picks a fast, web or deep model for each question.',
-    key: 'your hotkey',
+    steps: [['Mic', 'c-muted'], ['Parakeet', 'c-cyan'], ['Jev route', 'c-purple'], ['Speak · Pocket TTS', 'c-green']],
+    about: 'Hold the key, ask anything, hear a short answer. Jev picks a quick, web or deep model for each question.',
+    key: '⌥Q hold',
     note: ['cloud', 'c-muted'],
   },
 ];
@@ -51,10 +50,10 @@ const tracks: {
   <div class="wrap stack stack--40">
     <div class="stack stack--16">
       <span class="eyebrow">Tracks</span>
-      <h2 class="display h2">three to start, build your own</h2>
+      <h2 class="display h2">four to start, build your own</h2>
       <p class="lede">
-        A track is a hotkey plus a pipeline. Hold or toggle. Three come set up; change any block, or drag them into a
-        new order. Quick answer is a recipe: build it from the same blocks and give it a hotkey.
+        A track is a hotkey plus a pipeline. Hold, toggle or press once. Four come set up; change any block, drag them
+        into a new order, or build your own from the same blocks.
       </p>
     </div>
     <div class="g4">

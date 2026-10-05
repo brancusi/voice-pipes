@@ -112,12 +112,14 @@ final class TrackStore {
             let colors = Self.sundownColors(&loaded)
             migrated = pocket || fixWords || colors
         }
+        // One-time (1.15.0): Quick answer joins the starters, unless a track by that name or id is already there.
+        let quickAnswer = !fresh && !found.contains { $0.severity == .error } && Self.addQuickAnswer(&loaded)
         // One-time (1.8.1): the new defaults (HUD takes the keys always; agents read what needs you) reach setups
         // still on the old ones; a different choice someone made is kept.
         let newDefaults = !fresh && Self.adoptReadingDefaults(&loadedReading, &loadedAgents)
         let before = loaded
         ConfigFile.assignSlugs(&loaded)
-        let changed = migrated || newDefaults || loaded != before
+        let changed = migrated || newDefaults || quickAnswer || loaded != before
         tracks = loaded
         reading = loadedReading
         agents = loadedAgents
@@ -130,6 +132,22 @@ final class TrackStore {
         if disk == .missing || (changed && !found.contains { $0.severity == .error }) { save() }
         ConfigPaths.writeSchemas(in: configURL.deletingLastPathComponent())
         if watch { watcher = FileWatcher(configURL) { [weak self] in self?.reloadFromDisk() } }
+    }
+
+    /// Adds the Quick answer starter after Read aloud (or at the end), once. A track named "Quick answer" or with
+    /// its id stays exactly as it is, and nothing is added. Its hotkey is left off if another track uses it.
+    static func addQuickAnswer(_ tracks: inout [Track]) -> Bool {
+        let key = "migration.quickAnswerStarter.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return false }
+        UserDefaults.standard.set(true, forKey: key)
+        guard !tracks.contains(where: { $0.slug == "quick-answer" || $0.name.caseInsensitiveCompare("Quick answer") == .orderedSame }) else { return false }
+        var starter = Track.quickAnswer.copied(named: "Quick answer")
+        starter.enabled = true
+        let taken = Set(tracks.flatMap(\.triggers).map(\.combo))
+        starter.triggers.removeAll { taken.contains($0.combo) }
+        let at = tracks.firstIndex { $0.name == "Read aloud" }.map { $0 + 1 } ?? tracks.count
+        tracks.insert(starter, at: at)
+        return true
     }
 
     private static func adoptReadingDefaults(_ reading: inout ReadingSettings, _ agents: inout AgentSettings) -> Bool {

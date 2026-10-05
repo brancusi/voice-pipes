@@ -31,13 +31,19 @@ launch; those can't be granted from a script.
 ## Tracks
 
 A **track** is a pipeline: an input, any number of steps, and an output, started by one or more hotkeys. You
-build tracks in **Open Voice Pipes… → Tracks**. Three come by default:
+build tracks in **Open Voice Pipes… → Tracks**. Four come by default:
 
 | Track | Trigger | Pipeline |
 |---|---|---|
 | Fast dictation | ⌥ Space, hold | Mic → Transcribe (Parakeet v3, on this Mac) → Fix words → Paste |
 | Clean dictation | ⌥ ⇧ Space, toggle | Mic → Transcribe (MAI-Transcribe-2) → Fix words → LLM (Claude Haiku cleanup) → Paste |
 | Read aloud | ⌥ R, toggle | Text (selection → page → clipboard) → Branch · Jev (easy / medium / hard) → Speak (Pocket TTS) |
+| Quick answer | ⌥ Q, hold | Mic → Transcribe (Parakeet v3) → Route · Jev (quick: Claude Haiku · web: Perplexity Sonar · deep: Claude Sonnet) → Speak (Pocket TTS) |
+
+Quick answer needs an OpenRouter key; without a Jev key its first route (quick) answers every question. A track
+that needs a key you haven't added shows **NEEDS KEY** in the sidebar, and its editor links to Setup. Setups from
+before 1.15.0 get Quick answer added once, after Read aloud, unless they already have a track called Quick answer
+(left as it is); if another track uses ⌥ Q, it comes without a hotkey.
 
 Click a track in the menu bar panel to run it once without its hotkey. **Run now** in the editor does the same.
 

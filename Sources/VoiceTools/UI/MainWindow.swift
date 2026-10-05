@@ -107,7 +107,11 @@ struct MainWindowView: View {
                             Rectangle().fill(Palette.track(track.colorHex)).frame(width: 7, height: 7)
                             Text(track.name).lineLimit(1).help(track.name)
                             Spacer(minLength: 4)
-                            if let combo = track.triggers.first?.combo { Keycap(text: combo.display) }
+                            if track.usesOpenRouter, !app.hasOpenRouterKey {
+                                KeyTag(text: "NEEDS KEY").help("Needs an OpenRouter key: add one in Setup → Connections")
+                            } else if let combo = track.triggers.first?.combo {
+                                Keycap(text: combo.display)
+                            }
                         }
                         .opacity(track.enabled ? 1 : 0.4)
                         .help(track.enabled ? track.name : "\(track.name) (off)")

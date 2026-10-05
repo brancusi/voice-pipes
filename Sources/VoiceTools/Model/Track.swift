@@ -318,7 +318,17 @@ extension Track {
               steps: [Step(kind: .text(sources: [.selection, .page, .clipboard])),
                       Step(kind: .branch(question: Branch.starterQuestion, branches: Branch.starters)),
                       Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))]),
+        quickAnswer,
     ]
+
+    /// Ask out loud, hear a short answer (1.15.0). Jev routes each question to a quick, web or deep model; without a
+    /// Jev key the first route (quick: Claude Haiku) answers, so it works with only an OpenRouter key. Pocket speaks it
+    /// on this Mac. ⌥ Q: next to the other starters' ⌥ keys, and Q for quick.
+    static let quickAnswer = Track(name: "Quick answer", colorHex: "#A9BF8A",
+                                   triggers: [Trigger(combo: KeyCombo(key: .q, modifiers: [.option]), mode: .hold)],
+                                   steps: [Step(kind: .microphone(input: nil)), Step(kind: .parakeet(chunkOnPauseMs: 500, mode: .onRelease)),
+                                           Step(kind: .route(routes: Route.answerRoutes)),
+                                           Step(kind: .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0))])
 }
 
 /// One way through a Branch block: what Jev chooses it by, and the steps it runs.
