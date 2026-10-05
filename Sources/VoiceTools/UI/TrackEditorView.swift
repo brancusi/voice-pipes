@@ -154,7 +154,7 @@ struct TrackDetailView: View {
                 if trigger.id != track.triggers.first?.id { Hairline() }
                 let recorder = KeyRecorder(combo: $trigger.combo, app: app)
                 let mode = VPSegmented(selection: $trigger.mode, options: Trigger.Mode.allCases.map { ($0, $0.label) })
-                let remove = Button { track.triggers.removeAll { $0.id == trigger.id } } label: { Image(systemName: "xmark") }
+                let remove = Button { let id = trigger.id; track.triggers.removeAll { $0.id == id } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.vpIcon).help("Remove this trigger")
                 let warning = triggerWarning(trigger.combo)
                 // One line when there's room; the mode switch goes under the key in a narrow window.
@@ -189,7 +189,9 @@ struct TrackDetailView: View {
                     StepRow(step: $step, speaker: app.speaker, expanded: expandedStep == step.id) {
                         expandedStep = expandedStep == step.id ? nil : step.id
                     } onDelete: {
-                        track.steps.removeAll { $0.id == step.id }
+                        // The id first: `step` reads through a binding into `steps` (exclusive access).
+                        let id = step.id
+                        track.steps.removeAll { $0.id == id }
                     } onDragStart: {
                         draggingStep = step.id
                     }
@@ -258,7 +260,8 @@ private struct BranchSteps: View {
                 StepRow(step: $step, speaker: speaker, expanded: expandedStep == step.id) {
                     expandedStep = expandedStep == step.id ? nil : step.id
                 } onDelete: {
-                    steps.removeAll { $0.id == step.id }
+                    let id = step.id
+                    steps.removeAll { $0.id == id }
                 } onDragStart: {
                     draggingStep = step.id
                 }

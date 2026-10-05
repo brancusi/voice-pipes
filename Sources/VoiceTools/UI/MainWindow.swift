@@ -611,7 +611,12 @@ private struct VocabularyView: View {
                                         .buttonStyle(.vpSecondary)
                                         .disabled(entry.write.trimmingCharacters(in: .whitespaces).isEmpty)
                                         .help("Say it a few times and collect the ways transcription gets it wrong")
-                                    Button { store.entries.removeAll { $0.id == entry.id } } label: { Image(systemName: "trash") }
+                                    Button {
+                                        // The id first: `entry` reads through a binding into `entries`, which
+                                        // removeAll is changing (Swift's exclusive-access check aborts on that).
+                                        let id = entry.id
+                                        store.entries.removeAll { $0.id == id }
+                                    } label: { Image(systemName: "trash") }
                                         .buttonStyle(.vpIcon)
                                         .help("Remove")
                                 }

@@ -77,6 +77,11 @@ via the system `SQLite3` module (no package). Measured with 50,000 runs (164 MB)
 characters, so shorter searches fall back to a plain `LIKE` scan. `LIKE` is ASCII-only case-insensitive. Run numbers
 in `vp history` come from `row_number() OVER (ORDER BY seq DESC)`, so `show <n>` matches the list under any filter.
 
+**Deleting from a list you're showing with bindings crashes.** `ForEach($store.entries) { $entry in … }` with a
+delete button doing `store.entries.removeAll { $0.id == entry.id }` aborts at runtime: reading `entry.id` goes through
+the binding into `entries` while `removeAll` is changing it (Swift's exclusive-access check, SIGABRT in
+`swift_beginAccess`). → Read the id first: `let id = entry.id; store.entries.removeAll { $0.id == id }`.
+
 **Apple Foundation Models** reports `appleIntelligenceNotEnabled` until Apple Intelligence is switched on, then
 `modelNotReady` while the model downloads.
 

@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.15.1**
+- **Fixed: deleting a vocabulary word crashed the app.** Removing a hotkey, a step, or a step inside a branch could crash the same way; all four are fixed.
+
 **1.15.0**
 - **New starter track: Quick answer.** Hold ⌥ Q, ask anything, and hear a short answer. It looks things up on the web when it needs to: Jev sends each question to a quick model, a web search or a deeper one, and Pocket reads the reply on your Mac. It needs an OpenRouter key; without a Jev key, the quick model answers everything. If you already have a track called Quick answer, it's left exactly as it is, and if ⌥ Q is taken, the new track comes without a hotkey.
 - A track that needs an OpenRouter key you haven't added says **NEEDS KEY** in the sidebar, and its editor has **Add a key in Setup →**.
