@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.11.0**
+- **Training a word finds the mishearings that really happen.** Training now has you read the word in a short sentence, the way you'd dictate it, and keeps only the part where the word was. Said on its own, a word gets misheard in ways real dictation never produces (Parakeet would sometimes answer in another language), which is where odd entries like Cyrillic spellings came from. Results in another script are now left out.
+- **More voices join in.** Besides your takes, the Mac's English voices now read the sentences too, along with the on-device ones. In tests they found most of the mishearings that turned up in real dictation.
+- **A slider sets what gets ticked.** "Tick what Jev rates at least 30%" ticks every result from there up, and you can change any row after. It starts at 30%, not 60%: Jev's numbers run low, so 60% left most genuine mishearings unticked. In tests, 30% ticked 29 of 32 of them and only 3 of 19 real words. It remembers where you leave it.
+
 **1.10.0**
 - **Choose which microphone to use.** Setup → Microphone → **Input**: *System* follows whatever macOS uses, or pick a mic by name, such as your MacBook's.
 - **Each track can use its own mic.** Open a track's Microphone block and pick one, for example your headset for a track where you want the clearer audio, and the laptop mic for quick dictation. Every mic your tracks use is kept ready, so takes start the moment you press. Bluetooth headsets are the exception: keeping one open switches it to low-quality call audio, so tracks on a headset start a moment after you press.

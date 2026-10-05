@@ -1,10 +1,37 @@
 import AppKit
+@preconcurrency import AVFoundation
 import Foundation
 
 /// Finds the ways transcription mishears a word. Parakeet gives the same text for the same audio, so variety comes
 /// from the audio: each of your recorded takes is replayed at different speeds, volumes and noise levels, and
-/// (optionally) on-device voices say the word too. Every variation is transcribed and the distinct results counted.
+/// (optionally) on-device and macOS voices say it too. Every variation is transcribed and the distinct results counted.
+///
+/// Takes are sentences with the word in them, and only the part of the transcript where the word was is kept: said on
+/// its own, a word gets misheard in ways real dictation never produces (Parakeet is multilingual, and a lone word
+/// often comes back in another language). Measured 2026-10-05 on seven terms × 42 voices: sentences found the
+/// mishearings from real dictation as well as lone words did, with far fewer stray ones (docs/research.md).
 struct VocabularyTrainer {
+    /// One recorded take and the sentence that was read.
+    struct Take {
+        var samples: [Float]
+        var sentence: String
+    }
+
+    /// Sentences to read, with the word in different places. `{w}` is the word.
+    static let carriers = [
+        "I had a quick chat with {w} today.",
+        "Can you look at {w} for me?",
+        "{w} is next on my list.",
+        "We talked about {w} again this morning.",
+        "Let's ask {w} about it tomorrow.",
+        "I still need to check {w} before Friday.",
+    ]
+
+    /// The sentence for the `index`th take (or voice), cycling through `carriers`.
+    static func sentence(_ word: String, _ index: Int) -> String {
+        carriers[index % carriers.count].replacingOccurrences(of: "{w}", with: word)
+    }
+
     struct Result: Identifiable, Hashable {
         var id: String { text }
         /// As heard, lowercased (matching ignores case anyway).
@@ -26,41 +53,55 @@ struct VocabularyTrainer {
     let parakeet: ParakeetService
     let spelling: String
 
+    /// A voice that can say a sentence: an on-device one, or a macOS one.
+    private enum Voice {
+        case local(LocalVoiceEngine, String)
+        case macos(AVSpeechSynthesisVoice)
+    }
+
     /// Runs every variation. `progress` gets (done, total) on the main actor.
-    func run(takes: [[Float]], useVoices: Bool, progress: @escaping @MainActor (Int, Int) -> Void) async -> Report {
-        var clips: [(samples: [Float], fromYou: Bool)] = []
+    func run(takes: [Take], useVoices: Bool, progress: @escaping @MainActor (Int, Int) -> Void) async -> Report {
+        var clips: [(samples: [Float], sentence: String)] = []
         for take in takes {
-            for variant in Self.variations(of: take) { clips.append((variant, true)) }
+            for variant in Self.variations(of: take.samples) { clips.append((variant, take.sentence)) }
         }
-        let voiceJobs: [(LocalVoiceEngine, String, Float)] = useVoices
-            ? LocalVoiceEngine.allCases.flatMap { engine in
-                engine.voices.flatMap { voice in [Float(1.0), 1.25].map { (engine, voice, $0) } }
-            }
-            : []
+        var voices: [Voice] = []
+        if useVoices {
+            voices = LocalVoiceEngine.allCases.flatMap { engine in engine.voices.map { Voice.local(engine, $0) } }
+            voices += await MainActor.run { Self.macVoices().map(Voice.macos) }
+        }
+        // Each voice reads two of the sentences.
+        let voiceJobs = voices.enumerated().flatMap { i, voice in [(voice, Self.sentence(spelling, 2 * i)), (voice, Self.sentence(spelling, 2 * i + 1))] }
 
         let total = clips.count + voiceJobs.count
         var heard: [String: (you: Int, voices: Int)] = [:]
         var correct = 0, done = 0
         let target = Self.normalize(spelling)
+        let latinTarget = !Self.hasOtherScript(target)
 
-        func record(_ text: String, fromYou: Bool) {
-            let key = Self.normalize(text)
-            guard !key.isEmpty else { return }
+        func record(_ transcript: String, sentence: String, fromYou: Bool) {
+            guard let key = Self.span(of: spelling, in: transcript, sentence: sentence), !key.isEmpty else { return }
             if key == target { correct += 1; return }
+            // A Latin word heard as Cyrillic, Greek and the like: the model guessing another language, not a mishearing.
+            if latinTarget, Self.hasOtherScript(key) { return }
             var entry = heard[key] ?? (0, 0)
             if fromYou { entry.you += 1 } else { entry.voices += 1 }
             heard[key] = entry
         }
 
         for clip in clips {
-            if let text = try? await parakeet.transcribe(clip.samples) { record(text, fromYou: true) }
+            if let text = try? await parakeet.transcribe(clip.samples) { record(text, sentence: clip.sentence, fromYou: true) }
             done += 1
             await progress(done, total)
         }
-        for (engine, voice, speed) in voiceJobs {
-            if let samples = await Self.synthesize(spelling, engine: engine, voice: voice, speed: speed),
-               let text = try? await parakeet.transcribe(samples) {
-                record(text, fromYou: false)
+        for (voice, sentence) in voiceJobs {
+            let samples: [Float]?
+            switch voice {
+            case .local(let engine, let name): samples = await Self.synthesize(sentence, engine: engine, voice: name)
+            case .macos(let v): samples = await Self.synthesizeMac(sentence, voice: v)
+            }
+            if let samples, let text = try? await parakeet.transcribe(samples) {
+                record(text, sentence: sentence, fromYou: false)
             }
             done += 1
             await progress(done, total)
@@ -117,8 +158,8 @@ struct VocabularyTrainer {
         }
     }
 
-    /// The word spoken by an on-device voice, as 16 kHz audio for Parakeet.
-    private static func synthesize(_ text: String, engine: LocalVoiceEngine, voice: String, speed: Float) async -> [Float]? {
+    /// A sentence spoken by an on-device voice, as 16 kHz audio for Parakeet.
+    private static func synthesize(_ text: String, engine: LocalVoiceEngine, voice: String) async -> [Float]? {
         guard let stream = try? await LocalVoices.shared.stream(engine, text: text, voice: voice) else { return nil }
         var samples: [Float] = []
         do {
@@ -126,10 +167,74 @@ struct VocabularyTrainer {
         } catch {
             return nil
         }
-        return resample(samples, by: speed, from: LocalVoices.sampleRate(engine), to: 16_000)
+        return resample(samples, by: 1, from: LocalVoices.sampleRate(engine), to: 16_000)
+    }
+
+    /// The Mac's English voices, one per name (the best quality installed of each).
+    @MainActor static func macVoices() -> [AVSpeechSynthesisVoice] {
+        var seen = Set<String>()
+        return AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("en") && !$0.identifier.contains("eloquence") && !$0.identifier.contains("speech.synthesis.voice") }
+            .sorted { $0.quality.rawValue > $1.quality.rawValue }
+            .filter { seen.insert($0.name).inserted }
+    }
+
+    @MainActor private static let synthesizer = AVSpeechSynthesizer()
+
+    /// A sentence spoken by a macOS voice, as 16 kHz audio for Parakeet.
+    @MainActor private static func synthesizeMac(_ text: String, voice: AVSpeechSynthesisVoice) async -> [Float]? {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        return await withCheckedContinuation { (done: CheckedContinuation<[Float]?, Never>) in
+            var samples: [Float] = []
+            var rate: Double = 22_050
+            var resumed = false
+            synthesizer.write(utterance) { buffer in
+                guard let pcm = buffer as? AVAudioPCMBuffer else { return }
+                if pcm.frameLength == 0 {
+                    // The last (empty) buffer: done.
+                    guard !resumed else { return }
+                    resumed = true
+                    done.resume(returning: samples.isEmpty ? nil : resample(samples, by: 1, from: rate, to: 16_000))
+                    return
+                }
+                rate = pcm.format.sampleRate
+                if let f = pcm.floatChannelData {
+                    samples += UnsafeBufferPointer(start: f[0], count: Int(pcm.frameLength))
+                } else if let i = pcm.int16ChannelData {
+                    samples += UnsafeBufferPointer(start: i[0], count: Int(pcm.frameLength)).map { Float($0) / 32_768 }
+                }
+            }
+        }
     }
 
     // MARK: - Text
+
+    /// The part of a sentence's transcript where `word` was: the words it shares with the sentence before and after
+    /// the word are dropped (and a possessive 's). nil when the transcript strayed too far to tell.
+    static func span(of word: String, in transcript: String, sentence: String) -> String? {
+        let s = normalize(sentence).split(separator: " ").map(String.init)
+        let t = normalize(transcript).split(separator: " ").map(String.init)
+        let w = normalize(word).split(separator: " ").map(String.init)
+        guard !w.isEmpty, s.count >= w.count,
+              let at = (0...(s.count - w.count)).first(where: { i in zip(s[i..<i + w.count], w).allSatisfy { $0 == $1 || $0 == $1 + "'s" } })
+        else { return nil }
+        let before = Array(s[..<at]), after = Array(s[(at + w.count)...])
+        var p = 0
+        while p < before.count, p < t.count, t[p] == before[p] { p += 1 }
+        var q = 0
+        while q < after.count, q < t.count - p, t[t.count - 1 - q] == after[after.count - 1 - q] { q += 1 }
+        var span = Array(t[p..<(t.count - q)])
+        if let last = span.last, last.hasSuffix("'s") { span[span.count - 1] = String(last.dropLast(2)) }
+        // Neighbours the transcript also changed end up in the span: past a couple of extra words, it's not the word.
+        guard span.count <= w.count + 2 else { return nil }
+        return span.joined(separator: " ")
+    }
+
+    /// Letters outside Latin (Cyrillic, Greek, CJK…).
+    static func hasOtherScript(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0.properties.isAlphabetic && $0.value > 0x024F }
+    }
 
     static func normalize(_ text: String) -> String {
         text.lowercased()

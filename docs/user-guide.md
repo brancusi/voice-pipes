@@ -133,13 +133,17 @@ spellings too. The list lives in `~/.config/voice-pipes/vocabulary.toml`.
 1. **Start takes**, say the word; **Next take** (Space) ends that take and starts the next with the microphone
    still open; **Finish** (Return) ends the last. About five takes, varied a little, works well. A level meter shows
    it's hearing you; silent or too-short takes are rejected.
-2. Optionally have the on-device voices say it too (36 voices at two speeds).
+   Each take shows a short sentence with the word in it: read it out the way you'd dictate it. Words are misheard
+   differently in a sentence than on their own (on its own, a word often comes back in another language), so only
+   the part of the transcript where the word was is kept.
+2. Optionally have other voices say it too: the on-device voices and the Mac's English voices, two sentences each.
 3. **Train**: each take is replayed about 30 ways (5 speeds × 2 volumes × 3 noise levels) through Parakeet; every
-   distinct result is listed with how often it came up, and you see how often it was already right. Five takes take
-   about 5 seconds; with the voices, about 30 seconds the first time.
+   distinct result is listed with how often it came up, and you see how often it was already right. With the voices,
+   about 30 seconds. Results in another script (Cyrillic for an English word) are left out.
 4. With a **TypeSafe Jev** key (Setup), each result is judged: how safe is it to replace everywhere? Garbled
-   versions of the word score high (green, pre-ticked at 60%+); real words, other names and specialist terms score
-   low. Without a key, results that came up twice and aren't ordinary dictionary words are pre-ticked.
+   versions of the word score higher; real words, other names and specialist terms score lower. **Tick what Jev rates
+   at least** (a slider, 30% to start, remembered) ticks everything from there up; change any row after. Without a
+   key, results that came up twice and aren't ordinary dictionary words are pre-ticked.
 5. **Add to Heard as**. The results list ticks a row with one click anywhere on it; hover a row for where each result
    came from (your takes or the voices).
 

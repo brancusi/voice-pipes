@@ -15,7 +15,10 @@ struct TrainWordSheet: View {
     }
 
     @State private var recorder: AudioRecorder
-    @State private var takes: [[Float]] = []
+    @State private var takes: [VocabularyTrainer.Take] = []
+    /// Jev's probability from which a result is ticked (the slider); kept between sessions. 30%: measured 2026-10-05,
+    /// Jev's numbers run low, and 30% ticked 29 of 32 real garbles and 3 of 19 real words (60% ticked only 6 garbles).
+    @AppStorage("vocabulary.threshold") private var threshold = 0.3
     @State private var recording = false
     @State private var takeStarted = Date()
     @State private var level: Float = 0
@@ -55,9 +58,9 @@ struct TrainWordSheet: View {
         _recorder = State(initialValue: AudioRecorder())
         _report = State(initialValue: preview.0)
         _verdicts = State(initialValue: preview.1)
-        _takes = State(initialValue: Array(repeating: [], count: preview.2))
+        _takes = State(initialValue: Array(repeating: VocabularyTrainer.Take(samples: [], sentence: ""), count: preview.2))
         _trainedSeconds = State(initialValue: preview.3)
-        _selected = State(initialValue: Set(preview.1.filter { $0.value >= 0.6 }.map(\.key)))
+        _selected = State(initialValue: Set(preview.1.filter { $0.value >= 0.3 }.map(\.key)))
     }
     #endif
 
@@ -72,7 +75,7 @@ struct TrainWordSheet: View {
             if let message { Text(message).font(VPFont.caption).foregroundStyle(Palette.orange) }
             Spacer(minLength: 0)
             HStack(spacing: 8) {
-                Text(report == nil ? "" : JevClient.hasKey || !verdicts.isEmpty ? "60% or more from Jev is pre-ticked." : "Repeats that aren't ordinary words are pre-ticked.")
+                Text(report == nil || !verdicts.isEmpty ? "" : "Repeats that aren't ordinary words are pre-ticked.")
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(.vpSecondary).keyboardShortcut(.cancelAction)
@@ -93,15 +96,27 @@ struct TrainWordSheet: View {
     private var setup: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Train “\(spelling)”").font(VPFont.title)
-            Text("Click **Start takes** and say it; click **Next take** and say it again, about five times, varying it a little. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
+            Text("Click **Start takes** and read the sentence out loud, the way you'd dictate it; **Next take** shows another. About five takes. Words are misheard differently in a sentence than on their own, so only the part where “\(spelling)” was is kept. Each take is replayed about 30 ways (speed, volume, background noise) through Parakeet. \(JevClient.hasKey ? "Jev then judges which results are safe to replace everywhere." : "Add a Jev key in Setup to have each result judged automatically.")")
                 .font(VPFont.caption).lineSpacing(2).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if recording {
+                // The sentence to read, big enough to read from a step back.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Say").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.fgMuted)
+                    Text("“\(currentSentence)”").font(VPFont.title).foregroundStyle(Palette.fg)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.bg200))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.red.opacity(0.6), lineWidth: 1))
+            }
             recordingControls
 
             HStack(spacing: 8) {
-                VPCheckbox(isOn: $useVoices, label: "Also have on-device voices say it").disabled(busy)
-                Text("Also have on-device voices say it (Pocket TTS and Supertonic, 36 voices at two speeds)")
+                VPCheckbox(isOn: $useVoices, label: "Also have other voices say it").disabled(busy)
+                Text("Also have other voices say it (\(LocalVoiceEngine.allCases.map(\.voices.count).reduce(0, +)) on-device voices and the Mac's English voices, two sentences each)")
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     .onTapGesture { if !busy { useVoices.toggle() } }
             }
@@ -173,7 +188,8 @@ struct TrainWordSheet: View {
                     .disabled(busy)
                 ForEach(takes.indices, id: \.self) { i in
                     HStack(spacing: 4) {
-                        Text("\(i + 1) · \(String(format: "%.1f", Double(takes[i].count) / 16_000))s")
+                        Text("\(i + 1) · \(String(format: "%.1f", Double(takes[i].samples.count) / 16_000))s")
+                            .help(takes[i].sentence)
                         Button { takes.remove(at: i) } label: { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)) }
                             .buttonStyle(.plain).foregroundStyle(Palette.fgMuted)
                             .help("Remove this take")
@@ -213,6 +229,9 @@ struct TrainWordSheet: View {
         level = 0
     }
 
+    /// The sentence to read for the take being recorded.
+    private var currentSentence: String { VocabularyTrainer.sentence(spelling, takes.count) }
+
     private func keep(_ samples: [Float]) {
         let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
         if samples.count < 4_800 {
@@ -220,7 +239,7 @@ struct TrainWordSheet: View {
         } else if peak < 0.01 {
             message = "That take was silent — is the right microphone selected? It wasn't kept."
         } else {
-            takes.append(samples)
+            takes.append(VocabularyTrainer.Take(samples: samples, sentence: currentSentence))
             message = nil
         }
     }
@@ -255,12 +274,12 @@ struct TrainWordSheet: View {
         }
     }
 
-    /// With Jev: tick what it judges safe (60%+). Without: tick repeats that aren't all ordinary words.
+    /// With Jev: tick what it rates at `threshold` or more. Without: tick repeats that aren't all ordinary words.
     private func preselect(_ report: VocabularyTrainer.Report) {
         let existing = Set(entry.heardAs.map { $0.lowercased() })
         selected = Set(report.results.filter { r in
             guard !existing.contains(r.text) else { return false }
-            if let p = verdicts[r.text] { return p >= 0.6 }
+            if let p = verdicts[r.text] { return p >= threshold }
             return !r.commonWords && r.count >= 2
         }.map(\.text))
     }
@@ -268,6 +287,7 @@ struct TrainWordSheet: View {
     @ViewBuilder private func results(_ report: VocabularyTrainer.Report) -> some View {
         if !report.results.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
+                if !verdicts.isEmpty { thresholdRow(report) }
                 HStack(spacing: 12) {
                     SectionLabel("How it came out")
                     Spacer()
@@ -286,6 +306,22 @@ struct TrainWordSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// "Tick everything Jev rates at least …": sets the ticks; you can change any of them after.
+    private func thresholdRow(_ report: VocabularyTrainer.Report) -> some View {
+        let binding = Binding { threshold } set: { threshold = ($0 * 20).rounded() / 20 }
+        return HStack(spacing: 10) {
+            Text("Tick what Jev rates at least").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            Slider(value: binding, in: 0.05...0.95).frame(width: 160)
+                .accessibilityLabel("Threshold")
+                .accessibilityValue("\(Int((threshold * 100).rounded())) percent")
+            Text("\(Int((threshold * 100).rounded()))%").font(VPFont.bodyStrong).monospacedDigit().frame(width: 40, alignment: .trailing)
+            Spacer()
+            Text("\(selected.count) of \(report.results.count) ticked").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
+        }
+        .padding(.bottom, 4)
+        .onChange(of: threshold) { _, _ in preselect(report) }
     }
 
     /// The whole row is one button that ticks the result.
@@ -311,7 +347,7 @@ struct TrainWordSheet: View {
                 Group {
                     if let p = verdicts[result.text] {
                         Text("\(Int((p * 100).rounded()))%")
-                            .foregroundStyle(p >= 0.6 ? Palette.green : p >= 0.35 ? Palette.yellow : Palette.orange)
+                            .foregroundStyle(p >= threshold ? Palette.green : p >= threshold - 0.15 ? Palette.yellow : Palette.orange)
                     } else {
                         Text("—").foregroundStyle(Palette.comment)
                     }
@@ -330,7 +366,7 @@ struct TrainWordSheet: View {
     private func helpText(_ result: VocabularyTrainer.Result) -> String {
         var text = source(result)
         if let p = verdicts[result.text] {
-            text += p >= 0.6 ? ". Jev thinks this is a garbled version of the word: safe to replace."
+            text += p >= threshold ? ". Jev thinks this is a garbled version of the word: safe to replace."
                 : ". Jev thinks this could be something people actually write, so replacing it could change text you meant."
         }
         return text
