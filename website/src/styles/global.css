@@ -267,6 +267,7 @@ a:hover {
   left: 0;
   min-width: 220px;
   width: max-content; /* as wide as the longest item: items never wrap */
+  max-width: calc(100vw - 32px);
   margin: 0;
   padding: 6px;
   list-style: none;
