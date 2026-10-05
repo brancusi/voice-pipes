@@ -28,11 +28,12 @@ const lede =
             <span class="eyebrow prompt__label" id="prompt-label">Paste this into your agent</span>
             <div class="prompt__box">
               <p class="prompt__text" id="prompt" aria-labelledby="prompt-label">
-                <span class="c-fg">Install Voice Pipes for me:</span> <span class="c-purple">{GUIDE_URL}</span>
+                <span class="c-fg">Install Voice Pipes for me:</span> <a class="prompt__url" href="/install.md" target="_blank" rel="noopener">{GUIDE_URL}</a>
               </p>
               <button type="button" class="btn btn-p prompt__copy" data-copy-prompt={PROMPT} hidden>Copy prompt</button>
             </div>
             <span class="prompt__note">Works with Claude Code, Codex, Cursor and other agents that can run commands.</span>
+            <a class="prompt__review" href="/install.md" target="_blank" rel="noopener">Review the install prompt: exactly what your agent will read and do →</a>
           </div>
           <span class="hero__small">Apple silicon · macOS 14 or later · free</span>
         </div>
@@ -181,7 +182,11 @@ const lede =
     border-radius: 6px;
     box-shadow: 0 0 0 4px rgba(195, 163, 212, 0.14);
   }
-  .prompt__text { flex: 1; margin: 0; padding: 16px 18px; font-size: 15px; line-height: 24px; overflow-wrap: anywhere; user-select: all; }
+  .prompt__text { flex: 1; margin: 0; padding: 16px 18px; font-size: 15px; line-height: 24px; overflow-wrap: anywhere; }
+  .prompt__url { color: var(--purple); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .prompt__url:hover { color: var(--pink); }
+  .prompt__review { font-size: 13px; color: var(--purple); text-underline-offset: 3px; }
+  .prompt__review:hover { color: var(--pink); }
   .prompt__copy { height: 40px; flex: none; border: 0; font-family: inherit; cursor: pointer; }
   .prompt__note { font-size: 13px; color: var(--sand); }
   .install-term { margin: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4); }
