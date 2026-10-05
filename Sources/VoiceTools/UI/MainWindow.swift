@@ -564,6 +564,8 @@ private struct VocabularyView: View {
     let app: AppState
     @Bindable private var store = VocabularyStore.shared
     @State private var training: VocabularyEntry.ID?
+    /// The word whose Heard-as list is open in full (HeardAsSheet).
+    @State private var editingHeardAs: VocabularyEntry.ID?
     @State private var sample = "i use cloud code and open router every day."
     @State private var askingWord = false
     @State private var newWord = ""
@@ -601,8 +603,13 @@ private struct VocabularyView: View {
                                         .frame(minWidth: 120, maxWidth: 260)
                                         .id("vocab-\(entry.id)")
                                         .vpFlash("vocab-\(entry.id)")
-                                    VPTextField("what comes out instead, comma-separated", text: heardAs($entry))
-                                        .frame(minWidth: 160, maxWidth: .infinity)
+                                    HStack(spacing: 6) {
+                                        VPTextField("what comes out instead, comma-separated", text: heardAs($entry))
+                                        Button("\(entry.heardAs.count) ⤢") { editingHeardAs = entry.id }
+                                            .buttonStyle(.vpGhost).monospacedDigit()
+                                            .help("Open the whole list: alphabetical, searchable, one per row")
+                                    }
+                                    .frame(minWidth: 200, maxWidth: .infinity)
                                     Toggle("Always exact", isOn: $entry.alwaysExact)
                                         .labelsHidden()
                                         .toggleStyle(.vpSwitch)
@@ -675,6 +682,11 @@ private struct VocabularyView: View {
             .frame(width: 420)
             .background(Palette.bg100)
             .vpWindow()
+        }
+        .sheet(isPresented: Binding { editingHeardAs != nil } set: { if !$0 { editingHeardAs = nil } }) {
+            if let index = store.entries.firstIndex(where: { $0.id == editingHeardAs }) {
+                HeardAsSheet(entry: $store.entries[index])
+            }
         }
         .sheet(isPresented: Binding { training != nil } set: { if !$0 { training = nil } }) {
             if let index = store.entries.firstIndex(where: { $0.id == training }) {

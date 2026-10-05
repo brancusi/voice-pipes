@@ -49,6 +49,9 @@ struct VocabularyTrainer {
         /// Transcriptions that already matched the spelling.
         var correct: Int
         var total: Int
+        /// Transcriptions set aside: the words around the term were misheard or misread too, so the part that's the
+        /// term couldn't be told apart (`SpanAligner`).
+        var setAside = 0
     }
 
     let parakeet: ParakeetService
@@ -80,12 +83,17 @@ struct VocabularyTrainer {
 
         let total = clips.count + voiceJobs.count
         var heard: [String: (you: Int, voices: Int)] = [:]
-        var correct = 0, done = 0
+        var correct = 0, done = 0, setAside = 0
         let target = Self.normalize(spelling)
         let latinTarget = !Self.hasOtherScript(target)
 
         func record(_ transcript: String, sentence: String, fromYou: Bool) {
-            guard let key = Self.span(of: spelling, in: transcript, sentence: sentence), !key.isEmpty else { return }
+            let key: String
+            switch SpanAligner.span(of: spelling, in: transcript, sentence: sentence, normalize: Self.normalize) {
+            case .correct: correct += 1; return
+            case .rejected: setAside += 1; return
+            case .heard(let heard): key = heard
+            }
             if key == target { correct += 1; return }
             // A Latin word heard as Cyrillic, Greek and the like: the model guessing another language, not a mishearing.
             if latinTarget, Self.hasOtherScript(key) { return }
@@ -120,7 +128,7 @@ struct VocabularyTrainer {
             }
             .sorted { ($0.fromYou, $0.count) > ($1.fromYou, $1.count) }
         }
-        return Report(results: results, correct: correct, total: done)
+        return Report(results: results, correct: correct, total: done, setAside: setAside)
     }
 
     // MARK: - Audio variations
@@ -215,27 +223,6 @@ struct VocabularyTrainer {
 
     // MARK: - Text
 
-    /// The part of a sentence's transcript where `word` was: the words it shares with the sentence before and after
-    /// the word are dropped (and a possessive 's). nil when the transcript strayed too far to tell.
-    static func span(of word: String, in transcript: String, sentence: String) -> String? {
-        let s = normalize(sentence).split(separator: " ").map(String.init)
-        let t = normalize(transcript).split(separator: " ").map(String.init)
-        let w = normalize(word).split(separator: " ").map(String.init)
-        guard !w.isEmpty, s.count >= w.count,
-              let at = (0...(s.count - w.count)).first(where: { i in zip(s[i..<i + w.count], w).allSatisfy { $0 == $1 || $0 == $1 + "'s" } })
-        else { return nil }
-        let before = Array(s[..<at]), after = Array(s[(at + w.count)...])
-        var p = 0
-        while p < before.count, p < t.count, t[p] == before[p] { p += 1 }
-        var q = 0
-        while q < after.count, q < t.count - p, t[t.count - 1 - q] == after[after.count - 1 - q] { q += 1 }
-        var span = Array(t[p..<(t.count - q)])
-        if let last = span.last, last.hasSuffix("'s") { span[span.count - 1] = String(last.dropLast(2)) }
-        // Neighbours the transcript also changed end up in the span: past a couple of extra words, it's not the word.
-        guard span.count <= w.count + 2 else { return nil }
-        return span.joined(separator: " ")
-    }
-
     /// Letters outside Latin (Cyrillic, Greek, CJK…).
     static func hasOtherScript(_ text: String) -> Bool {
         text.unicodeScalars.contains { $0.properties.isAlphabetic && $0.value > 0x024F }
@@ -250,9 +237,12 @@ struct VocabularyTrainer {
 
     @MainActor
     static func isAllDictionaryWords(_ text: String) -> Bool {
+        // English only: with the Mac's languages on "automatic", "claro" and "waar" pass as Spanish and Dutch.
         let checker = NSSpellChecker.shared
         return text.split(separator: " ").allSatisfy { word in
-            checker.checkSpelling(of: String(word), startingAt: 0).location == NSNotFound
+            var count = 0
+            return checker.checkSpelling(of: String(word), startingAt: 0, language: "en", wrap: false,
+                                         inSpellDocumentWithTag: 0, wordCount: &count).location == NSNotFound
         }
     }
 }

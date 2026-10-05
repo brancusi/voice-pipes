@@ -131,7 +131,10 @@ On-device models download once on first use and load when the app starts if a tr
 **Open Voice Pipes… → Vocabulary** holds words transcription keeps getting wrong. Each row:
 
 - **Write** — the spelling you want, e.g. `Claude Code`.
-- **Heard as** — what comes out instead, comma-separated, e.g. `cloud code, clawed code`.
+- **Heard as** — what comes out instead, comma-separated, e.g. `cloud code, clawed code`. The count button beside it
+  (`13 ⤢`) opens the whole list: alphabetical, searchable, one per row with its own ×, and a field to add one.
+  Spellings in another script (a Latin word heard as Cyrillic) and ones made only of English dictionary words (which
+  could change text you meant) are marked, and **Remove them** clears the other-script ones at once.
 - **Always exact** — for all-lowercase spellings that must never be capitalised (`kubectl`).
 
 **Fix words** replaces them mechanically — no model, nothing leaves the Mac, effectively zero time:
@@ -152,15 +155,19 @@ spellings too. The list lives in `~/.config/voice-pipes/vocabulary.toml`.
 **Train…** on a row collects the ways transcription mishears that word:
 
 1. **Start takes**, say the word; **Next take** (Space) ends that take and starts the next with the microphone
-   still open; **Finish** (Return) ends the last. About five takes, varied a little, works well. A level meter shows
-   it's hearing you; silent or too-short takes are rejected.
+   still open; **Finish** (Return) ends the last. Stumbled? **Redo take** (R) starts the take over with the same
+   sentence, and **Discard take** (Esc) stops without keeping it; × on a finished take removes it. About five takes,
+   varied a little, works well. A level meter shows it's hearing you; silent or too-short takes are rejected.
    Each take shows a short sentence with the word in it: read it out the way you'd dictate it. With an OpenRouter
    key, the sentences are written for the word when the sheet opens (Claude Haiku 4.5, about 2 s), so they read
    naturally and use it the way you do; your other vocabulary tells the model what you mean, and **What is it?**
    (optional) settles a word with several meanings. **New sentences** writes another set. Without a key, built-in
    sentences are used. Words are misheard
    differently in a sentence than on their own (on its own, a word often comes back in another language), so only
-   the part of the transcript where the word was is kept.
+   the part of the transcript where the word was is kept. The transcript is lined up with the sentence word by word,
+   and only what lies between the correctly heard words on either side of the term counts, so a stumble or a misread
+   word elsewhere in the sentence doesn't end up in the results. When the words right next to it were misheard too,
+   or most of the sentence was, that transcript is set aside rather than guessed at (the summary says how many).
 2. Optionally have other voices say it too: the on-device voices and the Mac's English voices, two sentences each.
 3. **Train**: each take is replayed about 30 ways (5 speeds × 2 volumes × 3 noise levels) through Parakeet; every
    distinct result is listed with how often it came up, and you see how often it was already right. With the voices,
@@ -169,7 +176,8 @@ spellings too. The list lives in `~/.config/voice-pipes/vocabulary.toml`.
    versions of the word score higher; real words, other names and specialist terms score lower. **Tick what Jev rates
    at least** (a slider, 30% to start, remembered) ticks everything from there up; change any row after. Without a
    key, results that came up twice and aren't ordinary dictionary words are pre-ticked.
-5. **Add to Heard as**. The results list ticks a row with one click anywhere on it; hover a row for where each result
+5. **Add to Heard as**. Results already in the word's list show a dimmed tick and "already in your list", and the
+   count above the list says how many. The results list ticks a row with one click anywhere on it; hover a row for where each result
    came from (your takes or the voices).
 
 Tip: if your first name comes out right and the surname doesn't, add and train the surname as its own entry too.

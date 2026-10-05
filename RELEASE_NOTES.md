@@ -1,5 +1,12 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.16.0**
+- **Redo a take while training a word.** Stumbled over the sentence? **Redo take** (R) starts that take over with the same sentence; **Discard take** (Esc) stops without keeping it. Esc no longer closes the training sheet mid-recording and loses your takes.
+- **Training keeps only the word, even when you stumble.** What you said is now lined up with the sentence word by word, and only the part between the correctly heard words around your word counts, so a slip elsewhere in the sentence can't turn into a false mishearing. When the words right next to it were misheard too, that take is set aside rather than guessed at, and the summary says how many.
+- **Long Heard-as lists get their own view.** The count button beside a word's Heard as (e.g. "112 ⤢") opens the whole list alphabetically, searchable, one per row with its own remove button, and a field to add more. Spellings in another script and ones made only of ordinary English words are marked, and the other-script ones can be removed in one click.
+- When training finds a spelling that's already in the word's list, it now shows as "already in your list" (with a dimmed tick) instead of looking left out.
+- "Ordinary words" checks English only, so Spanish or Dutch look-alikes are no longer marked.
+
 **1.15.1**
 - **Fixed: deleting a vocabulary word crashed the app.** Removing a hotkey, a step, or a step inside a branch could crash the same way; all four are fixed.
 

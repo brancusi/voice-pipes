@@ -68,7 +68,7 @@ struct TrainWordSheet: View {
             .init(text: "erin zadig", count: 1, fromYou: 1, fromVoices: 0, commonWords: false),
         ], correct: 41, total: 150)
         let verdicts = ["aram zedickian": 0.97, "aaron zadikian": 0.91, "a ram zadikyan": 0.88, "aaron's attacking": 0.04, "erin zadig": 0.52]
-        return TrainWordSheet(parakeet: ParakeetService(), entry: .constant(VocabularyEntry(write: "Aram Zadikian", heardAs: [])),
+        return TrainWordSheet(parakeet: ParakeetService(), entry: .constant(VocabularyEntry(write: "Aram Zadikian", heardAs: ["aaron zadikian"])),
                               preview: (report, verdicts, 5, 4.8))
     }
 
@@ -99,7 +99,8 @@ struct TrainWordSheet: View {
                 Text(report == nil || !verdicts.isEmpty ? "" : "Repeats that aren't ordinary words are pre-ticked.")
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(.vpSecondary).keyboardShortcut(.cancelAction)
+                // While recording, Esc discards the take instead of closing the sheet (and losing every take).
+                Button("Cancel") { dismiss() }.buttonStyle(.vpSecondary).keyboardShortcut(recording ? nil : .cancelAction)
                 Button("Add \(selected.count) to Heard as") { add() }
                     .buttonStyle(.vpPrimary)
                     .disabled(selected.isEmpty || busy)
@@ -184,6 +185,9 @@ struct TrainWordSheet: View {
     private func summary(_ report: VocabularyTrainer.Report) -> String {
         var parts = ["“\(spelling)” · \(takes.count) \(takes.count == 1 ? "take" : "takes"), \(report.total) variants in \(String(format: "%.1f", trainedSeconds)) s."]
         parts.append("Already right in \(report.correct) of \(report.total).")
+        if report.setAside > 0 {
+            parts.append("\(report.setAside) set aside: the words around it were misheard too, so they can't say what it was heard as.")
+        }
         if !verdicts.isEmpty { parts.append("Jev judged \(verdicts.count) \(verdicts.count == 1 ? "result" : "results").") }
         if report.results.isEmpty { parts.append("Nothing else came out: it's already reliable.") }
         return parts.joined(separator: " ")
@@ -203,6 +207,10 @@ struct TrainWordSheet: View {
                         .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
                 }
                 Spacer()
+                Button("Discard take") { discardTake() }.buttonStyle(.vpGhost).keyboardShortcut(.escape, modifiers: [])
+                    .help("Stop without keeping this take (Esc); earlier takes stay")
+                Button("Redo take") { redoTake() }.buttonStyle(.vpSecondary).keyboardShortcut("r", modifiers: [])
+                    .help("Start this take over with the same sentence (R)")
                 Button("Next take") { nextTake() }.buttonStyle(.vpSecondary).keyboardShortcut(.space, modifiers: [])
                 Button("Finish") { finishTakes() }.buttonStyle(.vpPrimary).keyboardShortcut(.return, modifiers: [])
             } else {
@@ -238,6 +246,21 @@ struct TrainWordSheet: View {
         } catch {
             message = "Microphone unavailable: \(error.localizedDescription)"
         }
+    }
+
+    /// Throws away what's been said in this take and starts it again, same sentence.
+    private func redoTake() {
+        _ = recorder.cut()
+        takeStarted = Date()
+        message = "Take \(takes.count + 1) started over."
+    }
+
+    /// Stops recording without keeping the take in progress.
+    private func discardTake() {
+        _ = recorder.stop()
+        recording = false
+        level = 0
+        message = "That take wasn't kept."
     }
 
     /// Ends this take and starts the next one without stopping the microphone.
@@ -385,6 +408,9 @@ struct TrainWordSheet: View {
                 if !verdicts.isEmpty { thresholdRow(report) }
                 HStack(spacing: 12) {
                     SectionLabel("How it came out")
+                    let inList = report.results.filter { alreadyIn.contains($0.text) }.count
+                    Text("\(selected.count) of \(report.results.count - inList) new ticked" + (inList > 0 ? " · \(inList) already in your list" : ""))
+                        .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted).lineLimit(1)
                     Spacer()
                     SectionLabel("×").frame(width: 40, alignment: .trailing)
                     SectionLabel("Jev").frame(width: 56, alignment: .trailing)
@@ -407,20 +433,47 @@ struct TrainWordSheet: View {
     private func thresholdRow(_ report: VocabularyTrainer.Report) -> some View {
         let binding = Binding { threshold } set: { threshold = ($0 * 20).rounded() / 20 }
         return HStack(spacing: 10) {
-            Text("Tick what Jev rates at least").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+            Text("Tick from").font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize()
             Slider(value: binding, in: 0.05...0.95).frame(width: 160)
                 .accessibilityLabel("Threshold")
                 .accessibilityValue("\(Int((threshold * 100).rounded())) percent")
             Text("\(Int((threshold * 100).rounded()))%").font(VPFont.bodyStrong).monospacedDigit().frame(width: 40, alignment: .trailing)
+            Text("Jev's rating up").font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize()
             Spacer()
-            Text("\(selected.count) of \(report.results.count) ticked").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
         }
         .padding(.bottom, 4)
         .onChange(of: threshold) { _, _ in preselect(report) }
     }
 
+    /// Results the word's Heard-as list already has: shown, not tickable (they're in).
+    private var alreadyIn: Set<String> { Set(entry.heardAs.map { $0.lowercased() }) }
+
     /// The whole row is one button that ticks the result.
-    private func resultRow(_ result: VocabularyTrainer.Result) -> some View {
+    @ViewBuilder private func resultRow(_ result: VocabularyTrainer.Result) -> some View {
+        if alreadyIn.contains(result.text) {
+            HStack(spacing: 12) {
+                CheckboxMark(isOn: true).opacity(0.35)
+                HStack(spacing: 0) {
+                    Text(result.text).foregroundStyle(Palette.fgMuted)
+                    Text(" · already in your list").font(VPFont.caption).foregroundStyle(Palette.comment)
+                }
+                .lineLimit(1)
+                Spacer()
+                Text("\(result.count)").font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.comment)
+                    .frame(width: 40, alignment: .trailing)
+                Group {
+                    if let p = verdicts[result.text] { Text("\(Int((p * 100).rounded()))%") } else { Text("—") }
+                }
+                .foregroundStyle(Palette.comment).monospacedDigit().frame(width: 56, alignment: .trailing)
+            }
+            .padding(.horizontal, 12).frame(minHeight: 36)
+            .help("Already in “\(entry.write)”'s Heard as list")
+        } else {
+            tickableRow(result)
+        }
+    }
+
+    private func tickableRow(_ result: VocabularyTrainer.Result) -> some View {
         let on = selected.contains(result.text)
         return Button {
             if on { selected.remove(result.text) } else { selected.insert(result.text) }
