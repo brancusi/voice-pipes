@@ -49,7 +49,9 @@ struct KeyCombo: Codable, Hashable {
         if modifiers.contains(.option) { s += "⌥" }
         if modifiers.contains(.shift) { s += "⇧" }
         if modifiers.contains(.command) { s += "⌘" }
-        return s.isEmpty ? Self.name(for: key.code) : s + " " + Self.name(for: key.code)
+        // "⇧⌘C": a character sits right against its modifiers; a named key keeps a space ("⌥ Space", "⌘ Return").
+        let name = Self.name(for: key.code)
+        return s.isEmpty ? name : s + (name.count == 1 ? "" : " ") + name
     }
 
     static func name(for code: UInt32) -> String {
