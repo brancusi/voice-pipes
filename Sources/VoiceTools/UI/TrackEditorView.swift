@@ -145,7 +145,7 @@ struct TrackDetailView: View {
 
     private var enabledSwitch: some View {
         Toggle("Enabled", isOn: Binding { track.enabled } set: { app.setEnabled(track.id, $0) })
-            .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .labelsHidden().toggleStyle(.vpSwitch)
     }
 
     private var triggers: some View {

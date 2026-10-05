@@ -182,7 +182,7 @@ enum StepKind: Codable, Hashable {
         case .text(let sources): sources.map(\.label).joined(separator: " → ")
         case .parakeet(_, let mode):
             switch mode ?? .onRelease {
-            case .onRelease: "Parakeet v3 · local"
+            case .onRelease: "Parakeet v3"
             case .pauseChunks: "Parakeet v3 · chunked"
             case .streaming: "Parakeet v3 · streaming"
             }

@@ -441,3 +441,27 @@ extension Track {
     /// Any of its blocks runs on OpenRouter.
     var usesOpenRouter: Bool { allSteps.contains { $0.kind.usesOpenRouter } }
 }
+
+/// The on/off switch in the palette (the system one is grey and white): on, a purple track with an on-accent knob;
+/// off, a bg300 track with a line border and a muted knob. VoiceOver still sees a switch.
+struct VPSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        let on = configuration.isOn
+        return Button { configuration.isOn.toggle() } label: {
+            ZStack(alignment: on ? .trailing : .leading) {
+                Capsule().fill(on ? Palette.purple : Palette.bg300)
+                    .overlay(Capsule().strokeBorder(on ? Color.clear : Palette.line, lineWidth: 1))
+                Circle().fill(on ? Palette.onAccent : Palette.fgMuted).padding(3)
+            }
+            .frame(width: 34, height: 20)
+            .animation(.easeOut(duration: 0.12), value: on)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
+    }
+}
+
+extension ToggleStyle where Self == VPSwitchStyle {
+    static var vpSwitch: VPSwitchStyle { VPSwitchStyle() }
+}

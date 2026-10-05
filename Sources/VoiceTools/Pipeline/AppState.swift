@@ -684,7 +684,7 @@ final class AppState {
     static func logTitle(_ kind: StepKind) -> String {
         switch kind {
         case .openRouterSTT(let model): "Transcribe · \(model.split(separator: "/").last ?? "")"
-        case .parakeet(_, let mode): (mode ?? .onRelease) == .onRelease ? "Parakeet v3" : kind.title.replacingOccurrences(of: " · local", with: "")
+        case .parakeet: kind.title
         case .localSpeech(let engine, _, _): "Speak · \(engine.label)"
         case .openRouterSpeech(let model, _, _): "Speak · \(model.split(separator: "/").last ?? "")"
         case .speak: "Speak · macOS voice"

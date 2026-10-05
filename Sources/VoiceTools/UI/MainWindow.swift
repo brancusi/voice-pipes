@@ -605,8 +605,7 @@ private struct VocabularyView: View {
                                         .frame(minWidth: 160, maxWidth: .infinity)
                                     Toggle("Always exact", isOn: $entry.alwaysExact)
                                         .labelsHidden()
-                                        .toggleStyle(.switch)
-                                        .controlSize(.small)
+                                        .toggleStyle(.vpSwitch)
                                         .gridColumnAlignment(.center)
                                     Button("Train…") { training = entry.id }
                                         .buttonStyle(.vpSecondary)
