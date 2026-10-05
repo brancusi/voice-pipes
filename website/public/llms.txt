@@ -1,0 +1,17 @@
+# Voice Pipes
+
+> A Mac menu bar app (Apple silicon, macOS 14+): hold a hotkey, talk, and your words appear where you're typing,
+> transcribed on the Mac. It also reads text aloud and runs voice pipelines. `vp` is its agent-first command line.
+
+## For agents
+
+- [Install and set up Voice Pipes for your user](https://voicepipes.app/install.md): a step-by-step guide for an AI
+  agent to install the app, walk the user through permissions, say hello out loud and run a one-minute demo.
+
+## Docs
+
+- [Install from a terminal](https://voicepipes.app/docs/install)
+- [The vp command](https://voicepipes.app/docs/cli)
+- [config.toml: tracks and settings](https://voicepipes.app/docs/config)
+- [vp for agents](https://voicepipes.app/docs/agents)
+- [Key setup (OpenRouter, TypeSafe Jev)](https://voicepipes.app/setup)

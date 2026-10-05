@@ -1,0 +1,227 @@
+---
+// Install with your agent: the human page around /install.md (public/install.md), the guide an agent follows. The
+// example transcript uses the installer's and vp's real output lines (Tools/install.sh, `vp status`); keep them in
+// step with install.md.
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import InstallLine from '../components/InstallLine.astro';
+import CopyCode from '../components/CopyCode.astro';
+import { DOWNLOAD_URL } from '../site';
+
+const GUIDE_URL = 'https://voicepipes.app/install.md';
+const PROMPT = `Install Voice Pipes for me: ${GUIDE_URL}`;
+const lede =
+  'Paste one line into Claude Code, Codex or ChatGPT. It installs Voice Pipes, walks you through two permissions and gives you a one-minute demo.';
+---
+
+<Base title="Install with your agent · Voice Pipes" description={lede}>
+  <SiteHeader />
+  <main id="main">
+    <section id="top" class="install-hero">
+      <div class="wrap install-hero__grid">
+        <div class="hero__body">
+          <span class="eyebrow c-purple">Install with your agent</span>
+          <h1 class="display hero__title">let your agent do the riding<span class="c-pink">.</span></h1>
+          <p class="lede hero__lede">{lede}</p>
+          <div class="stack prompt">
+            <span class="eyebrow prompt__label" id="prompt-label">Paste this into your agent</span>
+            <div class="prompt__box">
+              <p class="prompt__text" id="prompt" aria-labelledby="prompt-label">
+                <span class="c-fg">Install Voice Pipes for me:</span> <span class="c-purple">{GUIDE_URL}</span>
+              </p>
+              <button type="button" class="btn btn-p prompt__copy" data-copy-prompt={PROMPT} hidden>Copy prompt</button>
+            </div>
+            <span class="prompt__note">Works with Claude Code, Codex, Cursor and other agents that can run commands.</span>
+          </div>
+          <span class="hero__small">Apple silicon · macOS 14 or later · free</span>
+        </div>
+
+        <figure class="term install-term" aria-label="Example: an agent installing Voice Pipes">
+          <div class="term-bar">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <figcaption class="term-title">your agent · example</figcaption>
+          </div>
+          <div class="install-term__body">
+            <p class="c-fg">› Install Voice Pipes for me: {GUIDE_URL}</p>
+            <p class="c-muted">
+              Your Mac is Apple silicon on macOS 15, so it'll run. The installer downloads it from GitHub, checks it's
+              signed and notarized by Apple, and adds the vp command. Shall I install it?
+            </p>
+            <p class="c-fg">› yes</p>
+            <p>
+              <span class="c-cyan">$ curl -fsSL …/install.sh | bash</span><br />
+              <span class="c-green">installed:</span> /Applications/Voice Pipes.app (1.10.0)<br />
+              <span class="c-green">started:</span> Voice Pipes (menu bar)
+            </p>
+            <p class="c-muted">
+              A Welcome window is open. Click <b class="c-fg">Allow…</b> next to Microphone, then next to Accessibility.
+            </p>
+            <p>
+              <span class="c-cyan">$ vp status</span><br />
+              permissions: microphone <span class="c-green">allowed</span> · accessibility <span class="c-green">allowed</span>
+            </p>
+            <p class="c-muted">Both on. Listen…</p>
+            <p><span class="c-cyan">$ vp say "Howdy! Voice Pipes is set up and ready to ride."</span></p>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section id="steps" class="sec sec--flush">
+      <div class="wrap stack stack--40">
+        <div class="stack stack--16">
+          <span class="eyebrow">Three steps, about two minutes</span>
+          <h2 class="display h2">you paste, it does the rest<span class="c-pink">.</span></h2>
+        </div>
+        <ol class="g3 install-steps" role="list">
+          <li class="card install-step">
+            <span class="px install-step__num" aria-hidden="true">1</span>
+            <h3 class="install-step__title">Paste it into your agent</h3>
+            <p class="install-step__text">It checks your Mac, tells you what it's going to do and asks before installing.</p>
+            <div class="install-step__proof c-muted">› Install Voice Pipes for me: …/install.md</div>
+          </li>
+          <li class="card install-step">
+            <span class="px install-step__num" aria-hidden="true">2</span>
+            <h3 class="install-step__title">Click Allow twice</h3>
+            <p class="install-step__text">Only you can grant these. Your agent watches and tells you when each one is on.</p>
+            <div class="install-step__proof install-step__perms">
+              <span>Microphone</span><span class="install-step__ok">OK allowed</span>
+              <span>Accessibility</span><span class="install-step__ok">OK allowed</span>
+            </div>
+          </li>
+          <li class="card install-step">
+            <span class="px install-step__num" aria-hidden="true">3</span>
+            <h3 class="install-step__title">Hold <kbd class="key install-step__key">⌥ Space</kbd> and talk</h3>
+            <p class="install-step__text">
+              When it says go. Let go and your words appear where you're typing. Your agent sees the take and shows you
+              what happened.
+            </p>
+            <div class="install-step__proof install-step__take">
+              <span class="hud"><span class="sq" style="background: var(--green)"></span>OK <span class="c-muted">138ms</span></span>
+              <span class="c-muted">"howdy, it works"</span>
+            </div>
+          </li>
+        </ol>
+        <div class="card install-info">
+          <span class="install-info__tag">INFO</span>
+          <p class="install-info__text">
+            <b class="c-fg">Using ChatGPT or another chat on the web?</b> It can't run commands on your Mac, so it'll give
+            you one line to paste into Terminal, then guide you through the rest from what you tell it.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="yourself" class="sec sec--deep">
+      <div class="wrap split split--top install-diy">
+        <div class="stack stack--16">
+          <span class="eyebrow">Or do it yourself</span>
+          <h2 class="display h2 install-diy__title">rather hold the reins<span class="c-pink">?</span></h2>
+          <p class="lede install-diy__lede">
+            Same app, same checks. The installer and the download are both signed with our Developer ID and notarized by
+            Apple; the installer refuses anything that isn't.
+          </p>
+        </div>
+        <div class="stack stack--16">
+          <div class="card install-diy__card install-diy__card--row">
+            <div class="install-diy__what">
+              <h3 class="install-diy__name">Download the app</h3>
+              <p class="small">Open the .dmg, drag Voice Pipes to Applications.</p>
+            </div>
+            <a class="btn btn-p" href={DOWNLOAD_URL}>Download for Mac</a>
+          </div>
+          <div class="card install-diy__card">
+            <div class="install-diy__what">
+              <h3 class="install-diy__name">Install from a terminal</h3>
+              <p class="small">Puts the app in Applications and adds the <code class="c-fg">vp</code> command.</p>
+            </div>
+            <div class="term">
+              <pre class="term-body term-install" data-copy><code><span class="c-muted" aria-hidden="true">$ </span><InstallLine /></code></pre>
+            </div>
+            <a class="install-diy__link" href="/docs/install">Step-by-step install guide →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+  <CopyCode />
+</Base>
+
+<script>
+  // The prompt's Copy button: hidden without JavaScript (the text stays selectable).
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy-prompt]')) {
+    button.hidden = false;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyPrompt!);
+        button.textContent = 'Copied ✓';
+      } catch {
+        button.textContent = 'Select and copy';
+      }
+      setTimeout(() => (button.textContent = 'Copy prompt'), 2000);
+    });
+  }
+</script>
+
+<style>
+  .install-hero { padding-block: 88px 72px; background: linear-gradient(var(--sky-1) 0, #43294a 55%, var(--bg-100) 100%); }
+  .install-hero__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+  .install-hero .hero__title { font-size: 72px; }
+  .prompt { gap: 10px; }
+  .prompt__label { color: var(--sand); }
+  .prompt__box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 8px;
+    background: var(--bg-000);
+    border: 1px solid var(--purple);
+    border-radius: 6px;
+    box-shadow: 0 0 0 4px rgba(195, 163, 212, 0.14);
+  }
+  .prompt__text { flex: 1; margin: 0; padding: 16px 18px; font-size: 15px; line-height: 24px; overflow-wrap: anywhere; user-select: all; }
+  .prompt__copy { height: 40px; flex: none; border: 0; font-family: inherit; cursor: pointer; }
+  .prompt__note { font-size: 13px; color: var(--sand); }
+  .install-term { margin: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4); }
+  .install-term__body { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; font-size: 13px; line-height: 22px; }
+  .install-term__body p { margin: 0; }
+  .install-steps { margin: 0; padding: 0; list-style: none; }
+  .install-step { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .install-step__num { font-size: 28px; line-height: 1; color: var(--purple); }
+  .install-step__title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 700; }
+  .install-step__key { height: 24px; font-size: 13px; font-weight: 700; color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); vertical-align: 1px; }
+  .install-step__text { margin: 0; font-size: 14px; line-height: 22px; color: var(--fg-muted); }
+  .install-step__proof { margin-top: auto; padding: 10px 12px; background: var(--bg-000); border-radius: 4px; font-size: 12px; line-height: 18px; }
+  .install-step__perms { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+  .install-step__ok { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--green); }
+  .install-step__take { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .install-info { padding: 18px 20px; display: flex; gap: 16px; align-items: baseline; background: var(--bg-100); }
+  .install-info__tag { flex: none; width: 40px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--cyan); }
+  .install-info__text { margin: 0; font-size: 14px; line-height: 22px; color: var(--fg-muted); }
+  .install-diy { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  .install-diy__title { font-size: 36px; line-height: 1.1; }
+  .install-diy__lede { font-size: 15px; line-height: 24px; }
+  .install-diy__card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .install-diy__card--row { flex-direction: row; align-items: center; gap: 16px; }
+  .install-diy__what { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .install-diy__name { margin: 0; font-size: 16px; font-weight: 700; }
+  .install-diy__link { font-size: 13px; color: var(--purple); }
+  @media (max-width: 900px) {
+    .install-hero { padding-block: 56px 48px; }
+    .install-hero__grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .install-hero .hero__title { font-size: 48px; }
+    .install-steps { grid-template-columns: minmax(0, 1fr); }
+    .install-diy { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 600px) {
+    .install-term { display: none; }
+    .prompt__box { flex-direction: column; align-items: stretch; padding: 0 8px 8px; }
+    .prompt__copy { justify-content: center; }
+    .prompt__text { font-size: 14px; padding: 14px 10px 10px; }
+    .install-diy__card--row { flex-direction: column; align-items: stretch; }
+    .install-diy__card--row .btn { justify-content: center; }
+    .install-hero .hero__title { font-size: 40px; }
+  }
+</style>

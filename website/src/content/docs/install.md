@@ -13,7 +13,7 @@ ways to get it:
 | --- | --- |
 | Nothing yet | [The one-line installer](#the-one-line-installer): the app, `vp` and the agent skill |
 | The app, installed from the DMG | [Link `vp` to it](#link-vp-to-an-app-you-already-have), from the app or a terminal |
-| An agent that should set it up | The same one line: it asks nothing ([agents](/docs/agents)) |
+| An agent that should set it up | Give it [voicepipes.app/install.md](/install.md): a guide it follows to install, walk you through permissions and run a short demo |
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 ---
 // The command line: the one-line installer and real vp commands (from the app's CLI, Sources/VoiceTools/CLI), with
 // what each does. Commands only, no made-up output.
+import InstallLine from './InstallLine.astro';
 import CopyCode from './CopyCode.astro';
-import { INSTALL_COMMAND } from '../site';
 
 const commands = [
   ['vp', 'live state: the app, your config, your tracks'],
@@ -30,7 +30,7 @@ const commands = [
         <div class="term-bar">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">install: app, vp and agent skill</span>
         </div>
-        <pre class="term-body term-install" data-copy><code><span class="c-muted" aria-hidden="true">$ </span>{INSTALL_COMMAND}</code></pre>
+        <pre class="term-body term-install" data-copy><code><span class="c-muted" aria-hidden="true">$ </span><InstallLine /></code></pre>
       </div>
       <p class="small">
         It checks the download is signed by Voice Pipes' developer and notarized by Apple, and asks nothing, so an agent

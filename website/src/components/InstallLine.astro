@@ -1,0 +1,15 @@
+---
+// The one-line installer as displayed text: <wbr> after each "/" of the path and before "| bash", so a wrapped line breaks only
+// at path boundaries (never mid-word). <wbr> adds no text, so Copy (CopyCode) still copies the plain command.
+import { INSTALL_COMMAND } from '../site';
+
+const [url, pipe] = INSTALL_COMMAND.split(' | ');
+const parts = url.split('/');
+---
+
+{parts.map((part, i) => {
+  if (i === parts.length - 1) return part;
+  // Never inside "https://".
+  const keep = part.endsWith(':') || part === '';
+  return keep ? `${part}/` : <>{part}/<wbr /></>;
+})}<wbr /> <span style="white-space: nowrap">| {pipe}</span>
