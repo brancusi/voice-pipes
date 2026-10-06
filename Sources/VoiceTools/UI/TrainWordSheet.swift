@@ -199,20 +199,23 @@ struct TrainWordSheet: View {
         HStack(spacing: 10) {
             if recording {
                 Rectangle().fill(Palette.red).frame(width: 7, height: 7)
-                Text("REC").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.red)
-                Text("take \(takes.count + 1)").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
-                LevelBars(level: level)
-                TimelineView(.periodic(from: takeStarted, by: 0.1)) { context in
-                    Text(String(format: "%.1fs", context.date.timeIntervalSince(takeStarted)))
-                        .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted)
+                Text("REC").font(VPFont.label).tracking(0.9).foregroundStyle(Palette.red).fixedSize()
+                // The status items are dropped, never wrapped, when the buttons leave no room: take number first, then the meter.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { takeLabel; LevelBars(level: level); takeTimer }
+                    HStack(spacing: 10) { LevelBars(level: level); takeTimer }
+                    takeTimer
                 }
-                Spacer()
-                Button("Discard take") { discardTake() }.buttonStyle(.vpGhost).keyboardShortcut(.escape, modifiers: [])
-                    .help("Stop without keeping this take (Esc); earlier takes stay")
-                Button("Redo take") { redoTake() }.buttonStyle(.vpSecondary).keyboardShortcut("r", modifiers: [])
-                    .help("Start this take over with the same sentence (R)")
-                Button("Next take") { nextTake() }.buttonStyle(.vpSecondary).keyboardShortcut(.space, modifiers: [])
-                Button("Finish") { finishTakes() }.buttonStyle(.vpPrimary).keyboardShortcut(.return, modifiers: [])
+                Spacer(minLength: 8)
+                Group {
+                    Button("Discard take") { discardTake() }.buttonStyle(.vpGhost).keyboardShortcut(.escape, modifiers: [])
+                        .help("Stop without keeping this take (Esc); earlier takes stay")
+                    Button("Redo take") { redoTake() }.buttonStyle(.vpSecondary).keyboardShortcut("r", modifiers: [])
+                        .help("Start this take over with the same sentence (R)")
+                    Button("Next take") { nextTake() }.buttonStyle(.vpSecondary).keyboardShortcut(.space, modifiers: [])
+                    Button("Finish") { finishTakes() }.buttonStyle(.vpPrimary).keyboardShortcut(.return, modifiers: [])
+                }
+                .fixedSize()
             } else {
                 Button { startTakes() } label: { Label(takes.isEmpty ? "Start takes" : "Record more takes", systemImage: "mic") }
                     .buttonStyle(.vpSecondary)
@@ -234,6 +237,17 @@ struct TrainWordSheet: View {
         }
         .padding(.horizontal, 12).frame(minHeight: 40)
         .vpCard()
+    }
+
+    private var takeLabel: some View {
+        Text("take \(takes.count + 1)").font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize()
+    }
+
+    private var takeTimer: some View {
+        TimelineView(.periodic(from: takeStarted, by: 0.1)) { context in
+            Text(String(format: "%.1fs", context.date.timeIntervalSince(takeStarted)))
+                .font(VPFont.caption).monospacedDigit().foregroundStyle(Palette.fgMuted).fixedSize()
+        }
     }
 
     private func startTakes() {

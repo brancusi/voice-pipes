@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.16.1**
+- Fixed: while recording takes, the "REC", take number and timer no longer break onto several lines. When there's no room they're dropped instead (take number first, then the level meter), and the buttons keep their size.
+
 **1.16.0**
 - **Redo a take while training a word.** Stumbled over the sentence? **Redo take** (R) starts that take over with the same sentence; **Discard take** (Esc) stops without keeping it. Esc no longer closes the training sheet mid-recording and loses your takes.
 - **Training keeps only the word, even when you stumble.** What you said is now lined up with the sentence word by word, and only the part between the correctly heard words around your word counts, so a slip elsewhere in the sentence can't turn into a false mishearing. When the words right next to it were misheard too, that take is set aside rather than guessed at, and the summary says how many.
