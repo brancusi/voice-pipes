@@ -1,6 +1,5 @@
 @preconcurrency import AVFoundation
 import CoreAudio
-import ObjCExceptions
 
 /// Whether the microphone stays open between takes ([settings] microphone). Starting a mic takes 150–550 ms
 /// (the Studio Display's ~430 ms is the slow one), and the first word was lost in that gap. An open mic starts a take
@@ -119,7 +118,8 @@ final class AudioRecorder: @unchecked Sendable {
     /// Audio from before the press that an open microphone adds to a take: you tend to start talking as you press.
     static let prerollSeconds = 0.5
 
-    private var engine = AVAudioEngine()
+    /// The open microphone (nil when closed).
+    private var mic: HALInput?
     /// Guards `samples`, `preroll`, `capturing` and `lastBuffer` (the audio thread writes them), and keeps `onSamples`
     /// in order.
     private let lock = NSLock()
@@ -128,13 +128,11 @@ final class AudioRecorder: @unchecked Sendable {
     private var capturing = false
     /// When the microphone last delivered audio (system uptime).
     private var lastBuffer: TimeInterval = 0
-    private var converter: AVAudioConverter?
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate,
                                              channels: 1, interleaved: false)!
     // Main thread only.
     private var running = false
     private var coolDown: DispatchWorkItem?
-    private var configObserver: NSObjectProtocol?
     /// The device the engine records from, and the check that it still delivers audio.
     private var openDevice: AudioDeviceID?
     private var watchdog: Timer?
@@ -159,12 +157,10 @@ final class AudioRecorder: @unchecked Sendable {
 
     init(input: String = AudioInputs.system) {
         self.input = input
-        observeConfiguration()
         observeDevices()
     }
 
     deinit {
-        if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
         watchdog?.invalidate()
         if let deviceListener {
             for var address in Self.deviceAddresses {
@@ -178,7 +174,7 @@ final class AudioRecorder: @unchecked Sendable {
         coolDown = nil
         // An open microphone that's gone quiet (its device changed without telling the engine) is reopened, so this
         // take records. A live one delivers a buffer every ~20 ms.
-        if running, lock.withLock({ ProcessInfo.processInfo.systemUptime - lastBuffer }) > Self.silentLimit { replaceEngine() }
+        if running, lock.withLock({ ProcessInfo.processInfo.systemUptime - lastBuffer }) > Self.silentLimit { stopEngine() }
         if !running { try startEngine() }
         lock.withLock {
             let keep = Int(Self.sampleRate * Self.prerollSeconds)
@@ -243,41 +239,29 @@ final class AudioRecorder: @unchecked Sendable {
     }
 
     private func startEngine() throws {
-        let input = engine.inputNode
-        let device = AudioInputs.resolve(self.input)
-        if self.input != AudioInputs.system, var device = device?.id, let unit = input.audioUnit {
-            // A named mic (when it's not connected, `resolve` gives the system's input and nothing needs setting).
-            AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device,
-                                 UInt32(MemoryLayout<AudioDeviceID>.size))
+        // A named mic that isn't connected resolves to the system's input.
+        guard let device = AudioInputs.resolve(input) else { throw RecorderError.noFormat }
+        let target = targetFormat
+        var converter: AVAudioConverter?
+        // Opening blocks while the device starts (~430 ms for the Studio Display mic).
+        mic = try HALInput(device: device.id) { [weak self] buffer in
+            // Audio thread. The converter follows the device's format (its own rate: a named mic needn't match the
+            // system input's, e.g. AirPods in call mode at 24 kHz).
+            if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: target) }
+            guard let converter else { return }
+            self?.process(buffer, converter)
         }
-        // The device's own format. After picking a named mic the node's output format keeps the system input's rate,
-        // and the input unit can't convert rates: a tap in that format got nothing (a named mic while AirPods were the
-        // system input recorded silence).
-        let inputFormat = input.inputFormat(forBus: 0)
-        // Mid-change (a headset connecting, or switching to call mode) a device can report no channels or 0 Hz.
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else { throw RecorderError.noFormat }
-        converter = AVAudioConverter(from: inputFormat, to: targetFormat)
-
-        input.removeTap(onBus: 0)
-        // AVFoundation raises (an abort, uncaught) if the format changed underneath, e.g. a headset just unplugged.
-        try ObjCExceptions.catching {
-            input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-                self?.process(buffer)
-            }
-        }
-        engine.prepare()
-        try engine.start()
-        // From here: `start()` blocks while the device starts (~430 ms for the Studio Display mic).
         lock.withLock { lastBuffer = ProcessInfo.processInfo.systemUptime }
         running = true
-        openDevice = device?.id
+        openDevice = device.id
         startWatchdog()
     }
 
+    /// Closes the microphone. `HALInput.stop()` returns once its last callback has run.
     private func stopEngine() {
+        mic?.stop()
+        mic = nil
         guard running else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
         running = false
         openDevice = nil
         watchdog?.invalidate()
@@ -316,43 +300,11 @@ final class AudioRecorder: @unchecked Sendable {
         }
     }
 
-    /// A fresh engine on the current device, keeping the take in progress.
+    /// Reopens on the current device, keeping the take in progress.
     private func reopen(_ reason: String) {
-        NSLog("VoiceTools: reopening the microphone (\(reason))")
-        replaceEngine()
+        NSLog("VoiceTools: reopening the microphone \(input) (\(reason))")
+        stopEngine()
         restart()
-    }
-
-    /// The default input changed (a headset, a display, sleep): the engine has stopped. Start a fresh one on the new
-    /// device if a take is running or the microphone should stay open.
-    private func observeConfiguration() {
-        if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
-        configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
-                                                                queue: .main) { [weak self] _ in
-            self?.configurationChanged()
-        }
-    }
-
-    private func configurationChanged() {
-        // Picking a named mic posts this too, with the engine still running on it: nothing to do. A real change (a
-        // device unplugged, a new format) stops the engine first.
-        guard !engine.isRunning else { return }
-        let wasRunning = running
-        replaceEngine()
-        if wasRunning { restart() }
-    }
-
-    /// Drops the engine (stopped, or half-started on a device that went away) for a fresh one on the current devices.
-    private func replaceEngine() {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        running = false
-        openDevice = nil
-        watchdog?.invalidate()
-        watchdog = nil
-        lock.withLock { preroll.removeAll() }
-        engine = AVAudioEngine()
-        observeConfiguration()
     }
 
     /// Reopens the microphone after a device change, for the take in progress or to keep it open. A device that's
@@ -369,13 +321,11 @@ final class AudioRecorder: @unchecked Sendable {
                 NSLog("VoiceTools: microphone didn't restart after a device change: \(error)")
                 return
             }
-            replaceEngine()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.restart(attempt: attempt + 1) }
         }
     }
 
-    private func process(_ buffer: AVAudioPCMBuffer) {
-        guard let converter else { return }
+    private func process(_ buffer: AVAudioPCMBuffer, _ converter: AVAudioConverter) {
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
         guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { return }

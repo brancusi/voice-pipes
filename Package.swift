@@ -18,12 +18,10 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "Sparkle", package: "Sparkle"),
                 .product(name: "TOMLDecoder", package: "TOMLDecoder"),
-                "ObjCExceptions",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         // Catches the NSExceptions AVFoundation raises on audio-device changes (Swift can't).
-        .target(name: "ObjCExceptions"),
     ]
 )

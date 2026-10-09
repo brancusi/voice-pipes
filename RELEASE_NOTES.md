@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.16.3**
+- **Fixed: the app could quit when you switched to a chosen mic after using AirPods (or another headset) as the system mic.** When a headset switches between music and call mode, the chosen mic stopped hearing anything and the app crashed while reopening it. Voice Pipes now opens microphones in a way that doesn't involve the speakers or headphones at all, so a headset changing mode no longer affects a different mic.
+- Takes start a little sooner: sound now arrives about 10 ms after the microphone opens, down from about 100 ms.
+
 **1.16.2**
 - **Fixed: a microphone picked by name could record nothing.** If the system's input was something else, AirPods for instance, the chosen mic often stayed silent. It now records in the mic's own format, so the two don't have to match.
 - **Fixed: the app could crash when you took out headphones or the audio devices changed.** It now waits a moment for the new device and carries on.

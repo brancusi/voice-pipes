@@ -57,33 +57,27 @@ permission, but can't register modifier-only keys. Registering Esc globally woul
 registered only while recording. While recording a new shortcut in the editor, all hotkeys are suspended so the
 old binding doesn't fire.
 
-**Opening the microphone is slow, and speech in that gap is lost.** `AVAudioEngine.start()` blocks for as long
+**Opening the microphone is slow, and speech in that gap is lost.** Starting the input unit blocks for as long
 as the device takes to start: ~430 ms for the Studio Display mic, ~40 ms for the MacBook mic. The first buffer
-arrives ~100 ms after that. With a cold engine the first word was clipped. → `AudioRecorder` keeps the engine
-running between takes (`[settings] microphone`, default `always`) and adds the last 0.5 s from before the press,
+arrives ~100 ms after that. With a cold mic the first word was clipped. → `AudioRecorder` keeps the mic
+open between takes (`[settings] microphone`, default `always`) and adds the last 0.5 s from before the press,
 which gives a 0 ms start. `pause()` doesn't help (still ~550 ms). Bluetooth inputs are never kept open, because an
-open Bluetooth mic holds the headset in call mode. A default-device change stops the engine
-(`AVAudioEngineConfigurationChange`), so a fresh engine is built on the new device. Bench with a scratch binary
+open Bluetooth mic holds the headset in call mode. A default-device change reopens on the new device. Bench with a scratch binary
 that times `start()` → first tap buffer.
 
-**Picking a mic posts `AVAudioEngineConfigurationChange`.** Setting `kAudioOutputUnitProperty_CurrentDevice` on the
-input node's audio unit posts the notification ~170 ms later with the engine still running; rebuilding on it looped
-forever and recorded nothing. → Ignore it while `engine.isRunning`. A change to the *named* device (new sample rate,
-a headset switching modes) often posts nothing at all and the tap just stops: see the next entry.
-
-**A named mic needs its own format and a watchdog (1.16.2).** After `CurrentDevice` is set, the input node's
-`outputFormat(forBus: 0)` keeps the previous (system) device's rate and channels, and the input unit can't convert
-rates: tapping in it recorded 0 samples whenever the two rates differed (AirPods as the system input at 16–24 kHz,
-the MacBook mic at 48 kHz). → Tap with `inputFormat(forBus: 0)`, the device's own format. Changing the open device's
-rate mid-take also stopped the tap with no notification → `AudioRecorder` reopens when no buffer has arrived for 0.75 s
-(buffers come every ~20 ms; the clock starts after `engine.start()` returns), before a take if the open mic has gone
-quiet, and when Core Audio's device list or default input changes the device a setting resolves to. Reproduce
-without a headset by changing a mic's nominal sample rate (`kAudioDevicePropertyNominalSampleRate`) and back.
-
-**`installTap` raises on a stale format, and Swift can't catch it.** "Failed to create tap due to format mismatch" is
-an `NSException`: uncaught, the app aborts (the 1.16.0 and 1.16.1 crashes on unplugging a headset). → `installTap` runs
-inside `ObjCExceptions.catching` (a small Objective-C target), formats with 0 Hz or no channels are refused, and a
-failed restart retries a few times 0.4 s apart while the device settles.
+**Microphones open through the HAL unit, not `AVAudioEngine` (1.16.3).** On macOS an engine's input node shares one
+I/O unit with its output, so the engine is tied to the default output device. With AirPods as the system device, a take
+on them flips the headset into call mode and back, and an engine recording a *different* mic (picked with
+`kAudioOutputUnitProperty_CurrentDevice`) stalled with no notification. Rebuilding it on every stall then crashed:
+`AVAudioEngine` dealloc'd while its own `AVAudioIOUnit` property listener was still queued (`EXC_BAD_ACCESS` in
+`IOUnitPropertyListener`, 1.16.2). Before that, picking a mic posted `AVAudioEngineConfigurationChange` with the engine
+still running, the node's output format kept the old device's rate (a tap in it got nothing), and `installTap` raised
+uncatchable `NSException`s on a stale format (the 1.16.0/1.16.1 crashes). → `HALInput` opens an input-only
+`kAudioUnitSubType_HALOutput` (input enabled, output disabled) on the device, asks for Float32 at the device's own rate
+and channels (the HAL unit converts formats but not rates), and renders in its input callback; `AudioOutputUnitStop` is
+synchronous, so closing is safe at any time. `AudioRecorder` still reopens when no buffer has come for 0.75 s and when
+the device list or default input changes the device a setting resolves to. Reproduce with AirPods as the system input:
+a take on them, then keep a named mic open (the 1.16.2 build crashed within ~10 s).
 
 **History in SQLite (1.9.0).** The JSON file was rewritten whole on every run and lived in memory. → `history.sqlite`
 via the system `SQLite3` module (no package). Measured with 50,000 runs (164 MB): 0.2 ms to add a run, 2 ms for a page,
