@@ -350,7 +350,7 @@ enum AgentsInstaller {
           paste pastes at the user's cursor, so prefer tracks without paste unless the user asked.
         - `vp transcribe recording.m4a` transcribes a file on the Mac (Parakeet, fast, private).
         - `vp history --limit 5` shows recent runs (what was said, what came out, timings); `vp history show <n>`. History
-          goes back to the first run: `--search`, `--track`, `--since 3d`, `--all`, and `vp history export` for whole runs as JSON lines.
+          goes back to the first run: `--search`, `--track`, `--since 3d`, `--all`, and `vp history export` for whole runs as JSON lines (`vp history archive [--to <folder>]`: all of it as Markdown, a file a day).
         - `vp watch` streams run events as they happen.
 
         ## Build or change a pipeline for the user

@@ -12,11 +12,12 @@ struct ArchiveSettings: Equatable {
     var folderURL: URL { URL(fileURLWithPath: (folder as NSString).expandingTildeInPath, isDirectory: true) }
 }
 
-/// Writes every run to `<folder>/YYYY-MM-DD.md` as it lands in History: the time, the track, the microphone, the app
+/// Writes every run to `<folder>/YYYY/MM/YYYY-MM-DD.md` as it lands in History: the time, the track, the microphone, the app
 /// in front, how long you spoke and what the run used, then the text. History (history.sqlite) is the source: the
 /// archive keeps a cursor (the `seq` of the last run written) and each write appends every run after it. So nothing is
 /// lost when the folder can't be written for a while (a drive unplugged, a permission refused): the next write,
 /// after the next run or the minute's retry, catches up. Appends go through `fsync` before the cursor moves on.
+/// `rebuild` writes the whole of History in the same form (`vp history archive`).
 @MainActor
 @Observable
 final class DictationArchive {
@@ -87,7 +88,91 @@ final class DictationArchive {
         }
     }
 
+    /// Rewrites the archive from the whole of History (each day's file whole), then carries on from there.
+    func rebuild() async throws -> RebuildResult {
+        guard settings.enabled else { throw ArchiveError.off }
+        guard let database else { throw ArchiveError.noHistory }
+        let folder = settings.folderURL
+        let result: Result<RebuildResult, Error> = await withCheckedContinuation { done in
+            queue.async {
+                done.resume(with: .success(Result {
+                    let result = try Self.rebuild(database: database, folder: folder)
+                    if UserDefaults.standard.object(forKey: Self.cursorKey) != nil {
+                        UserDefaults.standard.set(result.through, forKey: Self.cursorKey)
+                    }
+                    return result
+                }))
+            }
+        }
+        switch result {
+        case .success(let r):
+            if let last = r.lastFile { status = .wrote(file: last, at: Date()) }
+            return r
+        case .failure(let error):
+            status = .failed(error.localizedDescription)
+            throw error
+        }
+    }
+
+    enum ArchiveError: LocalizedError {
+        case off, noHistory
+        var errorDescription: String? {
+            switch self {
+            case .off: "The archive is off."
+            case .noHistory: "History isn't available."
+            }
+        }
+    }
+
+    struct RebuildResult {
+        var runs: Int
+        var days: Int
+        /// History's `seq` of the newest run written.
+        var through: Int64
+        var lastFile: String?
+    }
+
     // MARK: Writing (off the main thread)
+
+    /// Every run in History, written to `folder` a day's file at a time, each file whole (so running it again gives
+    /// the same files). Days without runs in History are left alone.
+    nonisolated static func rebuild(database: HistoryDatabase, folder: URL) throws -> RebuildResult {
+        let through = database.lastSeq()
+        let runs = database.runs(after: 0).filter { $0.seq <= through }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        moveFlatFiles(in: folder)
+        var days = 0
+        var last: String?
+        var start = 0
+        while start < runs.count {
+            let date = runs[start].record.date
+            var end = start + 1
+            while end < runs.count, Calendar.current.isDate(runs[end].record.date, inSameDayAs: date) { end += 1 }
+            let file = folder.appendingPathComponent(path(for: date))
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let text = header(for: date) + runs[start..<end].map { entry($0.record) }.joined()
+            try Data(text.utf8).write(to: file, options: .atomic)
+            // A 1.17.0 file for the same day still at the top: its runs are all in the file just written.
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(file.lastPathComponent))
+            days += 1
+            last = path(for: date)
+            start = end
+        }
+        return RebuildResult(runs: runs.count, days: days, through: through, lastFile: last)
+    }
+
+    /// 1.17.0 wrote `<folder>/YYYY-MM-DD.md`; files now go in `YYYY/MM/`. Moves any found there, unless that day
+    /// already has a file in its new place.
+    nonisolated private static func moveFlatFiles(in folder: URL) {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
+        for name in names where name.range(of: #"^\d{4}-\d{2}-\d{2}\.md$"#, options: .regularExpression) != nil {
+            let target = folder.appendingPathComponent("\(name.prefix(4))/\(name.dropFirst(5).prefix(2))/\(name)")
+            guard !fm.fileExists(atPath: target.path) else { continue }
+            try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.moveItem(at: folder.appendingPathComponent(name), to: target)
+        }
+    }
 
     /// Writes the runs after the cursor, a day's file at a time, oldest first, moving the cursor after each file.
     /// Returns the last file written, if any.
@@ -102,14 +187,16 @@ final class DictationArchive {
         var last: String?
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            moveFlatFiles(in: folder)
             var day: [(seq: Int64, record: RunRecord)] = []
             func flush() throws {
                 guard let first = day.first?.record else { return }
-                let file = folder.appendingPathComponent(fileName(for: first.date))
+                let file = folder.appendingPathComponent(path(for: first.date))
+                try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try append(day.map { entry($0.record) }.joined(), to: file, header: header(for: first.date))
                 // Still on: turning it off mid-write clears the cursor, and must stay cleared.
                 if defaults.object(forKey: cursorKey) != nil { defaults.set(day.last!.seq, forKey: cursorKey) }
-                last = file.lastPathComponent
+                last = path(for: first.date)
                 day = []
             }
             for run in runs {
@@ -138,10 +225,11 @@ final class DictationArchive {
         try handle.synchronize()
     }
 
-    nonisolated static func fileName(for date: Date) -> String {
+    /// `2026/10/2026-10-09.md`, relative to the folder.
+    nonisolated static func path(for date: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
+        f.dateFormat = "yyyy/MM/yyyy-MM-dd"
         return f.string(from: date) + ".md"
     }
 

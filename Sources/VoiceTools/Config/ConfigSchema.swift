@@ -22,7 +22,7 @@ enum ConfigSchema {
             "archive": {
               "type": "object",
               "additionalProperties": false,
-              "description": "A plain-text copy of every run: one Markdown file per day (YYYY-MM-DD.md) with the time, track, microphone, app, models and text.",
+              "description": "A plain-text copy of every run: one Markdown file per day (YYYY/MM/YYYY-MM-DD.md) with the time, track, microphone, app, models and text.",
               "properties": {
                 "enabled": { "type": "boolean", "default": false },
                 "folder": { "type": "string", "minLength": 1, "default": "~/Documents/Voice Pipes", "description": "Where the files go; ~ is your home folder." }

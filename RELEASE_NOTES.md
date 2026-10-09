@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.1**
+- **The archive is now sorted into folders by year and month** (`2026/10/2026-10-09.md`), so it stays tidy as it grows. Files from 1.17.0 are moved into place.
+- **Archive your whole history in one go.** `vp history archive` writes every run you've ever made into your archive folder in the same daily files. Running it again rewrites the same files, so there are no duplicates. `vp history archive --to <folder>` makes a copy anywhere else, even when the app isn't running.
+
 **1.17.0**
 - **Keep a plain-text copy of every dictation.** Turn on **Setup → Archive → Save every run as text** and Voice Pipes writes each run to a Markdown file for the day (like `2026-10-09.md`) in a folder you choose. Each entry has the time, the track, the microphone, the app you were in, how long you spoke, how long it took, the models it used, and the text, plus what was first heard if a later step changed it. The files open in any text editor and are easy to search, sync or back up.
 - It's off until you turn it on, and starts from that moment. Runs are written as soon as they finish. If the folder can't be written for a while (an unplugged drive, for example), Setup says so, and the missed runs are written once it's back, so none are lost.

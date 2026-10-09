@@ -39,8 +39,8 @@ enum VPCommands {
                     values: ["max", "silence", "voice", "voice-model", "listen-model", "speed"], handler: ask),
         CommandSpec(name: "transcribe", usage: "vp transcribe <audio-file> [--model parakeet|<openrouter-id>]",
                     summary: "Transcribe an audio file (on this Mac by default)", values: ["model"], handler: transcribe),
-        CommandSpec(name: "history", usage: "vp history [show <n> | usage | export] [--limit <n> | --all] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
-                    summary: "Every run ever and its log: what was said, each step, Jev's picks, tokens and cost", values: ["limit", "track", "search", "since"], switches: ["all"], handler: history),
+        CommandSpec(name: "history", usage: "vp history [show <n> | usage | export | archive [--to <folder>]] [--limit <n> | --all] [--track <id>] [--search <text>] [--since 30m|2h|3d]",
+                    summary: "Every run ever and its log: what was said, each step, Jev's picks, tokens and cost", values: ["limit", "track", "search", "since", "to"], switches: ["all"], handler: history),
         CommandSpec(name: "vocab", usage: "vp vocab [add <word> --heard \"a, b\" [--exact] | remove <word> | test \"<sentence>\" | train <word>]",
                     summary: "The words Fix words corrects", values: ["heard"], switches: ["exact"], handler: vocab),
         CommandSpec(name: "config", usage: "vp config [check [file] | schema [vocabulary] | backups | restore <n> | reload | open | path]",
@@ -366,6 +366,18 @@ enum VPCommands {
                                                       [summary("today", nil), summary("7 days", 7 * 86_400), summary("30 days", 30 * 86_400)]))]),
                             help: ["vp history show <n>   (one run's log and cost)"])
         }
+        if parsed.positionals.first == "archive" {
+            // Every run as Markdown, a file a day (YYYY/MM/YYYY-MM-DD.md), like Setup → Archive writes them.
+            if let to = parsed["to"] {
+                let folder = URL(fileURLWithPath: (to as NSString).expandingTildeInPath, isDirectory: true)
+                let r = try DictationArchive.rebuild(database: db, folder: folder)
+                return out.emit(.object([("folder", .string(ConfigPaths.tilde(folder))), ("runs", .int(r.runs)), ("days", .int(r.days))]),
+                                help: ["open \"\(folder.path)\""])
+            }
+            // The configured archive: the app writes it, so its own appends carry on from where this ends.
+            let reply = try AppClient.request("history.archive")
+            return out.emit(Out(any: reply), help: ["Setup → Archive shows its status", "vp history archive --to <folder>   (a copy anywhere else)"])
+        }
         if parsed.positionals.first == "export" {
             // Every matching run, whole (text, heard, timings, the step-by-step log), one JSON object per line, oldest first.
             let encoder = JSONEncoder()
@@ -392,6 +404,7 @@ enum VPCommands {
             : ["vp history show <n>   (the run's log: every step, Jev's picks, tokens, cost)", "vp history usage   (today, 7 and 30 days)"]
         if shown.count < matching { help.append("vp history --all   (\(matching - shown.count) more match; or --limit <n>)") }
         if !shown.isEmpty { help.append("vp history export [--track/--search/--since]   (whole runs as JSON lines)") }
+        if !shown.isEmpty { help.append("vp history archive [--to <folder>]   (all of it as Markdown, a file a day)") }
         out.emit(.object([
             ("count", .string("\(shown.count) of \(matching) matching (\(total) total)")),
             ("runs", .table(["n", "at", "track", "ms", "cost", "text"], rows)),

@@ -173,7 +173,7 @@ struct SetupView: View {
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Save every run as text").font(VPFont.bodyStrong)
-                            Text("A Markdown file a day (YYYY-MM-DD.md): the time, track, microphone, app, models and the text. A backup beside History, readable anywhere.")
+                            Text("A Markdown file a day, by year and month (2026/10/2026-10-09.md): the time, track, microphone, app, models and the text. A backup beside History, readable anywhere. `vp history archive` writes all of History this way.")
                                 .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 16)

@@ -13,7 +13,7 @@ Engine) and [Sparkle](https://sparkle-project.org) (self-updates).
 | | `Model/TrackStore.swift` | Loads/saves `tracks.json`; one-time migrations; trigger conflict detection. |
 | | `Model/HistoryStore.swift` | `RunRecord`; `HistoryStore` keeps the newest 200 runs in memory and the count. |
 | | `Model/HistoryDatabase.swift` | `history.sqlite`: every run ever (the record as JSON + filter columns), FTS5 trigram search, `step_models` for measured speeds; WAL so `vp` reads while the app writes; imports `history.json` once. |
-| | `Model/DictationArchive.swift` | `[settings.archive]`: appends each run to `<folder>/YYYY-MM-DD.md`. Catches up from `history.sqlite` by `seq` (cursor in `UserDefaults`, `archive.throughSeq`), so a folder that can't be written loses nothing; writes after each run and retries every minute. |
+| | `Model/DictationArchive.swift` | `[settings.archive]`: appends each run to `<folder>/YYYY-MM-DD.md`. Catches up from `history.sqlite` by `seq` (cursor in `UserDefaults`, `archive.throughSeq`), so a folder that can't be written loses nothing; writes after each run and retries every minute. Files go in `YYYY/MM/`; `rebuild` (`vp history archive`) rewrites each day whole from History. |
 | | `Model/Vocabulary.swift` | `VocabularyEntry`, `VocabularyStore` (`vocabulary.json`), `FixWords` (the replacement algorithm). |
 | | `Model/KeyCombo.swift` | Hotkeys as Carbon key codes + modifiers; layout-aware key names; key code for a character. |
 | Engine | `Pipeline/AppState.swift` | The runtime: hotkey registration, trigger semantics, mic capture, step execution, checks. |

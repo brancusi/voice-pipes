@@ -603,7 +603,7 @@ enum ConfigFile {
         out += "\n[settings.agents]  # what agents (Claude Code, Codex, …) read aloud to you without being asked\n"
         out += "read_aloud = \(quote(config.agents.readAloud.rawValue))  # off | long (summaries, reports) | attention (long text + anything that needs you) | all\n"
         out += "long_text = \(config.agents.longText)  # characters; longer than this counts as long\n"
-        out += "\n[settings.archive]  # a plain-text copy of every run: one Markdown file per day (YYYY-MM-DD.md)\n"
+        out += "\n[settings.archive]  # a plain-text copy of every run: one Markdown file per day (YYYY/MM/YYYY-MM-DD.md)\n"
         out += "enabled = \(config.archive.enabled)\n"
         out += "folder = \(quote(config.archive.folder))  # where the files go; ~ is your home folder\n"
         out += writeReading(config.reading)

@@ -126,6 +126,13 @@ extension AppState {
             guard speaker.state != .idle else { throw AgentError("not_speaking", "Nothing is being read aloud.", hint: "vp say \"…\" --speed \(value)") }
             speaker.setRate(Float(value))
             reply.result(["speed": Double(speaker.rate)])
+        case "history.archive":
+            // The whole of History into the archive folder, in step with the archive's own writes.
+            guard store.archive.enabled else {
+                throw AgentError("archive_off", "The archive is off.", hint: "turn on Setup → Archive, or vp history archive --to <folder>")
+            }
+            let r = try await archive.rebuild()
+            reply.result(["folder": store.archive.folder, "runs": r.runs, "days": r.days])
         case "config.reload":
             store.reloadFromDisk()
             VocabularyStore.shared.reloadFromDisk()

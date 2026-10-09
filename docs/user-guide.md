@@ -271,12 +271,14 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   instant. Every mic an enabled track uses is kept ready. Same as `input` and `microphone` under `[settings]` in
   config.toml, and `input = "…"` in a track's microphone block; `vp inputs` lists the names.
 - **Archive** — **Save every run as text** keeps a plain-text copy of every run beside History: one Markdown file
-  per day (`2026-10-09.md`) in the folder you choose (**Choose…**; default `~/Documents/Voice Pipes`). Each run gets
+  per day, by year and month (`2026/10/2026-10-09.md`), in the folder you choose (**Choose…**; default `~/Documents/Voice Pipes`). Each run gets
   its time and track, the microphone, the app in front when you pressed, how long you spoke, how long it took, the
   models it used, then the text, and what transcription heard when a later step changed it. Off by default; turning
   it on starts from that moment, not from the start of History. Runs are written as they finish. If the folder can't
   be written (a drive unplugged, say), the status line says so and the missed runs are written once it can, within a
-  minute. Same as `[settings.archive] enabled` and `folder` in config.toml.
+  minute. Same as `[settings.archive] enabled` and `folder` in config.toml. **`vp history archive`** writes the
+  whole of History into the archive folder the same way (each day's file whole, so it's safe to run again);
+  `--to <folder>` writes a copy anywhere else, app running or not.
 - **Updates** — version and **Check now**. The bar along the bottom of the main window shows the same: the version,
   *up to date* (hover for when it last checked) with **Check now**, or *x.y.z available* with **Install…**.
   The menu bar panel's last line shows it too.
