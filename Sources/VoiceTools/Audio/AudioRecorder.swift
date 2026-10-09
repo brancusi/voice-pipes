@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import CoreAudio
+import ObjCExceptions
 
 /// Whether the microphone stays open between takes ([settings] microphone). Starting a mic takes 150–550 ms
 /// (the Studio Display's ~430 ms is the slow one), and the first word was lost in that gap. An open mic starts a take
@@ -119,11 +120,14 @@ final class AudioRecorder: @unchecked Sendable {
     static let prerollSeconds = 0.5
 
     private var engine = AVAudioEngine()
-    /// Guards `samples`, `preroll` and `capturing` (the audio thread writes them), and keeps `onSamples` in order.
+    /// Guards `samples`, `preroll`, `capturing` and `lastBuffer` (the audio thread writes them), and keeps `onSamples`
+    /// in order.
     private let lock = NSLock()
     private var samples: [Float] = []
     private var preroll: [Float] = []
     private var capturing = false
+    /// When the microphone last delivered audio (system uptime).
+    private var lastBuffer: TimeInterval = 0
     private var converter: AVAudioConverter?
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate,
                                              channels: 1, interleaved: false)!
@@ -131,6 +135,14 @@ final class AudioRecorder: @unchecked Sendable {
     private var running = false
     private var coolDown: DispatchWorkItem?
     private var configObserver: NSObjectProtocol?
+    /// The device the engine records from, and the check that it still delivers audio.
+    private var openDevice: AudioDeviceID?
+    private var watchdog: Timer?
+    /// Reopens in a row that didn't bring audio back; the watchdog gives up after a few (a device that's gone dead).
+    private var silentReopens = 0
+    private var deviceListener: AudioObjectPropertyListenerBlock?
+    /// A running engine that's this long without audio has lost its device.
+    private static let silentLimit: TimeInterval = 0.75
 
     /// Called on the audio thread with each converted block of a take (the preroll first, on the caller's thread).
     var onSamples: (@Sendable ([Float]) -> Void)?
@@ -148,15 +160,25 @@ final class AudioRecorder: @unchecked Sendable {
     init(input: String = AudioInputs.system) {
         self.input = input
         observeConfiguration()
+        observeDevices()
     }
 
     deinit {
         if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
+        watchdog?.invalidate()
+        if let deviceListener {
+            for var address in Self.deviceAddresses {
+                AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, deviceListener)
+            }
+        }
     }
 
     func start() throws {
         coolDown?.cancel()
         coolDown = nil
+        // An open microphone that's gone quiet (its device changed without telling the engine) is reopened, so this
+        // take records. A live one delivers a buffer every ~20 ms.
+        if running, lock.withLock({ ProcessInfo.processInfo.systemUptime - lastBuffer }) > Self.silentLimit { replaceEngine() }
         if !running { try startEngine() }
         lock.withLock {
             let keep = Int(Self.sampleRate * Self.prerollSeconds)
@@ -222,21 +244,34 @@ final class AudioRecorder: @unchecked Sendable {
 
     private func startEngine() throws {
         let input = engine.inputNode
-        if self.input != AudioInputs.system, var device = AudioInputs.resolve(self.input)?.id, let unit = input.audioUnit {
+        let device = AudioInputs.resolve(self.input)
+        if self.input != AudioInputs.system, var device = device?.id, let unit = input.audioUnit {
             // A named mic (when it's not connected, `resolve` gives the system's input and nothing needs setting).
             AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device,
                                  UInt32(MemoryLayout<AudioDeviceID>.size))
         }
-        let inputFormat = input.outputFormat(forBus: 0)
+        // The device's own format. After picking a named mic the node's output format keeps the system input's rate,
+        // and the input unit can't convert rates: a tap in that format got nothing (a named mic while AirPods were the
+        // system input recorded silence).
+        let inputFormat = input.inputFormat(forBus: 0)
+        // Mid-change (a headset connecting, or switching to call mode) a device can report no channels or 0 Hz.
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else { throw RecorderError.noFormat }
         converter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-            self?.process(buffer)
+        // AVFoundation raises (an abort, uncaught) if the format changed underneath, e.g. a headset just unplugged.
+        try ObjCExceptions.catching {
+            input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+                self?.process(buffer)
+            }
         }
         engine.prepare()
         try engine.start()
+        // From here: `start()` blocks while the device starts (~430 ms for the Studio Display mic).
+        lock.withLock { lastBuffer = ProcessInfo.processInfo.systemUptime }
         running = true
+        openDevice = device?.id
+        startWatchdog()
     }
 
     private func stopEngine() {
@@ -244,7 +279,48 @@ final class AudioRecorder: @unchecked Sendable {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         running = false
+        openDevice = nil
+        watchdog?.invalidate()
+        watchdog = nil
         lock.withLock { preroll.removeAll() }
+    }
+
+    /// While the microphone is open: when its device changes under it (a new sample rate, a headset switching modes)
+    /// the engine often says nothing and simply stops delivering audio. Reopen it.
+    private func startWatchdog() {
+        watchdog?.invalidate()
+        watchdog = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            guard let self, self.running else { return }
+            let silent = self.lock.withLock { ProcessInfo.processInfo.systemUptime - self.lastBuffer }
+            guard silent > Self.silentLimit else { self.silentReopens = 0; return }
+            guard self.silentReopens < 3 else { return }
+            self.silentReopens += 1
+            self.reopen("no audio for \(String(format: "%.1f", silent)) s")
+        }
+    }
+
+    private static let deviceAddresses = [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice].map {
+        AudioObjectPropertyAddress(mSelector: $0, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    }
+
+    /// Mics connecting and disconnecting, and the system's input changing: if the mic this recorder means is now a
+    /// different device (a named mic came back, or went and the system's input stands in), reopen on it.
+    private func observeDevices() {
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self, self.running, AudioInputs.resolve(self.input)?.id != self.openDevice else { return }
+            self.reopen("microphone changed")
+        }
+        deviceListener = listener
+        for var address in Self.deviceAddresses {
+            AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+        }
+    }
+
+    /// A fresh engine on the current device, keeping the take in progress.
+    private func reopen(_ reason: String) {
+        NSLog("VoiceTools: reopening the microphone (\(reason))")
+        replaceEngine()
+        restart()
     }
 
     /// The default input changed (a headset, a display, sleep): the engine has stopped. Start a fresh one on the new
@@ -262,18 +338,39 @@ final class AudioRecorder: @unchecked Sendable {
         // device unplugged, a new format) stops the engine first.
         guard !engine.isRunning else { return }
         let wasRunning = running
+        replaceEngine()
+        if wasRunning { restart() }
+    }
+
+    /// Drops the engine (stopped, or half-started on a device that went away) for a fresh one on the current devices.
+    private func replaceEngine() {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         running = false
+        openDevice = nil
+        watchdog?.invalidate()
+        watchdog = nil
         lock.withLock { preroll.removeAll() }
         engine = AVAudioEngine()
         observeConfiguration()
-        guard wasRunning else { return }
-        if lock.withLock({ capturing }) {
-            do { try startEngine() } catch { NSLog("VoiceTools: microphone didn't restart after a device change: \(error)") }
-        } else if keepOpen != .off {
-            try? startEngine()
-            settle()
+    }
+
+    /// Reopens the microphone after a device change, for the take in progress or to keep it open. A device that's
+    /// just connected (or a headset switching to call mode) can take a moment to report a usable format.
+    private func restart(attempt: Int = 1) {
+        guard !running else { return }
+        let inTake = lock.withLock { capturing }
+        guard inTake || keepOpen != .off else { return }
+        do {
+            try startEngine()
+            if !inTake { settle() }
+        } catch {
+            guard attempt < 5 else {
+                NSLog("VoiceTools: microphone didn't restart after a device change: \(error)")
+                return
+            }
+            replaceEngine()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.restart(attempt: attempt + 1) }
         }
     }
 
@@ -298,6 +395,7 @@ final class AudioRecorder: @unchecked Sendable {
         let block = Array(UnsafeBufferPointer(start: channel, count: Int(out.frameLength)))
 
         let inTake = lock.withLock {
+            lastBuffer = ProcessInfo.processInfo.systemUptime
             guard capturing else {
                 // Between takes: keep only the last half second or so.
                 preroll.append(contentsOf: block)
@@ -312,6 +410,16 @@ final class AudioRecorder: @unchecked Sendable {
         if inTake, let onLevel {
             let rms = sqrt(block.reduce(0) { $0 + $1 * $1 } / Float(block.count))
             onLevel(min(1, rms * 12))
+        }
+    }
+}
+
+enum RecorderError: LocalizedError {
+    case noFormat
+
+    var errorDescription: String? {
+        switch self {
+        case .noFormat: "The microphone isn't ready (it may be connecting or switching). Try again in a moment."
         }
     }
 }

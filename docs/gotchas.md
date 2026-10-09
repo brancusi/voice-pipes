@@ -68,8 +68,22 @@ that times `start()` → first tap buffer.
 
 **Picking a mic posts `AVAudioEngineConfigurationChange`.** Setting `kAudioOutputUnitProperty_CurrentDevice` on the
 input node's audio unit posts the notification ~170 ms later with the engine still running; rebuilding on it looped
-forever and recorded nothing. → Ignore it while `engine.isRunning`: a real change (unplugged, new format) stops the
-engine first.
+forever and recorded nothing. → Ignore it while `engine.isRunning`. A change to the *named* device (new sample rate,
+a headset switching modes) often posts nothing at all and the tap just stops: see the next entry.
+
+**A named mic needs its own format and a watchdog (1.16.2).** After `CurrentDevice` is set, the input node's
+`outputFormat(forBus: 0)` keeps the previous (system) device's rate and channels, and the input unit can't convert
+rates: tapping in it recorded 0 samples whenever the two rates differed (AirPods as the system input at 16–24 kHz,
+the MacBook mic at 48 kHz). → Tap with `inputFormat(forBus: 0)`, the device's own format. Changing the open device's
+rate mid-take also stopped the tap with no notification → `AudioRecorder` reopens when no buffer has arrived for 0.75 s
+(buffers come every ~20 ms; the clock starts after `engine.start()` returns), before a take if the open mic has gone
+quiet, and when Core Audio's device list or default input changes the device a setting resolves to. Reproduce
+without a headset by changing a mic's nominal sample rate (`kAudioDevicePropertyNominalSampleRate`) and back.
+
+**`installTap` raises on a stale format, and Swift can't catch it.** "Failed to create tap due to format mismatch" is
+an `NSException`: uncaught, the app aborts (the 1.16.0 and 1.16.1 crashes on unplugging a headset). → `installTap` runs
+inside `ObjCExceptions.catching` (a small Objective-C target), formats with 0 Hz or no channels are refused, and a
+failed restart retries a few times 0.4 s apart while the device settles.
 
 **History in SQLite (1.9.0).** The JSON file was rewritten whole on every run and lived in memory. → `history.sqlite`
 via the system `SQLite3` module (no package). Measured with 50,000 runs (164 MB): 0.2 ms to add a run, 2 ms for a page,
