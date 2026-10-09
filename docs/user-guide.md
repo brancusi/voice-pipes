@@ -270,6 +270,13 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   them in call mode, so a track set to a headset starts a moment after you press; a track on the laptop's mic stays
   instant. Every mic an enabled track uses is kept ready. Same as `input` and `microphone` under `[settings]` in
   config.toml, and `input = "…"` in a track's microphone block; `vp inputs` lists the names.
+- **Archive** — **Save every run as text** keeps a plain-text copy of every run beside History: one Markdown file
+  per day (`2026-10-09.md`) in the folder you choose (**Choose…**; default `~/Documents/Voice Pipes`). Each run gets
+  its time and track, the microphone, the app in front when you pressed, how long you spoke, how long it took, the
+  models it used, then the text, and what transcription heard when a later step changed it. Off by default; turning
+  it on starts from that moment, not from the start of History. Runs are written as they finish. If the folder can't
+  be written (a drive unplugged, say), the status line says so and the missed runs are written once it can, within a
+  minute. Same as `[settings.archive] enabled` and `folder` in config.toml.
 - **Updates** — version and **Check now**. The bar along the bottom of the main window shows the same: the version,
   *up to date* (hover for when it last checked) with **Check now**, or *x.y.z available* with **Install…**.
   The menu bar panel's last line shows it too.
@@ -374,6 +381,7 @@ what changed and opens a single new or changed block, so you can watch a track b
 | `~/.config/voice-pipes/vocabulary.toml` | The Vocabulary list |
 | `~/.config/voice-pipes/backups/` | Earlier versions of both |
 | `~/Library/Application Support/VoiceTools/history.sqlite` | History: every run's text, what was heard, timings and log, kept for good. **Clear history…** empties it. (`history.json` beside it is the pre-1.9 history, imported once and kept as a backup) |
+| Your archive folder (Setup → Archive) | One Markdown file a day of every run, when **Save every run as text** is on |
 | `~/Library/Application Support/VoiceTools/tracks.json`, `vocabulary.json` | Last-good copies the app falls back on |
 | `~/Library/Application Support/VoiceTools/models-cache.json` | OpenRouter's model list (refreshed daily) |
 | `~/Library/Application Support/VoiceTools/control.sock` | How `vp` talks to the app (only you can open it) |

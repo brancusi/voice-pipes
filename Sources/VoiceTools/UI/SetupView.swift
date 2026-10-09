@@ -16,6 +16,7 @@ struct SetupView: View {
                     VPSection("Command line and agents") { Card { CommandLineCard(store: app.store) } }.vpSetupSection("cli")
                     onThisMac.vpSetupSection("models")
                     microphoneSection.vpSetupSection("microphone")
+                    archiveSection.vpSetupSection("archive")
                     appearanceSection.vpSetupSection("appearance")
                     ReadingSettingsSection(app: app).vpSetupSection("reading")
                     updatesSection.vpSetupSection("updates")
@@ -35,7 +36,7 @@ struct SetupView: View {
     }
 
     /// `vp open setup --section <name>`.
-    static let sections = ["checks", "connections", "cli", "models", "microphone", "appearance", "reading", "updates"]
+    static let sections = ["checks", "connections", "cli", "models", "microphone", "archive", "appearance", "reading", "updates"]
 
     private func takeRequest(_ proxy: ScrollViewProxy) {
         guard let section = UINav.shared.setupSection else { return }
@@ -160,6 +161,74 @@ struct SetupView: View {
                 .padding(16)
             }
         }
+    }
+
+    private var archiveSection: some View {
+        let settings = app.store.archive
+        let enabled = Binding { settings.enabled } set: { app.store.archive.enabled = $0 }
+        return VStack(alignment: .leading, spacing: 6) {
+            SectionLabel("Archive")
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Save every run as text").font(VPFont.bodyStrong)
+                            Text("A Markdown file a day (YYYY-MM-DD.md): the time, track, microphone, app, models and the text. A backup beside History, readable anywhere.")
+                                .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 16)
+                        Toggle("Save every run as text", isOn: enabled).labelsHidden().toggleStyle(.vpSwitch)
+                    }
+                    Hairline().padding(.vertical, 6)
+                    Text("Folder").font(VPFont.bodyStrong)
+                    HStack(spacing: 10) {
+                        Text(settings.folder).font(VPFont.caption).lineLimit(1).truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Choose…") { chooseArchiveFolder() }.buttonStyle(.vpSecondary)
+                        Button("Show in Finder") {
+                            let url = settings.folderURL
+                            if FileManager.default.fileExists(atPath: url.path) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                        }
+                        .buttonStyle(.vpSecondary)
+                        .disabled(!FileManager.default.fileExists(atPath: settings.folderURL.path))
+                    }
+                    if settings.enabled {
+                        HStack(spacing: 8) {
+                            StatusCode(level: archiveStatus.0)
+                            Text(archiveStatus.1).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private var archiveStatus: (Check.Level, String) {
+        switch app.archive.status {
+        case .off: (.info, "off")
+        case .waiting: (.info, "on · writes after your next run")
+        case .wrote(let file, let at): (.ok, "wrote \(file) \(at.shortAgo)")
+        case .failed(let error): (.problem, "can't write: \(error) · retries every minute")
+        }
+    }
+
+    private func chooseArchiveFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use folder"
+        panel.message = "Where Voice Pipes saves a text copy of every run"
+        let current = app.store.archive.folderURL
+        panel.directoryURL = FileManager.default.fileExists(atPath: current.path) ? current : current.deletingLastPathComponent()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Written with ~ when it's under your home folder, so config.toml reads well and travels between Macs.
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = url.path
+        app.store.archive.folder = path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
     }
 
     private var appearanceSection: some View {

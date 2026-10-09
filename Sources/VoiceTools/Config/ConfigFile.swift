@@ -9,6 +9,7 @@ struct AppConfig: Equatable {
     var input = AudioInputs.system
     var reading = ReadingSettings()
     var agents = AgentSettings()
+    var archive = ArchiveSettings()
     var tracks: [Track]
 }
 
@@ -295,6 +296,7 @@ enum ConfigFile {
         var input = AudioInputs.system
         var reading = ReadingSettings()
         var agents = AgentSettings()
+        var archive = ArchiveSettings()
         if case .table(let settingsTable)? = top.raw("settings") {
             var settings = TableReader(settingsTable, path: "settings")
             if let a = settings.choice("appearance", AppearanceChoice.allCases.map(\.rawValue)) { appearance = AppearanceChoice(rawValue: a) ?? .auto }
@@ -318,7 +320,16 @@ enum ConfigFile {
                 a.finish(known: ["read_aloud", "long_text"])
                 settings.issues += a.issues
             }
-            settings.finish(known: ["appearance", "microphone", "input", "reading", "agents"])
+            if case .table(let archiveTable)? = settings.raw("archive") {
+                var a = TableReader(archiveTable, path: "settings.archive")
+                if let on = a.bool("enabled") { archive.enabled = on }
+                if let folder = a.string("folder") {
+                    if folder.trimmingCharacters(in: .whitespaces).isEmpty { a.error("folder", "should be a folder's path, e.g. \"\(ArchiveSettings.defaultFolder)\"") } else { archive.folder = folder }
+                }
+                a.finish(known: ["enabled", "folder"])
+                settings.issues += a.issues
+            }
+            settings.finish(known: ["appearance", "microphone", "input", "reading", "agents", "archive"])
             top.issues += settings.issues
         } else if root["settings"] != nil {
             top.error("settings", "should be a table: [settings]")
@@ -343,7 +354,7 @@ enum ConfigFile {
 
         let errors = top.issues.filter { $0.severity == .error }
         let warnings = top.issues.filter { $0.severity == .warning }
-        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, input: input, reading: reading, agents: agents, tracks: tracks) : nil, errors: errors, warnings: warnings)
+        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, input: input, reading: reading, agents: agents, archive: archive, tracks: tracks) : nil, errors: errors, warnings: warnings)
     }
 
     /// [settings.reading]: when the HUD takes the keyboard, click-away, its keys, and [settings.reading.global].
@@ -592,6 +603,9 @@ enum ConfigFile {
         out += "\n[settings.agents]  # what agents (Claude Code, Codex, …) read aloud to you without being asked\n"
         out += "read_aloud = \(quote(config.agents.readAloud.rawValue))  # off | long (summaries, reports) | attention (long text + anything that needs you) | all\n"
         out += "long_text = \(config.agents.longText)  # characters; longer than this counts as long\n"
+        out += "\n[settings.archive]  # a plain-text copy of every run: one Markdown file per day (YYYY-MM-DD.md)\n"
+        out += "enabled = \(config.archive.enabled)\n"
+        out += "folder = \(quote(config.archive.folder))  # where the files go; ~ is your home folder\n"
         out += writeReading(config.reading)
         for track in tracks { out += "\n" + write(track) }
         out += "\n" + reference
@@ -853,6 +867,8 @@ enum ConfigFile {
         #                        input = "system" | a mic's name (`vp inputs`): which mic tracks record from
         #    [settings.agents]   read_aloud = off | long | attention | all · long_text = characters (default 600)
         #                        what agents read aloud without being asked (`vp agents read-aloud <mode>` sets it)
+        #    [settings.archive]  enabled = true | false · folder = a path (default "~/Documents/Voice Pipes")
+        #                        a Markdown file a day of every run: time, track, mic, app, models, text
         #    [settings.reading]  take_keys = always | hover | click | never · click_away = keep-reading | stop
         #                        stop, pause, next, previous, slower, faster, start, end = lists of keys, e.g.
         #                        faster = ["l", "equal"]  (only while the HUD has the keyboard)

@@ -27,6 +27,15 @@ final class TrackStore {
         didSet { if !applyingFile, input != oldValue { save() } }
     }
 
+    /// The plain-text archive of every run ([settings.archive]); Setup edits it.
+    var archive = ArchiveSettings() {
+        didSet {
+            guard archive != oldValue else { return }
+            if !applyingFile { save() }
+            onArchiveChanged(archive)
+        }
+    }
+
     /// Keyboard control while reading ([settings.reading]); Setup edits it, the file can too.
     var reading = ReadingSettings() {
         didSet { if !applyingFile, reading != oldValue { save() } }
@@ -38,6 +47,8 @@ final class TrackStore {
     @ObservationIgnored var onIssuesChanged: () -> Void = {}
     /// After an outside edit to config.toml applies: what changed in each track that was already there.
     @ObservationIgnored var onExternalChanges: ([Track.ID: Track.Changes]) -> Void = { _ in }
+    /// Called when [settings.archive] changes, from Setup or the file (AppState's archive applies it).
+    @ObservationIgnored var onArchiveChanged: (ArchiveSettings) -> Void = { _ in }
 
     let fileURL: URL
     let configURL: URL
@@ -64,6 +75,7 @@ final class TrackStore {
         var loadedAgents = AgentSettings()
         var loadedMicrophone = MicReadiness.always
         var loadedInput = AudioInputs.system
+        var loadedArchive = ArchiveSettings()
         let disk = DiskText.read(configURL)
         switch disk {
         case .text(let content):
@@ -76,6 +88,7 @@ final class TrackStore {
                 loadedAgents = config.agents
                 loadedMicrophone = config.microphone
                 loadedInput = config.input
+                loadedArchive = config.archive
             } else {
                 // A broken file at launch: run the last good tracks and leave the file for its author to fix.
                 loaded = cached ?? Track.defaults
@@ -125,6 +138,7 @@ final class TrackStore {
         agents = loadedAgents
         microphone = loadedMicrophone
         input = loadedInput
+        archive = loadedArchive
         issues = found
         diskText = text
         createdFresh = fresh
@@ -200,6 +214,7 @@ final class TrackStore {
             agents = config.agents
             microphone = config.microphone
             input = config.input
+            archive = config.archive
             applyingFile = false
             writeCache()
             if !changes.isEmpty { onExternalChanges(changes) }
@@ -344,7 +359,7 @@ final class TrackStore {
             tracks = slugged
             applyingFile = false
         }
-        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, microphone: microphone, input: input, reading: reading, agents: agents, tracks: tracks))
+        let text = ConfigFile.write(AppConfig(appearance: AppearanceChoice.current, microphone: microphone, input: input, reading: reading, agents: agents, archive: archive, tracks: tracks))
         guard text != diskText else { return }
         do {
             try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)

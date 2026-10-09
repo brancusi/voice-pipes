@@ -44,6 +44,9 @@ struct ActiveRun {
     var branchDetail: [Int: (jevMs: Int, steps: [RunRecord.StepTiming])] = [:]
     /// The run's log so far, saved with it in History.
     var log: [RunRecord.LogEntry] = []
+    /// The mic a take recorded from, and the app in front when the run started (for History and the archive).
+    var microphone: String?
+    var app = NSWorkspace.shared.frontmostApplication?.localizedName
 }
 
 @MainActor
@@ -64,6 +67,8 @@ final class AppState {
     private(set) var lassoFrame = 0
     @ObservationIgnored private var lassoTimer: Timer?
     let historyStore: HistoryStore
+    /// A plain-text copy of every run, a Markdown file a day ([settings.archive]).
+    let archive: DictationArchive
     /// The newest runs, newest first (all of them are on disk: `historyStore.database`).
     var history: [RunRecord] { historyStore.recent }
     private(set) var parakeetState: ParakeetService.State = .notLoaded
@@ -218,8 +223,11 @@ final class AppState {
     init(store: TrackStore? = nil, history: HistoryStore? = nil, startServices: Bool = true) {
         self.store = store ?? TrackStore()
         historyStore = history ?? HistoryStore()
+        archive = DictationArchive(database: historyStore.database)
         needsOnboarding = startServices && Onboarding.shouldShow(freshInstall: self.store.createdFresh)
         guard startServices else { return }
+        archive.apply(self.store.archive)
+        self.store.onArchiveChanged = { [weak self] in self?.archive.apply($0) }
         self.store.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         VocabularyStore.shared.onIssuesChanged = { [weak self] in self?.refreshChecks() }
         self.store.onExternalChanges = { [weak self] in self?.showExternalChanges($0) }
@@ -518,6 +526,7 @@ final class AppState {
             show(failure: "Microphone unavailable: \(error.localizedDescription)", for: track)
             return
         }
+        run?.microphone = recorder.deviceName
         let started = Date()
         capture = Capture(track: track, mode: mode, live: live, started: started, recorder: recorder)
         if let pause { endAtPause(pause, started: started) }
@@ -806,8 +815,11 @@ final class AppState {
             return [RunRecord.StepTiming(title: pair.0, ms: ms, category: track.steps[safe: index]?.kind.category)]
                 + (run?.branchDetail[index]?.steps ?? [])
         }
+        let spokenMs = track.steps.first?.kind.isMicrophone == true ? run?.stepMs.first ?? nil : nil
         historyStore.add(RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
-                                   heard: heard == text ? nil : heard, failure: failure, log: run?.log))
+                                   heard: heard == text ? nil : heard, failure: failure, log: run?.log,
+                                   microphone: run?.microphone, app: run?.app, spokenMs: spokenMs))
+        archive.write()
         return total
     }
 

@@ -192,6 +192,21 @@ final class HistoryDatabase: @unchecked Sendable {
         return n ?? nil
     }
 
+    /// Runs after a `seq`, oldest first (the text archive catching up).
+    func runs(after seq: Int64) -> [(seq: Int64, record: RunRecord)] {
+        (try? locked {
+            try select("SELECT seq, record FROM runs WHERE seq > ? ORDER BY seq", [.int(seq)]) { ($0.int(0), $0.text(1)) }
+        })?.compactMap { seq, json in
+            (try? decoder.decode(RunRecord.self, from: Data(json.utf8))).map { (seq, $0) }
+        } ?? []
+    }
+
+    /// The newest run's `seq` (0 when History is empty).
+    func lastSeq() -> Int64 {
+        let n = try? locked { try select("SELECT coalesce(max(seq), 0) FROM runs", []) { $0.int(0) }.first }
+        return (n ?? nil) ?? 0
+    }
+
     /// Runs since a moment, newest first (usage totals).
     func runs(since date: Date) -> [RunRecord] {
         let rows = (try? locked {

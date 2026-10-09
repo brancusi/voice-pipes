@@ -138,6 +138,8 @@ final class AudioRecorder: @unchecked Sendable {
     private var coolDown: DispatchWorkItem?
     /// The device the engine records from, and the check that it still delivers audio.
     private var openDevice: AudioDeviceID?
+    /// The name of the mic last opened (what a take records from), for History.
+    private(set) var deviceName: String?
     private var watchdog: Timer?
     /// Reopens in a row that didn't bring audio back; the watchdog gives up after a few (a device that's gone dead).
     private var silentReopens = 0
@@ -264,6 +266,7 @@ final class AudioRecorder: @unchecked Sendable {
         lock.withLock { lastBuffer = ProcessInfo.processInfo.systemUptime }
         running = true
         openDevice = device.id
+        deviceName = device.name
         startWatchdog()
     }
 

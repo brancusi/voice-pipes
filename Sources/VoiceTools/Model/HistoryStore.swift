@@ -27,6 +27,12 @@ struct RunRecord: Codable, Identifiable, Hashable {
     var failure: String?
     /// Exactly how the run went, step by step (runs from 1.7.2 on; older runs have none).
     var log: [LogEntry]?
+    /// The microphone the take recorded from, by name (runs from 1.17.0 on that started with a microphone).
+    var microphone: String?
+    /// The app in front when the run started: where a dictation went (runs from 1.17.0 on).
+    var app: String?
+    /// How long you spoke (runs from 1.17.0 on that started with a microphone).
+    var spokenMs: Int?
 
     /// One step as it ran: what went in and came out, how long it took, what it cost, and for a Branch or Route
     /// what Jev chose.

@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.0**
+- **Keep a plain-text copy of every dictation.** Turn on **Setup → Archive → Save every run as text** and Voice Pipes writes each run to a Markdown file for the day (like `2026-10-09.md`) in a folder you choose. Each entry has the time, the track, the microphone, the app you were in, how long you spoke, how long it took, the models it used, and the text, plus what was first heard if a later step changed it. The files open in any text editor and are easy to search, sync or back up.
+- It's off until you turn it on, and starts from that moment. Runs are written as soon as they finish. If the folder can't be written for a while (an unplugged drive, for example), Setup says so, and the missed runs are written once it's back, so none are lost.
+- History now also remembers which microphone each take used and which app was in front.
+
 **1.16.4**
 - **The HUD now shows when the microphone is actually listening.** Bluetooth headphones like AirPods need almost a second to switch into microphone mode, and anything said in that time was lost while the HUD already showed REC. Now the HUD shows "MIC waking up" until sound comes through, then REC: start talking when you see REC. Wired and built-in mics are kept open, so they go straight to REC as before.
 

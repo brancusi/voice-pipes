@@ -19,6 +19,15 @@ enum ConfigSchema {
           "additionalProperties": false,
           "properties": {
             "appearance": { "enum": ["auto", "daylight", "sundown"], "default": "auto", "description": "auto follows macOS; the HUD stays dark either way." },
+            "archive": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "A plain-text copy of every run: one Markdown file per day (YYYY-MM-DD.md) with the time, track, microphone, app, models and text.",
+              "properties": {
+                "enabled": { "type": "boolean", "default": false },
+                "folder": { "type": "string", "minLength": 1, "default": "~/Documents/Voice Pipes", "description": "Where the files go; ~ is your home folder." }
+              }
+            },
             "input": { "type": "string", "minLength": 1, "default": "system", "description": "Which mic tracks record from: \"system\" (follows macOS) or a mic's name (`vp inputs`). A track's Microphone block can name its own." },
             "microphone": { "enum": ["always", "after-use", "off"], "default": "always", "description": "Keep the microphone open between takes so a take starts instantly and keeps the half second before the press: always, for 5 minutes after each take, or off (opened per take). Bluetooth mics are never kept open." }
           }
