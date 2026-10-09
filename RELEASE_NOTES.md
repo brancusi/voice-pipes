@@ -5,6 +5,7 @@ Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-trig
 - **Fixed: the app could crash when you took out headphones or the audio devices changed.** It now waits a moment for the new device and carries on.
 - If the open microphone stops sending sound (its device changed underneath it), it reopens on its own within a second, mid-take or between takes. If you plug a chosen mic back in, it's picked up again.
 - **Voice Pipes is now open source**, under the MIT licence, at github.com/brancusi/voice-pipes.
+- **Install this one by hand, once.** Updates are now signed with a new key, so 1.16.1 can't install it on its own: download the DMG from voicepipes.app or the releases page and drag it into Applications. Your tracks, settings and permissions stay as they are, and later updates install themselves again.
 
 **1.16.1**
 - Fixed: while recording takes, the "REC", take number and timer no longer break onto several lines. When there's no room they're dropped instead (take number first, then the level meter), and the buttons keep their size.

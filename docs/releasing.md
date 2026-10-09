@@ -85,7 +85,7 @@ permission re-grant.
 
 | What | Where | Used for |
 |---|---|---|
-| `SPARKLE_ED_PRIVATE_KEY` | Actions secret + your password manager | Signing update zips. Public half: `UPDATE_PUBLIC_KEY` (built into the app). Made once with `Tools/make_update_key.swift`. **If lost**, make a new pair and everyone reinstalls by hand once. |
+| `SPARKLE_ED_PRIVATE_KEY` | Actions secret + your password manager | Signing update zips (replaced in 1.16.2; earlier versions trust the old key). Public half: `UPDATE_PUBLIC_KEY` (built into the app). Made once with `Tools/make_update_key.swift`. **If lost**, make a new pair and everyone reinstalls by hand once. |
 | `DEVID_CERT_P12` (base64) + `DEVID_CERT_PASSWORD` | Actions secrets + your password manager | Code signing with Developer ID. Keep using the same certificate (valid until 2031; renewing from the same team keeps the requirement). |
 | `NOTARY_KEY_P8` + `NOTARY_KEY_ID` + `NOTARY_ISSUER_ID` | Actions secrets; `.p8` in your password manager | Notarization (App Store Connect Team Key "Voice Pipes notarization", Developer role). Can be revoked and replaced any time. |
 | `SIGNING_CERT_P12` + `SIGNING_CERT_PASSWORD` | Actions secrets | The old self-signed certificate (to 0.9.1). Unused; kept as a backup. |
