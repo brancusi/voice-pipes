@@ -9,7 +9,7 @@ import Foundation
 /// Takes are sentences with the word in them, and only the part of the transcript where the word was is kept: said on
 /// its own, a word gets misheard in ways real dictation never produces (Parakeet is multilingual, and a lone word
 /// often comes back in another language). Measured 2026-10-05 on seven terms × 42 voices: sentences found the
-/// mishearings from real dictation as well as lone words did, with far fewer stray ones (docs/research.md).
+/// mishearings from real dictation as well as lone words did, with far fewer stray ones.
 struct VocabularyTrainer {
     /// One recorded take and the sentence that was read.
     struct Take {

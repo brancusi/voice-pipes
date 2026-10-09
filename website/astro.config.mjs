@@ -5,7 +5,7 @@ import { defineConfig, fontProviders } from 'astro/config';
 export default defineConfig({
   // The canonical origin; Base.astro builds each page's canonical link from it.
   site: 'https://voicepipes.app',
-  // /features/speed → features/speed.html, served at the slash-less URLs in docs/website/copy-and-sitemap.md
+  // /features/speed → features/speed.html, served at slash-less URLs
   // without a redirect (Cloudflare's default html_handling, auto-trailing-slash, maps them).
   build: { format: 'file', inlineStylesheets: 'always' },
   trailingSlash: 'never',

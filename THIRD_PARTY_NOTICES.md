@@ -3,8 +3,8 @@
 Voice Pipes includes the following open-source software. The app's own code is under the MIT licence (LICENSE).
 
 On-device speech models are downloaded on first use, not shipped with the app, and are covered by their own
-licences on their model cards: NVIDIA Parakeet TDT v3 (speech recognition, CC-BY-4.0), Kyutai Pocket TTS and
-Supertonic-3 (read-aloud voices), converted to Core ML by FluidInference.
+licences on their model cards: NVIDIA Parakeet TDT v3 (speech recognition, CC-BY-4.0), Kyutai Pocket TTS
+(CC-BY-4.0) and Supertonic-3 (OpenRAIL++) for read-aloud, converted to Core ML by FluidInference.
 
 The Silkscreen font (The Silkscreen Project Authors) is under the SIL Open Font License 1.1: see Fonts/OFL.txt.
 

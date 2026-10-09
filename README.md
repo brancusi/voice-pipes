@@ -65,10 +65,8 @@ command-line tool), runs tracks, speaks, listens, transcribes and manages keys, 
 | [User guide](docs/user-guide.md) | Tracks, triggers, every building block, Vocabulary and training, the HUD, Setup |
 | [Architecture](docs/architecture.md) | How the code is organised and how a track runs, file by file |
 | [Building and releasing](docs/releasing.md) | Local builds, signing, the release pipeline, secrets and keys |
-| [Research and benchmarks](docs/research.md) | Every model comparison and measurement behind the defaults |
 | [Gotchas](docs/gotchas.md) | macOS, OpenRouter, FluidAudio and Jev lessons learned the hard way |
-| [Brand](docs/brand.md) | The cowboy-hacker direction: Sundown palette, type, the pixel mark and icons, the Wrangler, and links to the design artifacts |
-| [Website](docs/website/README.md) | The marketing site plan: copy, sitemap, design and the facts it needs |
+| [Website](website/README.md) | The voicepipes.app site: build, deploy, writing docs and blog posts |
 | [Release notes](RELEASE_NOTES.md) | What changed in each version |
 
 ## Build
@@ -86,13 +84,16 @@ Microphone and Accessibility again and has its own Keychain entries.
 
 ## Repositories
 
-- [`brancusi/voice-tools`](https://github.com/brancusi/voice-tools) — this source.
+- [`brancusi/voice-pipes`](https://github.com/brancusi/voice-pipes) — this source.
 - [`brancusi/voice-tools-releases`](https://github.com/brancusi/voice-tools-releases) (public) — release zips and
   the update feed only.
 
 ## License
 
 MIT — see [LICENSE](LICENSE). Bundled dependencies and fonts keep their own licences, listed in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The on-device speech models (NVIDIA Parakeet, Kyutai Pocket TTS,
-Supertonic-3, via [FluidAudio](https://github.com/FluidInference/FluidAudio)) are downloaded on first use and are
-covered by their model cards' licences.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). 
+## Third-party models
+
+Voice Pipes downloads its on-device models on first use; none are bundled. Parakeet TDT v3 (NVIDIA, CC-BY-4.0),
+Pocket TTS (Kyutai, CC-BY-4.0) and Supertonic-3 (OpenRAIL++), via [FluidAudio](https://github.com/FluidInference/FluidAudio)'s
+Core ML conversions. Check each licence before commercial use.

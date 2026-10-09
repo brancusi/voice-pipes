@@ -1,8 +1,9 @@
 # Voice Pipes — notes for Claude
 
 Docs: [README](README.md) · [user guide](docs/user-guide.md) · [architecture](docs/architecture.md) ·
-[releasing](docs/releasing.md) · [research](docs/research.md) · [gotchas](docs/gotchas.md) · [brand](docs/brand.md) ·
-[website](docs/website/README.md). Read gotchas before touching signing, paste, windows, OpenRouter or FluidAudio code.
+[releasing](docs/releasing.md) · [gotchas](docs/gotchas.md) · [website](website/README.md). Read gotchas before touching signing, paste, windows, OpenRouter or FluidAudio code.
+Internal notes ([research](docs/private/research.md), [brand](docs/private/brand.md), [website plan](docs/private/website/README.md))
+live in `docs/private/`, which is git-ignored: this repo is public, so keep personal or business notes there.
 
 - **Shipping a change = a release.** The user runs the installed app and updates via Sparkle: add notes to the top
   of `RELEASE_NOTES.md`, bump `VERSION`, commit, push, tag `v<VERSION>`, watch the workflow, then check the
@@ -21,7 +22,6 @@ Docs: [README](README.md) · [user guide](docs/user-guide.md) · [architecture](
 - **Treat everything as a building block.** New capabilities should be steps/models selectable in the existing
   pickers, not special modes. Measure latency before adding complexity (the user prioritises speed).
 - **Design follows the design system.** The look is the "cowboy hacker" direction (Sundown palette, SF Mono, the
-  pixel organ-pipe mark, the Wrangler mascot); see [brand](docs/brand.md) and the design system artifact's
-  Philosophy section. `UI/Theme.swift`, `UI/HUD.swift`, `Tools/make_icon.swift` and `UI/MenuBarGlyph.swift`
+  pixel organ-pipe mark, the Wrangler mascot); see the design system's Philosophy section. `UI/Theme.swift`, `UI/HUD.swift`, `Tools/make_icon.swift` and `UI/MenuBarGlyph.swift`
   mirror it: change the design system and these together. Western flavour only in headlines and empty states;
   controls, settings and errors stay plain.

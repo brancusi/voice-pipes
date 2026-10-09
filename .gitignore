@@ -6,3 +6,18 @@ xcuserdata/
 .DS_Store
 dist/
 .cache/
+
+# Secrets: never commit
+.env*
+*.p8
+*.p12
+*.pem
+*.cer
+*.mobileprovision
+.dev.vars*
+.wrangler/
+.claude/settings.local.json
+*-update-key.txt
+
+# Internal notes (research, brand, website plan): kept locally, not published
+docs/private/

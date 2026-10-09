@@ -83,7 +83,7 @@ chain before it runs. Output steps (paste, copy, HUD) return their input so trac
   - *Streaming* — FluidAudio `SlidingWindowAsrManager` (11 s windows, 2 s context) on the already-loaded models.
 - **OpenRouter** (`OpenRouterClient.transcribe`): WAV upload, multipart, on release.
 
-[Research](research.md) has the measurements that made *On release* the default.
+Measurements made *On release* the default.
 
 ## Text-to-speech
 
@@ -158,8 +158,8 @@ local FluidAudio checkout for model benchmarks. Views can be checked by renderin
 
 ## Look
 
-The UI follows the Voice Pipes design system; [brand](brand.md) maps its tokens, icons and mascot to the files
-that implement them.
+The UI follows the Voice Pipes design system (Sundown palette, SF Mono, the pixel organ-pipe mark, the Wrangler);
+`UI/Theme.swift`, `UI/HUD.swift`, `UI/MenuBarGlyph.swift` and `Tools/make_icon.swift` implement it.
 
 ## Driving the UI from vp
 

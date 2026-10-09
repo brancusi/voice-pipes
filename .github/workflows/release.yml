@@ -35,7 +35,7 @@ jobs:
   build:
     runs-on: macos-15          # Apple silicon runner
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Version
         id: v
@@ -52,7 +52,7 @@ jobs:
           [[ "$(cat VERSION)" == "${{ steps.v.outputs.version }}" ]] \
             || { echo "Tag v${{ steps.v.outputs.version }} doesn't match VERSION ($(cat VERSION))." >&2; exit 1; }
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .build
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
@@ -96,11 +96,12 @@ jobs:
           VERSION="${{ steps.v.outputs.version }}" ./build.sh
 
       # Manual runs only (an unsigned test build); tag builds go to the releases repo.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           name: Voice-Pipes-${{ steps.v.outputs.version }}-arm64
           path: dist/*
+          retention-days: 3
 
       - name: Sign the update and write its feed
         if: startsWith(github.ref, 'refs/tags/v')

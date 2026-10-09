@@ -1,13 +1,11 @@
 # Voice Pipes website
 
 The marketing site for [voicepipes.app](https://voicepipes.app): [Astro](https://astro.build), pre-rendered to plain
-HTML and CSS, served by Cloudflare Workers static assets. The plan, copy and sitemap are in
-[docs/website](../docs/website/README.md).
+HTML and CSS, served by Cloudflare Workers static assets.
 
 **Status: live at [voicepipes.app](https://voicepipes.app)** (home, `/setup`, `/docs` and `/blog`). The home page is the "Home · voicepipes" artboard
 of the Voice Pipes Website design (a Claude design canvas), built on the Voice Pipes design system (its Philosophy,
-Sundown tokens, components and logo rules) with the system's own logo and mascot files. See `docs/brand.md` for the
-direction. `/setup` is the key setup guide the app links to (`/setup#openrouter`, `/setup#jev`; keep those anchors).
+Sundown tokens, components and logo rules) with the system's own logo and mascot files. `/setup` is the key setup guide the app links to (`/setup#openrouter`, `/setup#jev`; keep those anchors).
 `/docs` is the developer docs (terminal install, the `vp` reference, config.toml, reading aloud, agents) and `/blog` the blog, both
 written in Markdown (see Writing below). The other pages in the sitemap aren't designed yet.
 
@@ -76,7 +74,7 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 - **Changelog** lists the newest four entries of `RELEASE_NOTES.md` at the repository root, summarised by each
   bullet's bold lead, so it is current after every release. The build reads `../RELEASE_NOTES.md`, so it needs the
   whole repository (as Workers Builds checks it out), not `website/` alone.
-- Figures and models on the page come from `docs/research.md` and the app's code (`Stats.astro` and `Routing.astro`
+- Figures and models on the page come from measurements and the app's code (`Stats.astro` and `Routing.astro`
   name their sources).
 
 ## Where it differs from the design
@@ -158,13 +156,12 @@ Still to set up when the site goes live:
 
 ## Analytics
 
-The site has no tracking code of its own. **Cloudflare Web Analytics** is on for the `voicepipes.app` zone in the
-Cloudflare account that holds the zone, with automatic setup **excluding visitor data in the EU**. Cloudflare turned it on when the zone was
+The site has no tracking code of its own. **Cloudflare Web Analytics** is on for the `voicepipes.app` zone, with automatic setup **excluding visitor data in the EU**. Cloudflare turned it on when the zone was
 added (2026-10-02). For visitors outside the EU, Cloudflare injects its beacon into each HTML page and reports to
 `voicepipes.app/cdn-cgi/rum`. EU visitors get no beacon. `/privacy` describes this to visitors. **Change that page
 whenever this setting changes.**
 
-- **Where to look:** Cloudflare dashboard → the zone's account → **Web Analytics** → `voicepipes.app`. **Manage site**
+- **Where to look:** Cloudflare dashboard → **Web Analytics** → `voicepipes.app`. **Manage site**
   holds the setting.
 - **What it gives:** visits, page views, path, referrer host, country, browser, OS, device type, page load time and
   Core Web Vitals. Bots can be excluded. The dashboard keeps six months, and data older than 7 days is sampled.

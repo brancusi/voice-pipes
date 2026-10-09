@@ -123,8 +123,8 @@ On-device models download once on first use and load when the app starts if a tr
 | Model | Kind | Size | Notes |
 |---|---|---|---|
 | Parakeet v3 | transcription | ~460 MB | ~50–150 ms after you stop speaking |
-| Pocket TTS | speech | ~770 MB | Streams: first sound in ~20 ms. 26 voices. Kyutai research licence — check before commercial use. |
-| Supertonic-3 | speech | ~100 MB + voices | ~80× faster than real time. 10 voices (Female/Male 1–5). Apache-2.0. |
+| Pocket TTS | speech | ~770 MB | Streams: first sound in ~20 ms. 26 voices. CC-BY-4.0 (Kyutai). |
+| Supertonic-3 | speech | ~100 MB + voices | ~80× faster than real time. 10 voices (Female/Male 1–5). OpenRAIL++. |
 
 ## Vocabulary and Fix words
 

@@ -1,14 +1,14 @@
 # Building and releasing
 
-The pipeline mirrors Media Utilities (`another project`): tag → GitHub Actions build → signed zip + Sparkle
+The pipeline: tag → GitHub Actions build → signed zip + Sparkle
 feed published to a public releases repo → installed copies update themselves.
 
 ## Local builds
 
 ```sh
 DEV=1 ./build.sh                                   # build/Voice Pipes.app — rebuilds over itself
-SIGN_IDENTITY="Developer ID Application: Aram Zadikian (7F3RGY9LG8)" DEV=1 ./build.sh   # signed like releases (shares their permissions)
-# add NOTARY_KEY_PATH=~/keys/AuthKey_<KEYID>.p8 NOTARY_KEY_ID=… NOTARY_ISSUER_ID=… to notarize too
+SIGN_IDENTITY="Developer ID Application: <Name> (<TEAMID>)" DEV=1 ./build.sh   # signed like releases (shares their permissions)
+# add NOTARY_KEY_PATH=/path/to/AuthKey_<KEYID>.p8 NOTARY_KEY_ID=… NOTARY_ISSUER_ID=… to notarize too
 ./build.sh                                         # dist/Voice-Pipes-<VERSION>-arm64.zip and dist/Voice-Pipes-<VERSION>.dmg (+ .sha256s); never overwrites
 ```
 
@@ -86,8 +86,8 @@ permission re-grant.
 | What | Where | Used for |
 |---|---|---|
 | `SPARKLE_ED_PRIVATE_KEY` | Actions secret + your password manager | Signing update zips. Public half: `UPDATE_PUBLIC_KEY` (built into the app). Made once with `Tools/make_update_key.swift`. **If lost**, make a new pair and everyone reinstalls by hand once. |
-| `DEVID_CERT_P12` (base64) + `DEVID_CERT_PASSWORD` | Actions secrets + your password manager (`~/keys/VoiceTools-DeveloperID.p12` + `p12-password`) | Code signing with Developer ID. Keep using the same certificate (valid until 2031; renewing from the same team keeps the requirement). |
-| `NOTARY_KEY_P8` + `NOTARY_KEY_ID` + `NOTARY_ISSUER_ID` | Actions secrets; `.p8` in `~/keys/` + your password manager | Notarization (App Store Connect Team Key "Voice Pipes notarization", Developer role). Can be revoked and replaced any time. |
+| `DEVID_CERT_P12` (base64) + `DEVID_CERT_PASSWORD` | Actions secrets + your password manager | Code signing with Developer ID. Keep using the same certificate (valid until 2031; renewing from the same team keeps the requirement). |
+| `NOTARY_KEY_P8` + `NOTARY_KEY_ID` + `NOTARY_ISSUER_ID` | Actions secrets; `.p8` in your password manager | Notarization (App Store Connect Team Key "Voice Pipes notarization", Developer role). Can be revoked and replaced any time. |
 | `SIGNING_CERT_P12` + `SIGNING_CERT_PASSWORD` | Actions secrets | The old self-signed certificate (to 0.9.1). Unused; kept as a backup. |
 | `RELEASES_TOKEN` | Actions secret | Fine-grained PAT, Contents read/write on `brancusi/voice-tools-releases` only. Releases stop publishing when it expires. |
 | OpenRouter key | Keychain `io.github.brancusi.voice-tools` / `openrouter` (set in the app) | Cloud transcription, LLM, speech. |
