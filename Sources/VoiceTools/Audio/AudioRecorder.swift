@@ -126,8 +126,11 @@ final class AudioRecorder: @unchecked Sendable {
     private var samples: [Float] = []
     private var preroll: [Float] = []
     private var capturing = false
-    /// When the microphone last delivered audio (system uptime).
+    /// When the microphone last delivered audio, and last delivered sound rather than digital silence (system uptime).
     private var lastBuffer: TimeInterval = 0
+    private var lastSound: TimeInterval = 0
+    /// Whether this take's `onLive` has been sent.
+    private var liveSent = false
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate,
                                              channels: 1, interleaved: false)!
     // Main thread only.
@@ -146,6 +149,10 @@ final class AudioRecorder: @unchecked Sendable {
     var onSamples: (@Sendable ([Float]) -> Void)?
     /// Normalized input level (0...1) for the HUD meter.
     var onLevel: (@Sendable (Float) -> Void)?
+    /// Once per take, when the microphone is actually hearing: at once for a mic that's already open, or when a cold
+    /// one sends its first sound. A Bluetooth headset sends ~0.5 s of digital silence while it switches to call mode
+    /// (~0.8 s from the press for AirPods), and anything said before this is lost.
+    var onLive: (@Sendable () -> Void)?
 
     /// What happens between takes. Off for recorders other than the app's own; set on the main thread.
     var readiness: MicReadiness = .off {
@@ -176,13 +183,16 @@ final class AudioRecorder: @unchecked Sendable {
         // take records. A live one delivers a buffer every ~20 ms.
         if running, lock.withLock({ ProcessInfo.processInfo.systemUptime - lastBuffer }) > Self.silentLimit { stopEngine() }
         if !running { try startEngine() }
-        lock.withLock {
+        let live = lock.withLock {
             let keep = Int(Self.sampleRate * Self.prerollSeconds)
             samples = Array(preroll.suffix(keep))
             preroll.removeAll(keepingCapacity: true)
             capturing = true
             if !samples.isEmpty { onSamples?(samples) }
+            liveSent = ProcessInfo.processInfo.systemUptime - lastSound < 0.25
+            return liveSent
         }
+        if live { onLive?() }
     }
 
     /// Returns what's been recorded since the last cut and keeps recording (for back-to-back takes).
@@ -344,8 +354,12 @@ final class AudioRecorder: @unchecked Sendable {
         guard error == nil, let channel = out.floatChannelData?[0], out.frameLength > 0 else { return }
         let block = Array(UnsafeBufferPointer(start: channel, count: Int(out.frameLength)))
 
+        let sound = block.contains { abs($0) > 1e-6 }
+        var nowLive = false
         let inTake = lock.withLock {
-            lastBuffer = ProcessInfo.processInfo.systemUptime
+            let now = ProcessInfo.processInfo.systemUptime
+            lastBuffer = now
+            if sound { lastSound = now }
             guard capturing else {
                 // Between takes: keep only the last half second or so.
                 preroll.append(contentsOf: block)
@@ -355,8 +369,10 @@ final class AudioRecorder: @unchecked Sendable {
             }
             samples.append(contentsOf: block)
             onSamples?(block)
+            if sound, !liveSent { liveSent = true; nowLive = true }
             return true
         }
+        if nowLive { onLive?() }
         if inTake, let onLevel {
             let rms = sqrt(block.reduce(0) { $0 + $1 * $1 } / Float(block.count))
             onLevel(min(1, rms * 12))

@@ -62,7 +62,12 @@ as the device takes to start: ~430 ms for the Studio Display mic, ~40 ms for the
 arrives ~100 ms after that. With a cold mic the first word was clipped. → `AudioRecorder` keeps the mic
 open between takes (`[settings] microphone`, default `always`) and adds the last 0.5 s from before the press,
 which gives a 0 ms start. `pause()` doesn't help (still ~550 ms). Bluetooth inputs are never kept open, because an
-open Bluetooth mic holds the headset in call mode. A default-device change reopens on the new device. Bench with a scratch binary
+open Bluetooth mic holds the headset in call mode, so a Bluetooth take starts cold: AirPods measured 30–50 ms to open,
+~290 ms to the first buffer, then ~0.5 s of exact zeros while they switch to call mode, so ~800 ms to the first sound
+(~65 ms if they're still in call mode, which lasts a few seconds after a take). → `AudioRecorder.onLive` fires on a
+take's first non-silent block (at once when the open mic was already hearing), and the HUD shows "MIC waking up"
+until then; REC and its clock start there. Bridging the gap with another mic was considered and left out: two devices
+to splice, and some Macs have no second mic. A default-device change reopens on the new device. Bench with a scratch binary
 that times `start()` → first tap buffer.
 
 **Microphones open through the HAL unit, not `AVAudioEngine` (1.16.3).** On macOS an engine's input node shares one

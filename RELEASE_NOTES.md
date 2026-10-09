@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.16.4**
+- **The HUD now shows when the microphone is actually listening.** Bluetooth headphones like AirPods need almost a second to switch into microphone mode, and anything said in that time was lost while the HUD already showed REC. Now the HUD shows "MIC waking up" until sound comes through, then REC: start talking when you see REC. Wired and built-in mics are kept open, so they go straight to REC as before.
+
 **1.16.3**
 - **Fixed: the app could quit when you switched to a chosen mic after using AirPods (or another headset) as the system mic.** When a headset switches between music and call mode, the chosen mic stopped hearing anything and the app crashed while reopening it. Voice Pipes now opens microphones in a way that doesn't involve the speakers or headphones at all, so a headset changing mode no longer affects a different mic.
 - Takes start a little sooner: sound now arrives about 10 ms after the microphone opens, down from about 100 ms.

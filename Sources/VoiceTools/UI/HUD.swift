@@ -265,6 +265,9 @@ struct HUDView: View {
 
     @ViewBuilder private func content(_ run: ActiveRun) -> some View {
         switch run.phase {
+        case .recording where !run.micLive:
+            // The microphone is open but not hearing yet: speaking now would be lost.
+            HUDTag(state: .waiting, label: "MIC", detail: "waking up")
         case .recording:
             // Streaming and chunked transcription show the words as they land, with a cursor; otherwise the level.
             TimelineView(.periodic(from: run.recordingStarted, by: 1)) { context in
@@ -297,7 +300,7 @@ struct HUDView: View {
 
 /// The tag itself: a colored square, a label and one detail, in monospace on a dark translucent strip.
 struct HUDTag: View {
-    enum State { case recording, processing, speaking, paused, done, failed }
+    enum State { case waiting, recording, processing, speaking, paused, done, failed }
 
     let state: State
     let label: String
@@ -343,6 +346,7 @@ struct HUDTag: View {
 
     private var color: Color {
         switch state {
+        case .waiting: Palette.hudMuted
         case .recording: Color(hex: 0xE0694A)
         case .processing: Color(hex: 0xE8C26A)
         case .speaking: Color(hex: 0xC3A3D4)

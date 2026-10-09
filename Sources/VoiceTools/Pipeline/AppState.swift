@@ -31,6 +31,9 @@ struct ActiveRun {
     /// Which model is answering (and, for a Route step, the route Jev picked), shown under the HUD tag.
     var modelInfo: String?
     var level: Float = 0
+    /// While false the microphone is still waking (a Bluetooth headset switching to call mode): the HUD says so, and
+    /// REC's clock starts when it turns true.
+    var micLive = true
     var recordingStarted = Date()
     /// When processing began (on release, or at once for tracks without a microphone).
     var processingStarted = Date()
@@ -501,6 +504,13 @@ final class AppState {
         recorder.onLevel = { [weak self] level in
             pause?.add(level)
             Task { @MainActor in self?.run?.level = level }
+        }
+        run?.micLive = false
+        recorder.onLive = { [weak self] in
+            Task { @MainActor in
+                self?.run?.micLive = true
+                self?.run?.recordingStarted = Date()
+            }
         }
         do {
             try recorder.start()
