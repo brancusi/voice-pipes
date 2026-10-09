@@ -66,6 +66,8 @@ swiftc -O "${CACHE[@]}" Tools/make_icon.swift -o "$WORK/make_icon"
 ditto Resources/Fonts "$APP/Contents/Resources/Fonts"
 # Model quality ratings for the pickers (curated per release; see Resources/model-ratings.json).
 cp Resources/model-ratings.json "$APP/Contents/Resources/model-ratings.json"
+# The app's licence and the notices its dependencies (Sparkle, FluidAudio, TOMLDecoder) require in binaries.
+cp LICENSE THIRD_PARTY_NOTICES.md "$APP/Contents/Resources/"
 
 echo "==> compile (arm64, macOS 14+)"
 swift build -c release --arch arm64

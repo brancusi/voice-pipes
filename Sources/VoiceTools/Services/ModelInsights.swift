@@ -29,7 +29,8 @@ enum ModelInsights {
     static let ratings: Ratings = {
         var urls = [Bundle.main.url(forResource: "model-ratings", withExtension: "json")]
         #if SNAPSHOTS
-        urls.append(URL(fileURLWithPath: "/path/to/voice-pipes/Resources/model-ratings.json"))
+        // The repo's copy (Sources/VoiceTools/Services/ → Resources/), for snapshot builds run outside the bundle.
+        urls.append(URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../Resources/model-ratings.json").standardized)
         #endif
         for url in urls.compactMap({ $0 }) {
             if let data = try? Data(contentsOf: url), let decoded = try? JSONDecoder().decode(Ratings.self, from: data) { return decoded }

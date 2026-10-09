@@ -69,7 +69,7 @@ npm run preview      # build, then serve dist/ with Wrangler's local Cloudflare 
 - Code blocks are plain (no highlighter). Fence commands as `sh` and they get a Copy button; fence sample output as
   `text` and they don't.
 - Docs describe the app as shipped: check commands against the CLI source (`Sources/VoiceTools/CLI/`) and
-  `Tools/install.sh`, and say which version a page matches. Don't link the private repository as documentation.
+  `Tools/install.sh`, and say which version a page matches. Link the docs pages rather than files in the source repository.
 
 ## Content that comes from the app
 
@@ -159,12 +159,12 @@ Still to set up when the site goes live:
 ## Analytics
 
 The site has no tracking code of its own. **Cloudflare Web Analytics** is on for the `voicepipes.app` zone in the
-Cloudflare account, with automatic setup **excluding visitor data in the EU**. Cloudflare turned it on when the zone was
+Cloudflare account that holds the zone, with automatic setup **excluding visitor data in the EU**. Cloudflare turned it on when the zone was
 added (2026-10-02). For visitors outside the EU, Cloudflare injects its beacon into each HTML page and reports to
 `voicepipes.app/cdn-cgi/rum`. EU visitors get no beacon. `/privacy` describes this to visitors. **Change that page
 whenever this setting changes.**
 
-- **Where to look:** Cloudflare dashboard → account Cloudflare → **Web Analytics** → `voicepipes.app`. **Manage site**
+- **Where to look:** Cloudflare dashboard → the zone's account → **Web Analytics** → `voicepipes.app`. **Manage site**
   holds the setting.
 - **What it gives:** visits, page views, path, referrer host, country, browser, OS, device type, page load time and
   Core Web Vitals. Bots can be excluded. The dashboard keeps six months, and data older than 7 days is sampled.

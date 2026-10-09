@@ -81,8 +81,18 @@ DEV=1 ./build.sh           # → build/Voice Pipes.app, for local iteration
 Needs macOS 14+ and Swift 6; the Command Line Tools are enough (no Xcode). Releases are cut by pushing a
 `v<VERSION>` tag — see [Building and releasing](docs/releasing.md).
 
+A local build isn't signed with the release Developer ID, so macOS treats it as a different app: it asks for
+Microphone and Accessibility again and has its own Keychain entries.
+
 ## Repositories
 
-- [`brancusi/voice-tools`](https://github.com/brancusi/voice-tools) (private) — this source.
+- [`brancusi/voice-tools`](https://github.com/brancusi/voice-tools) — this source.
 - [`brancusi/voice-tools-releases`](https://github.com/brancusi/voice-tools-releases) (public) — release zips and
   the update feed only.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled dependencies and fonts keep their own licences, listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The on-device speech models (NVIDIA Parakeet, Kyutai Pocket TTS,
+Supertonic-3, via [FluidAudio](https://github.com/FluidInference/FluidAudio)) are downloaded on first use and are
+covered by their model cards' licences.

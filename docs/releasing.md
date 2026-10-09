@@ -50,7 +50,8 @@ doesn't match `UPDATE_PUBLIC_KEY`), writes `appcast.xml` (`Tools/appcast.py`) an
 `vx.y.z` in `brancusi/voice-tools-releases` with the DMG, the zip, their SHA-256s, the feed, and a fixed-name copy
 `Voice-Pipes.dmg`: `https://github.com/brancusi/voice-tools-releases/releases/latest/download/Voice-Pipes.dmg` is
 the stable "download the latest" link for the website and README. A manual run (`workflow_dispatch` with a version like `0.0.0-ci`)
-builds and uploads an artifact without publishing — useful to check CI changes.
+builds an unsigned, un-notarized artifact without publishing, useful to check CI changes. Only tag builds see the
+signing secrets: the repo is public, and anyone can download a run's artifacts.
 
 Verify a release from outside:
 

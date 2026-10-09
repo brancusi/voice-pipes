@@ -39,8 +39,11 @@ jobs:
 
       - name: Version
         id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF#refs/tags/v}"; else v="${{ inputs.version }}"; fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF#refs/tags/v}"; else v="$INPUT_VERSION"; fi
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "Not a version: $v" >&2; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Tag matches VERSION
@@ -55,6 +58,8 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
 
       - name: Signing certificate
+        # Only tag builds are signed: a manual run's artifact can be downloaded by anyone on a public repo.
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           P12: ${{ secrets.DEVID_CERT_P12 }}
           P12_PASSWORD: ${{ secrets.DEVID_CERT_PASSWORD }}
@@ -74,6 +79,7 @@ jobs:
           echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
 
       - name: Notarization key
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
         run: |
@@ -89,7 +95,9 @@ jobs:
           [[ "$GITHUB_REF" == refs/tags/* ]] && export REQUIRE_UPDATES=1 REQUIRE_SIGNING=1 REQUIRE_NOTARIZATION=1
           VERSION="${{ steps.v.outputs.version }}" ./build.sh
 
+      # Manual runs only (an unsigned test build); tag builds go to the releases repo.
       - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         with:
           name: Voice-Pipes-${{ steps.v.outputs.version }}-arm64
           path: dist/*
