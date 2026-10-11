@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.2**
+- **History no longer shows a long take twice.** When a step like Fix words changed only a few words, History printed the whole transcript again above the result, so it looked like a duplicate. Now it lists only what changed, like `› gonna → going to ×4`. If a step rewrote most of the text (a translation or an LLM cleanup), you still see the full original.
+
 **1.17.1**
 - **The archive is now sorted into folders by year and month** (`2026/10/2026-10-09.md`), so it stays tidy as it grows. Files from 1.17.0 are moved into place.
 - **Archive your whole history in one go.** `vp history archive` writes every run you've ever made into your archive folder in the same daily files. Running it again rewrites the same files, so there are no duplicates. `vp history archive --to <folder>` makes a copy anywhere else, even when the app isn't running.

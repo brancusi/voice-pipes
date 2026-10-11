@@ -512,7 +512,9 @@ private struct HistoryView: View {
                         .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
                 }
                 if let heard = record.heard {
-                    Text("› " + heard).foregroundStyle(Palette.fgMuted).textSelection(.enabled)
+                    // A few fixed words shouldn't print a long take twice: list just what changed.
+                    Text("› " + (WordChanges.summary(from: heard, to: record.text) ?? heard))
+                        .foregroundStyle(Palette.fgMuted).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text(record.text).lineSpacing(3).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
@@ -848,5 +850,50 @@ struct VersionLine: View {
                 .font(VPFont.label).foregroundStyle(updates.checking ? Palette.comment : Palette.purple)
                 .disabled(updates.checking)
         }
+    }
+}
+
+/// What a later step changed in the transcript, word by word, as "gonna → going to ×3 · teh → the".
+enum WordChanges {
+    /// nil when the text changed too much to list (a rewrite or translation): show the whole transcript then.
+    static func summary(from heard: String, to text: String) -> String? {
+        let a = heard.split(whereSeparator: \.isWhitespace).map(String.init)
+        let b = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard a.count * b.count <= 1_000_000 else { return nil }
+        var changes: [String] = []
+        var counts: [String: Int] = [:]
+        var changedWords = 0
+        for (old, new) in hunks(a, b) {
+            changedWords += max(old.count, new.count)
+            let label = old.isEmpty ? "+ " + new.joined(separator: " ")
+                : new.isEmpty ? "− " + old.joined(separator: " ")
+                : "\(old.joined(separator: " ")) → \(new.joined(separator: " "))"
+            if counts[label] == nil { changes.append(label) }
+            counts[label, default: 0] += 1
+        }
+        guard !changes.isEmpty, changes.count <= 8, changedWords * 4 <= max(a.count, b.count) else { return nil }
+        return changes.map { counts[$0]! > 1 ? "\($0) ×\(counts[$0]!)" : $0 }.joined(separator: " · ")
+    }
+
+    /// Runs of replaced words between two word lists, from their longest common subsequence.
+    static func hunks(_ a: [String], _ b: [String]) -> [(old: [String], new: [String])] {
+        let n = a.count, m = b.count
+        var lcs = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
+        for i in stride(from: n - 1, through: 0, by: -1) {
+            for j in stride(from: m - 1, through: 0, by: -1) {
+                lcs[i][j] = a[i] == b[j] ? lcs[i + 1][j + 1] + 1 : max(lcs[i + 1][j], lcs[i][j + 1])
+            }
+        }
+        var result: [(old: [String], new: [String])] = []
+        var old: [String] = [], new: [String] = []
+        func flush() { if !old.isEmpty || !new.isEmpty { result.append((old, new)); old = []; new = [] } }
+        var i = 0, j = 0
+        while i < n || j < m {
+            if i < n, j < m, a[i] == b[j] { flush(); i += 1; j += 1 }
+            else if j < m, i == n || lcs[i][j + 1] >= lcs[i + 1][j] { new.append(b[j]); j += 1 }
+            else { old.append(a[i]); i += 1 }
+        }
+        flush()
+        return result
     }
 }
