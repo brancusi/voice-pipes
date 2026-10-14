@@ -55,6 +55,10 @@ struct ActiveRun {
     var stepsStarted: Date?
     /// A trigger was pressed while this run was processing (and was ignored): the HUD says how to stop it.
     var busyPress: Date?
+    /// The run as saved in History, so the HUD's "details" can open it.
+    var recordID: RunRecord.ID?
+    /// A step failed but passed its input through: what to say beside OK.
+    var problem: String?
 }
 
 /// The run a pipeline task belongs to. Its steps only touch the HUD's run while it's still that one, so a run that
@@ -594,6 +598,17 @@ final class AppState {
         run = nil
     }
 
+    /// How long the HUD keeps an error (or a passed-through failure) up: long enough to read and click "details".
+    static let problemSeconds: Double = 8
+
+    /// The HUD's "details": History, filtered to errors, with this run open.
+    func showRunDetails(_ id: RunRecord.ID) {
+        mainSection = .activity
+        UINav.shared.history = UINav.HistoryRequest(run: id, problems: true, expand: true)
+        NotificationCenter.default.post(name: .voicePipesOpenWindow, object: "main")
+        run = nil
+    }
+
     /// Stops a run that's processing (the HUD's ×): cancels the step it's on, keeps what it had in History, and
     /// frees the HUD at once, even if the step never answers.
     func stopProcessing() {
@@ -715,10 +730,17 @@ final class AppState {
         let total = record(track, startedAt: startedAt, heard: heard, failure: nil)
         let finalText = run?.liveText
         run?.totalMs = total
+        // A step that failed and passed its input through shouldn't look like a clean run: say so, and keep it up.
+        let passed = run?.log.filter { $0.status == .passedThrough } ?? []
+        if let first = passed.first {
+            // The model's own name, short enough to leave room for "details".
+            let name = first.model.flatMap { $0.split(separator: "/").last.map(String.init) } ?? first.title
+            run?.problem = "\(name) failed, passed through" + (passed.count > 1 ? " (+\(passed.count - 1))" : "")
+        }
         run?.phase = .done
         emit(["event": "run.done", "track": track.slug ?? track.name, "ms": total, "text": finalText ?? ""])
         Task {
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: passed.isEmpty ? .milliseconds(650) : .seconds(Self.problemSeconds))
             if run?.phase == .done, owns(track) { run = nil }
         }
         return RunOutcome(text: finalText, totalMs: total, failure: nil)
@@ -888,9 +910,11 @@ final class AppState {
                 + (run?.branchDetail[index]?.steps ?? [])
         }
         let spokenMs = track.steps.first?.kind.isMicrophone == true ? run?.stepMs.first ?? nil : nil
-        historyStore.add(RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
-                                   heard: heard == text ? nil : heard, failure: failure, log: run?.log,
-                                   microphone: run?.microphone, app: run?.app, spokenMs: spokenMs))
+        let saved = RunRecord(trackName: track.name, colorHex: track.colorHex, date: Date(), text: text, totalMs: total, steps: steps,
+                              heard: heard == text ? nil : heard, failure: failure, log: run?.log,
+                              microphone: run?.microphone, app: run?.app, spokenMs: spokenMs)
+        historyStore.add(saved)
+        run?.recordID = saved.id
         archive.write()
         return total
     }
@@ -1081,9 +1105,11 @@ final class AppState {
                             stepMs: Array(repeating: nil, count: track.steps.count))
         }
         run?.phase = .failed(message)
+        let id = run?.id
         Task {
-            try? await Task.sleep(for: .seconds(4))
-            if case .failed = self.run?.phase { self.run = nil }
+            try? await Task.sleep(for: .seconds(Self.problemSeconds))
+            // Only this failure: a run started since keeps the HUD.
+            if case .failed = self.run?.phase, self.run?.id == id { self.run = nil }
         }
     }
 }

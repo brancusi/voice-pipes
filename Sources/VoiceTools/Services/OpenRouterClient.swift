@@ -106,7 +106,7 @@ final class OpenRouterClient: Sendable {
 
     func complete(model: String, system: String?, user: String) async throws -> String {
         struct Message: Codable { let role: String; let content: String }
-        struct Request: Encodable { let model: String; let messages: [Message] }
+        struct Request: Encodable { let model: String; let messages: [Message]; let max_tokens: Int }
         struct Response: Decodable {
             struct Choice: Decodable { let message: Message }
             struct Usage: Decodable { let prompt_tokens: Int?; let completion_tokens: Int?; let cost: Double? }
@@ -121,7 +121,8 @@ final class OpenRouterClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("Bearer \(try apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(Request(model: model, messages: messages))
+        request.httpBody = try JSONEncoder().encode(Request(model: model, messages: messages,
+                                                            max_tokens: Self.maxTokens(inputCharacters: (system ?? "").count + user.count)))
 
         let response = try await send(request, as: Response.self)
         // OpenRouter reports tokens and the exact cost with every reply.
@@ -129,6 +130,14 @@ final class OpenRouterClient: Sendable {
                                                 completionTokens: response.usage?.completion_tokens, cost: response.usage?.cost))
         guard let text = response.choices.first?.message.content else { throw OpenRouterError.emptyResponse }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Without max_tokens OpenRouter assumes the model's maximum (65,536 for Claude Sonnet) and holds that much credit
+    /// for every call: a key with a monthly limit then fails with 402 long before it's used up. Replies here are
+    /// rewrites and answers: room for twice the input (about 3 characters a token), at least 8,192 so reasoning
+    /// models have space to think, at most 32,768.
+    static func maxTokens(inputCharacters: Int) -> Int {
+        min(32_768, max(8_192, inputCharacters / 3 * 2))
     }
 
     private func send<T: Decodable>(_ request: URLRequest, as: T.Type) async throws -> T {
@@ -149,9 +158,22 @@ enum OpenRouterError: LocalizedError {
         switch self {
         case .missingKey: "No OpenRouter key. Add a key in Setup → Connections."
         case .emptyResponse: "OpenRouter returned an empty response."
-        case .http(let code, let body): "OpenRouter error \(code): \(body.prefix(300))"
+        case .http(let code, let body): "OpenRouter error \(code): \(Self.message(in: body).prefix(300))"
         }
     }
+}
+
+extension OpenRouterError {
+    /// The readable part of an error reply ({"error": {"message": "…"}}), else the body as it came.
+    static func message(in body: String) -> String {
+        struct Reply: Decodable { struct Detail: Decodable { let message: String? }; let error: Detail? }
+        let text = (try? JSONDecoder().decode(Reply.self, from: Data(body.utf8)))?.error?.message
+        return text?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? body
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 extension Data {

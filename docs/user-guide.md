@@ -205,7 +205,8 @@ its read-aloud buttons.
 | `PROC 312ms` **×** | Processing since you let go; **×** stops the run |
 | `OK 186ms` | Done — total processing time; fades in under a second |
 | `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice, with **⏸/▶** and **⏹** buttons (pressing the track's hotkey again also pauses and resumes) |
-| `ERR …` | What went wrong (stays a few seconds) |
+| `ERR …` **details ›** | What went wrong, first line (stays 8 seconds); **details ›** opens the run in History with the whole error |
+| `OK … · <model> failed, passed through` **details ›** | The run finished, but an LLM step failed and handed its input on unchanged |
 
 **Follow along.** While anything is read aloud, the tag's third button (☰) opens a card above it with the whole
 text, a sentence per line: the one being read is lit with a lavender bar, finished ones dim, and the card scrolls
@@ -236,7 +237,7 @@ field) is never lost. The menu bar panel shows the last three runs with a copy b
 **History** in the Voice Pipes window, where you can search everything, copy any run back to the clipboard, and see
 each step's time. A run that failed partway keeps the text it had, marked with what went wrong. When later steps
 changed what you said (a question and its answer, dictation and its cleanup), what transcription heard is shown
-above the result. Runs are grouped by day; the chips next to the search box filter by track, and each run's steps
+above the result. Runs are grouped by day; the chips next to the search box filter by track (**Errors** shows only runs that stopped on an error or had a step pass its input through), and each run's steps
 are listed in order with their times, coloured by kind (transcription blue, transforms lavender, outputs green).
 Every run is kept, for good (in a small database; the window loads older runs as you scroll); **Clear history…** removes them all.
 

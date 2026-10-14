@@ -244,6 +244,8 @@ private struct HistoryView: View {
     let app: AppState
     @State private var query = ""
     @State private var trackFilter: String?
+    /// The Errors chip: only runs that stopped on an error or passed a failed step's input through.
+    @State private var problemsOnly = false
     @State private var copied: RunRecord.ID?
     @State private var copiedLog: RunRecord.ID?
     @State private var confirmingClear = false
@@ -257,7 +259,7 @@ private struct HistoryView: View {
 
     private var records: [RunRecord] { loaded.map(\.record) }
     private var history: HistoryStore { app.historyStore }
-    private var dbQuery: HistoryDatabase.Query { HistoryDatabase.Query(track: trackFilter, search: query) }
+    private var dbQuery: HistoryDatabase.Query { HistoryDatabase.Query(track: trackFilter, search: query, problems: problemsOnly) }
 
     /// Track names that appear in History, in the sidebar's order, then any others (renamed or deleted tracks).
     private var trackNames: [String] {
@@ -345,6 +347,7 @@ private struct HistoryView: View {
         .background(Palette.bg100)
         .onAppear { reload(); report() }
         .onChange(of: trackFilter) { _, _ in loaded = []; reload(); report() }
+        .onChange(of: problemsOnly) { _, _ in loaded = []; reload() }
         .onChange(of: query) { _, _ in loaded = []; reload(); report() }
         .onChange(of: history.revision) { _, _ in reload() }
         .confirmationDialog("Clear all \(history.count.formatted()) runs from History?", isPresented: $confirmingClear) {
@@ -360,13 +363,16 @@ private struct HistoryView: View {
         UINav.shared.history = nil
         trackFilter = request.track
         query = request.search ?? ""
+        problemsOnly = request.problems
         loaded = []
         reload()
         guard let run = request.run else { return }
+        if request.expand { open.insert(run) }
         // A run outside the filter isn't shown: show everything so it is. An older one: load down to it.
         if !records.contains(where: { $0.id == run }) {
             trackFilter = nil
             query = ""
+            problemsOnly = false
             reload(atLeast: (history.database?.position(of: run) ?? 0) + 20)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -383,11 +389,17 @@ private struct HistoryView: View {
     /// Search and track chips; narrow, search gets its own line and the chips wrap (never truncated).
     @ViewBuilder private func filters(narrow: Bool) -> some View {
         let search = VPTextField("Search everything you've said", text: $query).focusKey("search")
-        let chips = ForEach(["All"] + Array(trackNames.prefix(5)), id: \.self) { name in
-            VPChip(title: name, selected: name == "All" ? trackFilter == nil : trackFilter == name) {
-                trackFilter = name == "All" || trackFilter == name ? nil : name
+        let chips = Group {
+            ForEach(["All"] + Array(trackNames.prefix(5)), id: \.self) { name in
+                VPChip(title: name, selected: name == "All" ? trackFilter == nil && !problemsOnly : trackFilter == name) {
+                    if name == "All" { problemsOnly = false }
+                    trackFilter = name == "All" || trackFilter == name ? nil : name
+                }
+                .fixedSize()
             }
-            .fixedSize()
+            VPChip(title: "Errors", selected: problemsOnly) { problemsOnly.toggle() }
+                .fixedSize()
+                .help("Runs that stopped on an error, or where a failed step passed its input through")
         }
         if narrow {
             VStack(alignment: .leading, spacing: 8) {

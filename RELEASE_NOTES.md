@@ -1,5 +1,12 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.12**
+- **Errors are easier to see and read.** When a track stops on an error, the HUD now shows just the first line, stays up for 8 seconds instead of 4, and has a **details ›** link. Click it to open History with that run expanded, showing the full error and every step.
+- **Failures that passed the text through no longer look like success.** If an LLM step fails while set to pass its input through, the HUD now says so (for example "claude-opus-5.5 failed, passed through"), with the same **details ›** link.
+- **New Errors filter in History.** Next to the track chips, **Errors** shows only runs that stopped on an error or had a step pass its input through.
+- **OpenRouter errors are readable.** Instead of a block of JSON you get OpenRouter's own message, like "This request requires more credits…".
+- **Fixed: LLM steps could fail with "requires more credits" while the key still had money on it.** Voice Pipes didn't set a reply length, so OpenRouter held enough credit for the model's maximum (65,536 tokens) on every call. That's more than a key with a monthly limit may have left. Replies now ask for twice the input length, at least 8,192 tokens and at most 32,768, which is plenty for rewrites and answers.
+
 **1.17.11**
 - **Fixed: typing in the middle of a Branch question or a "Use when" description jumped the cursor to the end.** 1.17.7 fixed this for instructions, but the shorter fields (a Branch's question, each branch's and route's Use when, names, an HTTP step's URL and body) still sent the cursor to the end with every key. They now keep it where you're typing.
 

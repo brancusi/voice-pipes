@@ -21,6 +21,8 @@ final class HistoryDatabase: @unchecked Sendable {
         var before: Int64?
         /// Only runs from this moment on.
         var since: Date?
+        /// Only runs that stopped on an error or had a step pass its input through after failing.
+        var problems = false
     }
 
     private var db: OpaquePointer?
@@ -251,6 +253,10 @@ final class HistoryDatabase: @unchecked Sendable {
         if let since = query.since {
             conditions.append("date >= ?")
             values.append(.real(since.timeIntervalSince1970))
+        }
+        if query.problems {
+            // The status is in the saved record's log; there's no column for it, and errors are rare enough to scan.
+            conditions.append("(failed = 1 OR record LIKE '%\"passedThrough\"%')")
         }
         if let before = query.before {
             conditions.append("seq < ?")

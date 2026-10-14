@@ -26,6 +26,10 @@ final class UINav {
         var track: String?
         var search: String?
         var run: RunRecord.ID?
+        /// Show only runs with errors (the Errors chip).
+        var problems = false
+        /// Open the run's log as well as scrolling to it.
+        var expand = false
     }
 
     struct VocabularyRequest: Equatable {
