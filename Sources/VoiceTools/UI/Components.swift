@@ -147,6 +147,9 @@ struct VPTextField: View {
     var onSubmit: () -> Void = {}
     private var focusKey: String?
     @FocusState private var focused: Bool
+    /// What the field shows: edited here and synced both ways, so a binding rebuilt on every keystroke (step
+    /// settings, through the track store) doesn't reset the cursor to the end. See VPTextEditor.
+    @State private var draft: String?
 
     /// Names the field for `vp open … --field`.
     func focusKey(_ key: String) -> Self { var copy = self; copy.focusKey = key; return copy }
@@ -165,10 +168,15 @@ struct VPTextField: View {
     var body: some View {
         ZStack(alignment: axis == .vertical ? .topLeading : .leading) {
             // Our own placeholder: a TextField prompt's colour isn't honoured, and it must read as muted.
-            if text.isEmpty {
+            if (draft ?? text).isEmpty {
                 Text(prompt).font(font).foregroundStyle(Palette.fgMuted).lineLimit(1).allowsHitTesting(false)
             }
-            TextField("", text: $text, axis: axis)
+            TextField("", text: Binding { draft ?? text } set: { new in
+                draft = new
+                if text != new { text = new }
+            }, axis: axis)
+                // Changed elsewhere (config.toml, vp, a sheet): show that.
+                .onChange(of: text) { _, new in if draft != nil, new != draft { draft = new } }
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .font(font)

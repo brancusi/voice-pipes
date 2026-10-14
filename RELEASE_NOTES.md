@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.11**
+- **Fixed: typing in the middle of a Branch question or a "Use when" description jumped the cursor to the end.** 1.17.7 fixed this for instructions, but the shorter fields (a Branch's question, each branch's and route's Use when, names, an HTTP step's URL and body) still sent the cursor to the end with every key. They now keep it where you're typing.
+
 **1.17.10**
 - **Choose whether an LLM step gets your vocabulary.** Until now every LLM step (and every Route) quietly added your whole Vocabulary list to its instructions as a glossary. A capable model usually spells names right on its own, so you can now set **Vocabulary** to **Off** on any LLM step or route. Existing tracks keep working as before (on).
 - **Or place it yourself with `{{vocabulary}}`.** Put `{{vocabulary}}` anywhere in the instructions (there's a button for it next to Insert `{{input}}`) and your list goes exactly there, for example "Names to spell exactly: {{vocabulary}}". When it's in the instructions, the list isn't added a second time at the end.
