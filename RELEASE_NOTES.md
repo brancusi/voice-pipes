@@ -1,6 +1,6 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
-**1.17.5**
+**1.17.6**
 - **Fixed: the app could still freeze when opening the model list for an LLM step.** 1.17.4 made the list itself fast, but the pop-up that holds it could get stuck resizing itself: it fitted itself to the list, which made the list measure itself again, over and over, at full CPU. The pop-up now resizes once things have settled, and stops if it keeps changing. The same fix applies to the Add step pop-up.
 
 **1.17.4**

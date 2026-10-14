@@ -144,13 +144,22 @@ else
   fi
 fi
 
+# Stapling fetches the ticket from Apple's CDN, which sometimes drops the connection ("Error 68"); try a few times.
+staple() {
+  for attempt in 1 2 3 4 5; do
+    xcrun stapler staple "$1" && return 0
+    echo "    stapling failed (attempt $attempt); retrying" >&2; sleep 30
+  done
+  echo "Stapling $1 failed five times." >&2; exit 1
+}
+
 if [[ -n "${NOTARY_KEY_PATH:-}" && "$IDENTITY" == "Developer ID Application"* ]]; then
   echo "==> notarize"
   ditto -c -k --keepParent "$APP" "$WORK/notarize.zip"
   xcrun notarytool submit "$WORK/notarize.zip" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" \
     --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m | tee "$WORK/notary.log"
   grep -q "status: Accepted" "$WORK/notary.log" || { echo "Notarization failed." >&2; exit 1; }
-  xcrun stapler staple "$APP"
+  staple "$APP"
   spctl --assess --type execute --verbose "$APP"
 elif [[ "${REQUIRE_NOTARIZATION:-0}" == 1 ]]; then
   echo "REQUIRE_NOTARIZATION=1 but no Developer ID identity or NOTARY_KEY_PATH." >&2; exit 1
@@ -190,7 +199,7 @@ if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
     xcrun notarytool submit "$DMG" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" \
       --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m | tee "$WORK/notary-dmg.log"
     grep -q "status: Accepted" "$WORK/notary-dmg.log" || { echo "DMG notarization failed." >&2; exit 1; }
-    xcrun stapler staple "$DMG"
+    staple "$DMG"
     spctl --assess --type open --context context:primary-signature --verbose "$DMG"
   fi
 fi
