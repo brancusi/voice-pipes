@@ -191,6 +191,12 @@ models. Computing the "top" badge per row (a full re-sort for every row) made ea
 the app. → `ModelBrowser.listing()` works the list out once per redraw and everything reads from it; rows are lazy;
 `OpenRouterCatalog.model(id)` is a dictionary lookup. Never call `allRows`/`ModelInsights.order` from per-row code.
 
+**Pickers sized from a height preference.** `AnchoredPanel` fits its panel to the height the content reports. Resizing
+inside that SwiftUI update lays the content out again in the same update; when the reported height kept changing,
+the app spun at 100% CPU forever (sampled in 1.17.4, opening the LLM model picker). → The resize happens on the next
+run-loop turn, coalesced; more than six resizes in a second keep the larger height; the hosting view's own
+`sizingOptions` are off so `place()` is the only thing sizing the panel.
+
 **stdin in `vp`.** Agents' shells may leave stdin an open, empty pipe; reading it would hang. → Only read piped text
 that's there within 200 ms (or after an explicit `-`).
 

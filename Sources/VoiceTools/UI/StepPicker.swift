@@ -369,8 +369,10 @@ final class AnchoredPanel {
         panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.appearance = window.effectiveAppearance
-        let view = content({ [weak self] in self?.close() }, { [weak self] height in self?.place(height: height) })
+        let view = content({ [weak self] in self?.close() }, { [weak self] height in self?.report(height: height) })
         let host = NSHostingView(rootView: view.vpWindow())
+        // Only place() sizes the panel: the hosting view also resizing it to fit was a second driver to fight with.
+        host.sizingOptions = []
         panel.contentView = host
         self.panel = panel
         place(height: host.fittingSize.height)
@@ -379,6 +381,31 @@ final class AnchoredPanel {
         resignObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.close() }
         }
+    }
+
+    private var pendingHeight: CGFloat?
+    private var resizes: [Date] = []
+
+    /// The content's height, reported from inside a SwiftUI update. Resizing right there lays the content out again in
+    /// the same update, and if that reports a different height it never ends (the app spun at 100% CPU opening the
+    /// model picker). So: resize on the next turn of the run loop, once for however many reports came in.
+    private func report(height: CGFloat) {
+        let scheduled = pendingHeight != nil
+        pendingHeight = height
+        guard !scheduled else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let height = self.pendingHeight else { return }
+            self.pendingHeight = nil
+            self.resize(to: height)
+        }
+    }
+
+    private func resize(to height: CGFloat) {
+        guard let panel, abs(height - panel.frame.height) >= 1 else { return }
+        // Still changing after a handful of resizes in a second: two heights are taking turns. Keep the larger.
+        resizes = resizes.filter { $0.timeIntervalSinceNow > -1 } + [Date()]
+        if resizes.count > 6, height < panel.frame.height { return }
+        place(height: height)
     }
 
     /// Below the control, top edge fixed as the content shrinks; above it if there's no room below.
@@ -395,6 +422,8 @@ final class AnchoredPanel {
     func close() {
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
+        pendingHeight = nil
+        resizes = []
         guard let panel else { return }
         self.panel = nil
         panel.parent?.removeChildWindow(panel)

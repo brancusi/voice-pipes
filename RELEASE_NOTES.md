@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.5**
+- **Fixed: the app could still freeze when opening the model list for an LLM step.** 1.17.4 made the list itself fast, but the pop-up that holds it could get stuck resizing itself: it fitted itself to the list, which made the list measure itself again, over and over, at full CPU. The pop-up now resizes once things have settled, and stops if it keeps changing. The same fix applies to the Add step pop-up.
+
 **1.17.4**
 - **Fixed: opening the model list for an LLM step could freeze the app.** The list re-sorted all of OpenRouter's ~460 models once for every row it drew, so a single redraw took about 18 seconds, and moving the pointer or typing started another. That's the spinning wheel you could only escape by force-quitting. It now opens and redraws in about 25 ms. The model pickers for transcription and speech get the same fix.
 
