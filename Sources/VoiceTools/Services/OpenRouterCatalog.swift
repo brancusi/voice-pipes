@@ -100,7 +100,11 @@ final class OpenRouterCatalog {
         }
     }
 
-    private(set) var models: [Model] = []
+    private(set) var models: [Model] = [] {
+        didSet { byID = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }) }
+    }
+    /// The pickers look models up by id hundreds of times per redraw.
+    @ObservationIgnored private var byID: [String: Model] = [:]
     private(set) var loading = false
     private(set) var error: String?
     private(set) var updated: Date?
@@ -111,6 +115,8 @@ final class OpenRouterCatalog {
         if let data = try? Data(contentsOf: cacheURL),
            let cached = try? JSONDecoder().decode(Cache.self, from: data) {
             models = cached.models
+            // didSet doesn't run in init.
+            byID = Dictionary(cached.models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             updated = cached.updated
         }
     }
@@ -132,7 +138,10 @@ final class OpenRouterCatalog {
         models.filter { $0.supports(capability) }
     }
 
-    func model(_ id: String) -> Model? { models.first { $0.id == id } }
+    func model(_ id: String) -> Model? {
+        _ = models  // observed, like the list itself
+        return byID[id]
+    }
 
     /// Loads the list if it's missing or older than a day.
     func refreshIfStale() {

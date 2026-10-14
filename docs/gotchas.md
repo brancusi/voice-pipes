@@ -186,6 +186,11 @@ broken.
 raise SIGPIPE and kill the process, despite `SO_NOSIGPIPE`. → `signal(SIGPIPE, SIG_IGN)` in the server and no reply
 to an empty request. Socket paths must fit 104 bytes; very long home paths fall back to `/tmp/voicepipes-<uid>.sock`.
 
+**The model picker's cost.** `ModelInsights.info` queries History for each model, and the LLM picker lists ~460
+models. Computing the "top" badge per row (a full re-sort for every row) made each redraw take 18 s and beach-balled
+the app. → `ModelBrowser.listing()` works the list out once per redraw and everything reads from it; rows are lazy;
+`OpenRouterCatalog.model(id)` is a dictionary lookup. Never call `allRows`/`ModelInsights.order` from per-row code.
+
 **stdin in `vp`.** Agents' shells may leave stdin an open, empty pipe; reading it would hang. → Only read piped text
 that's there within 200 ms (or after an explicit `-`).
 

@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.4**
+- **Fixed: opening the model list for an LLM step could freeze the app.** The list re-sorted all of OpenRouter's ~460 models once for every row it drew, so a single redraw took about 18 seconds, and moving the pointer or typing started another. That's the spinning wheel you could only escape by force-quitting. It now opens and redraws in about 25 ms. The model pickers for transcription and speech get the same fix.
+
 **1.17.3**
 - **Stop a run that's taking too long.** While the HUD shows PROC, there's now a **×** next to it. Click it to stop the run straight away, for example when a cloud model hangs. Nothing gets pasted, and the text it had so far (your transcript, for instance) is saved in History marked *Stopped*, so you can still copy it. `vp stop` does the same.
 - **A second shortcut no longer interferes with a run that's still working.** Pressing a track's shortcut while another run was processing used to start the new one on top of it, and the two could mix up their text or paste into the wrong place. Now the shortcut is ignored until the run finishes, and the HUD says *busy, × stops it*.

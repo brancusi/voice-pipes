@@ -66,7 +66,7 @@ struct ModelBrowser: View {
         }
     }
 
-    private var filtered: [Row] {
+    private func filtered(_ allRows: [Row]) -> [Row] {
         let terms = query.lowercased().split(separator: " ")
         return allRows.filter { row in
             let hay = "\(row.name) \(row.id) \(row.provider) \(row.detail ?? "") \(row.info.tags.joined(separator: " "))".lowercased()
@@ -74,22 +74,31 @@ struct ModelBrowser: View {
         }
     }
 
-    /// On this Mac is pinned on top in every sort (free, private, offline: a different choice, not a point on the
-    /// same curve); each group is ordered by the current sort.
-    private var groups: [(title: String?, rows: [Row])] {
-        let rows = filtered
-        let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-        func ordered(_ subset: [Row]) -> [Row] { ModelInsights.order(subset.map(\.id), capability, by: sort).compactMap { byID[$0] } }
-        return [("On this Mac", ordered(rows.filter(\.local))), ("OpenRouter", ordered(rows.filter { !$0.local }))].filter { !$0.rows.isEmpty }
+    /// Everything the list shows, worked out once per redraw: every row needs ModelInsights (history lookups) for
+    /// hundreds of models, so nothing below may recompute it per row.
+    private struct Listing {
+        var total = 0
+        var groups: [(title: String?, rows: [Row])] = []
+        var flatIDs: [String] { groups.flatMap { $0.rows.map(\.id) } }
+        var topID: String?
     }
 
-    private var flatIDs: [String] { groups.flatMap { $0.rows.map(\.id) } }
+    /// On this Mac is pinned on top in every sort (free, private, offline: a different choice, not a point on the
+    /// same curve); each group is ordered by the current sort.
+    private func listing() -> Listing {
+        let all = allRows
+        let rows = filtered(all)
+        let byID = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func ordered(_ subset: [Row]) -> [Row] { ModelInsights.order(subset.map(\.id), capability, by: sort).compactMap { byID[$0] } }
+        let cloud = ordered(rows.filter { !$0.local })
+        let groups = [("On this Mac", ordered(rows.filter(\.local))), ("OpenRouter", cloud)].filter { !$0.1.isEmpty }
+        return Listing(total: all.count, groups: groups.map { (title: Optional($0.0), rows: $0.1) }, topID: cloud.first.flatMap(top))
+    }
 
-    /// Only one row gets the top badge: the first OpenRouter row under the current sort that has the measure.
-    private var topID: String? {
-        let ids = ModelInsights.order(filtered.filter { !$0.local }.map(\.id), capability, by: sort)
-        guard let first = ids.first else { return nil }
-        let info = ModelInsights.info(first, capability)
+    /// Only one row gets the top badge: the first OpenRouter row under the current sort, if it has the measure.
+    private func top(_ first: Row) -> String? {
+        let info = first.info
+        let first = first.id
         switch sort {
         case .value: return ModelInsights.value(info) != nil ? first : nil
         case .quality: return info.quality != nil ? first : nil
@@ -110,16 +119,17 @@ struct ModelBrowser: View {
     // MARK: Layout
 
     var body: some View {
+        let listing = listing()
         VStack(spacing: 0) {
-            header
+            header(total: listing.total)
             Hairline()
             columns
             Hairline()
-            if flatIDs.isEmpty {
+            if listing.groups.isEmpty {
                 Text("No model matches \"\(query)\".").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(14)
             } else {
-                list
+                list(listing)
             }
             Hairline()
             footer
@@ -148,12 +158,12 @@ struct ModelBrowser: View {
         }
     }
 
-    private var header: some View {
+    private func header(total: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title).font(.system(size: 15, weight: .bold, design: .monospaced)).foregroundStyle(Palette.fg)
                 Spacer()
-                Text("\(allRows.count) · " + (catalog.updated.map { Calendar.current.isDateInToday($0) ? "refreshed today" : "refreshed \($0.shortAgo)" } ?? "not refreshed yet"))
+                Text("\(total) · " + (catalog.updated.map { Calendar.current.isDateInToday($0) ? "refreshed today" : "refreshed \($0.shortAgo)" } ?? "not refreshed yet"))
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             }
             TextField("", text: $query, prompt: Text("Search models, voices or providers").foregroundStyle(Palette.fgMuted))
@@ -197,17 +207,18 @@ struct ModelBrowser: View {
             .foregroundStyle(active ? Palette.purple : Palette.fgMuted).lineLimit(1)
     }
 
-    private var list: some View {
+    private func list(_ listing: Listing) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                // Lazy: hundreds of rows, and only a dozen show.
+                LazyVStack(alignment: .leading, spacing: 0) {
                     Color.clear.frame(height: 8)
-                    ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                    ForEach(Array(listing.groups.enumerated()), id: \.offset) { _, group in
                         if let title = group.title {
                             Text(title.uppercased()).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
                                 .foregroundStyle(Palette.fgMuted).padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
                         }
-                        ForEach(group.rows) { row in rowView(row).id(row.id) }
+                        ForEach(group.rows) { row in rowView(row, top: row.id == listing.topID).id(row.id) }
                     }
                 }
                 .padding(.bottom, 20)
@@ -221,18 +232,18 @@ struct ModelBrowser: View {
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
                 }
             )
-            .frame(height: listHeight)
+            .frame(height: listHeight(listing))
             .onAppear { proxy.scrollTo(selection, anchor: .center) }
             .onChange(of: highlighted) { _, id in if let id { proxy.scrollTo(id) } }
         }
     }
 
-    private var listHeight: CGFloat {
-        let content = CGFloat(flatIDs.count) * Self.rowHeight + CGFloat(groups.filter { $0.title != nil }.count) * 28 + (expanded != nil ? 70 : 0) + 6
+    private func listHeight(_ listing: Listing) -> CGFloat {
+        let content = CGFloat(listing.flatIDs.count) * Self.rowHeight + CGFloat(listing.groups.filter { $0.title != nil }.count) * 28 + (expanded != nil ? 70 : 0) + 6
         return min(content, Self.maxHeight - 250)
     }
 
-    private func rowView(_ row: Row) -> some View {
+    private func rowView(_ row: Row, top: Bool) -> some View {
         let selected = row.id == selection
         let on = highlighted == row.id
         let open = expanded == row.id
@@ -246,8 +257,8 @@ struct ModelBrowser: View {
             }
             HStack(spacing: 6) {
                 // The badge counts toward the two tags, so the provider line never truncates.
-                if row.id == topID { tag(topLabel, filled: true) }
-                ForEach(Array(row.info.tags.prefix(row.id == topID ? 1 : 2)), id: \.self) { tag($0, filled: false) }
+                if top { tag(topLabel, filled: true) }
+                ForEach(Array(row.info.tags.prefix(top ? 1 : 2)), id: \.self) { tag($0, filled: false) }
                 Text([row.local ? nil : row.provider, row.detail].compactMap { $0 }.joined(separator: " · "))
                     .font(VPFont.caption).foregroundStyle(Palette.fgMuted).lineLimit(1)
             }
@@ -362,14 +373,14 @@ struct ModelBrowser: View {
     // MARK: Keyboard
 
     private func move(_ delta: Int) {
-        let ids = flatIDs
+        let ids = listing().flatIDs
         guard !ids.isEmpty else { return }
         let current = highlighted.flatMap { ids.firstIndex(of: $0) } ?? -1
         highlighted = ids[max(0, min(ids.count - 1, current + delta))]
     }
 
     private func pickHighlighted() {
-        if let id = highlighted ?? flatIDs.first { pick(id) }
+        if let id = highlighted ?? listing().flatIDs.first { pick(id) }
     }
 
     private func pick(_ id: String) {
