@@ -109,6 +109,9 @@ struct Route: Codable, Hashable, Identifiable {
     var when: String
     var model: String
     var prompt: String
+    /// Your vocabulary goes to the model as a glossary; false leaves it out (`{{vocabulary}}` in the prompt still
+    /// places it). Nil (saved before 1.17.10) is on.
+    var vocabulary: Bool?
 }
 
 enum StepKind: Codable, Hashable {
@@ -124,7 +127,8 @@ enum StepKind: Codable, Hashable {
     case openRouterSTT(model: String)
 
     // Transform (text -> text)
-    case llm(model: String, prompt: String, onFailure: FailurePolicy)
+    /// `vocabulary`: see `Route.vocabulary`.
+    case llm(model: String, prompt: String, onFailure: FailurePolicy, vocabulary: Bool? = nil)
     /// Jev chooses one of the routes for the input; that route's model and instructions produce the output.
     case route(routes: [Route])
     /// Jev answers `question` about the text and picks a branch; that branch's own steps run, then the track
@@ -187,7 +191,7 @@ enum StepKind: Codable, Hashable {
             case .streaming: "Parakeet v3 · streaming"
             }
         case .openRouterSTT(let model): model
-        case .llm(let model, _, _): "LLM · \(model)"
+        case .llm(let model, _, _, _): "LLM · \(model)"
         case .route(let routes): "Route · Jev · " + routes.map(\.name).joined(separator: " / ")
         case .branch(_, let branches): "Branch · Jev · " + branches.map(\.name).joined(separator: " / ")
         case .http(let url, let method, _, _, _): "\(method) \(URL(string: url)?.host ?? url)"
@@ -210,7 +214,7 @@ enum StepKind: Codable, Hashable {
         case .text(let sources): sources.first?.label ?? "Text"
         case .parakeet: "Parakeet"
         case .openRouterSTT(let model): model.split(separator: "/").last.map(String.init) ?? model
-        case .llm(let model, _, _): model.split(separator: "/").last.map(String.init) ?? model
+        case .llm(let model, _, _, _): model.split(separator: "/").last.map(String.init) ?? model
         case .route: "Jev route"
         case .branch: "Jev branch"
         case .http(_, let method, _, _, _): method

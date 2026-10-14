@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.10**
+- **Choose whether an LLM step gets your vocabulary.** Until now every LLM step (and every Route) quietly added your whole Vocabulary list to its instructions as a glossary. A capable model usually spells names right on its own, so you can now set **Vocabulary** to **Off** on any LLM step or route. Existing tracks keep working as before (on).
+- **Or place it yourself with `{{vocabulary}}`.** Put `{{vocabulary}}` anywhere in the instructions (there's a button for it next to Insert `{{input}}`) and your list goes exactly there, for example "Names to spell exactly: {{vocabulary}}". When it's in the instructions, the list isn't added a second time at the end.
+- The Fix words block is unchanged: it only runs in tracks that include it.
+
 **1.17.9**
 - **Start a track from your selection or your clipboard.** Add step now lists **Selected text** and **Clipboard** as inputs of their own. Selected text takes whatever is highlighted in the app you're in and leaves your clipboard as it was; Clipboard takes what you last copied. Either one hands its text to the next step, like the microphone does. (They're the Text block with one source ticked, so you can still combine sources in one block.)
 

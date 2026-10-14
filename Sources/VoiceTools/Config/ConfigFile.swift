@@ -497,11 +497,11 @@ enum ConfigFile {
                 kind = .openRouterSTT(model: model)
             }
         case "llm":
-            known += ["model", "prompt", "on_failure"]
+            known += ["model", "prompt", "on_failure", "vocabulary"]
             let model = s.string("model", required: true) ?? ""
             let prompt = s.string("prompt") ?? ""
             let failure = s.choice("on_failure", ["pass-through", "stop"], default: "pass-through")
-            kind = .llm(model: model, prompt: prompt, onFailure: failure == "stop" ? .stop : .passThrough)
+            kind = .llm(model: model, prompt: prompt, onFailure: failure == "stop" ? .stop : .passThrough, vocabulary: s.bool("vocabulary"))
         case "route":
             known += ["route"]
             var routes: [Route] = []
@@ -510,8 +510,9 @@ enum ConfigFile {
             for (i, table) in tables.enumerated() {
                 var r = TableReader(table, path: "\(s.path).route[\(i + 1)]")
                 let route = Route(name: r.string("name", required: true) ?? "", when: r.string("when") ?? "",
-                                  model: r.string("model", required: true) ?? "", prompt: r.string("prompt") ?? "")
-                r.finish(known: ["name", "when", "model", "prompt"])
+                                  model: r.string("model", required: true) ?? "", prompt: r.string("prompt") ?? "",
+                                  vocabulary: r.bool("vocabulary"))
+                r.finish(known: ["name", "when", "model", "prompt", "vocabulary"])
                 s.issues += r.issues
                 routes.append(route)
             }
@@ -678,10 +679,11 @@ enum ConfigFile {
         case .openRouterSTT(let model):
             add("type", quote("transcribe"))
             add("model", quote(model), "OpenRouter; needs `vp auth login openrouter`")
-        case .llm(let model, let prompt, let failure):
+        case .llm(let model, let prompt, let failure, let vocabulary):
             add("type", quote("llm"))
             add("model", quote(model), "any OpenRouter model id: `vp models --capability text`")
             add("on_failure", quote(failure == .stop ? "stop" : "pass-through"), "pass-through | stop")
+            if vocabulary == false { add("vocabulary", "false", "no glossary unless the prompt has {{vocabulary}}") }
             add("prompt", multiline(prompt))
         case .route(let routes):
             add("type", quote("route"))
@@ -691,6 +693,7 @@ enum ConfigFile {
                 lines.append("\(inner)name = \(quote(route.name))")
                 lines.append("\(inner)when = \(multiline(route.when))")
                 lines.append("\(inner)model = \(quote(route.model))")
+                if route.vocabulary == false { lines.append("\(inner)vocabulary = false") }
                 lines.append("\(inner)prompt = \(multiline(route.prompt))")
             }
         case .branch(let question, let branches):
@@ -842,8 +845,9 @@ enum ConfigFile {
         #    fix-words    your vocabulary.toml, instantly, on this Mac          text → text
         #    llm          model = an OpenRouter id · prompt = '''…''' ({{input}} places the text; without it the
         #                 text is the user message) · on_failure = pass-through | stop          text → text
+        #                 vocabulary = false: no glossary of your vocabulary ({{vocabulary}} in the prompt places it)
         #    route        Jev picks one [[track.step.route]] by its `when`; that route's model answers with its
-        #                 prompt. Each route: name, when, model, prompt. Without a Jev key the first route answers.
+        #                 prompt. Each route: name, when, model, prompt, vocabulary. Without a Jev key the first route answers.
         #                                                                         text → text
         #    branch       Jev answers `question` about the text and picks one [[track.step.branch]] by its
         #                 `when`; that branch's own [[track.step.branch.step]] blocks run (any blocks, even

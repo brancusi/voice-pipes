@@ -382,7 +382,8 @@ enum AgentsInstaller {
           `input = "<name>"` for a specific mic (`vp inputs`); without it, [settings] input.
         - Text in: `text` with `sources` (selection, page, clipboard; first with text wins).
         - Change the text: `llm` (any OpenRouter model, `vp models --capability text --search <name>`; `{{input}}` in
-          the prompt places the text; `on_failure = "pass-through"` keeps a track working offline), `template`, `http`.
+          the prompt places the text; `on_failure = "pass-through"` keeps a track working offline; their vocabulary
+          goes along as a glossary unless `vocabulary = false`, and `{{vocabulary}}` places it), `template`, `http`.
         - Out: `paste`, `copy`, `speak` (`vp voices --model pocket`), `show-hud`, or `http` to post somewhere.
           Outputs pass their text on, so a track can paste and then post.
         - Different handling for different input: `branch`. Jev answers your `question` about the text and picks a

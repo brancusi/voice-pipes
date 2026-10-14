@@ -479,6 +479,13 @@ private struct StepDropDelegate: DropDelegate {
 
 /// Edits the associated values of a step kind in place.
 private struct StepConfigView: View {
+    /// What the model gets besides the instructions, under an LLM's or a route's Instructions.
+    static func vocabularyHelp(on: Bool, prompt: String) -> String {
+        let input = "{{input}} places the text; otherwise it's sent as the user message."
+        if prompt.contains("{{vocabulary}}") { return input + " {{vocabulary}} becomes your vocabulary list." }
+        return input + (on ? " Your vocabulary is added at the end as a glossary." : " Your vocabulary isn't sent.")
+    }
+
     @Binding var kind: StepKind
     let stepID: Step.ID
     let speaker: Speaker
@@ -531,16 +538,21 @@ private struct StepConfigView: View {
         case .openRouterSTT:
             transcriptionPicker
 
-        case .llm(let model, let prompt, let policy):
+        case .llm(let model, let prompt, let policy, let vocabulary):
+            let set = { (m: String, p: String, f: FailurePolicy, v: Bool?) in kind = .llm(model: m, prompt: p, onFailure: f, vocabulary: v) }
             ConfigRow("Model") {
-                ModelPicker(capability: .text, modelID: Binding { model } set: { kind = .llm(model: $0, prompt: prompt, onFailure: policy) })
+                ModelPicker(capability: .text, modelID: Binding { model } set: { set($0, prompt, policy, vocabulary) })
             }
             ConfigRow("If it fails") {
-                VPSegmented(selection: Binding { policy } set: { kind = .llm(model: model, prompt: prompt, onFailure: $0) },
+                VPSegmented(selection: Binding { policy } set: { set(model, prompt, $0, vocabulary) },
                             options: [(.passThrough, "Pass input through"), (.stop, "Stop the track")])
             }
-            FieldLabel("Instructions", help: "{{input}} places the text; otherwise it's sent as the user message.") {
-                VPTextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) }, tokens: ["{{input}}"])
+            ConfigRow("Vocabulary") {
+                VPSegmented(selection: Binding { vocabulary ?? true } set: { set(model, prompt, policy, $0 ? nil : false) },
+                            options: [(true, "Add as glossary"), (false, "Off")])
+            }
+            FieldLabel("Instructions", help: Self.vocabularyHelp(on: vocabulary ?? true, prompt: prompt)) {
+                VPTextEditor(text: Binding { prompt } set: { set(model, $0, policy, vocabulary) }, tokens: ["{{input}}", "{{vocabulary}}"])
                     .focusKey("prompt")
             }
 
@@ -858,8 +870,12 @@ private struct RouteEditor: View {
                     VPTextField("Use when…", text: $route.when, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 38)
                         .focusKey("route\(index + 1).when")
                 }
-                FieldLabel("Instructions", help: "{{input}} places the text.") {
-                    VPTextEditor(text: $route.prompt, tokens: ["{{input}}"])
+                ConfigRow("Vocabulary") {
+                    VPSegmented(selection: Binding { route.vocabulary ?? true } set: { route.vocabulary = $0 ? nil : false },
+                                options: [(true, "Add as glossary"), (false, "Off")])
+                }
+                FieldLabel("Instructions", help: StepConfigView.vocabularyHelp(on: route.vocabulary ?? true, prompt: route.prompt)) {
+                    VPTextEditor(text: $route.prompt, tokens: ["{{input}}", "{{vocabulary}}"])
                         .focusKey("route\(index + 1).prompt")
                 }
             } else {
@@ -921,7 +937,7 @@ private struct FieldLabel<Content: View>: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
             content
-            if let help { Text(help).font(VPFont.caption).foregroundStyle(Palette.fgMuted) }
+            if let help { Text(help).font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true) }
         }
     }
 }

@@ -758,7 +758,7 @@ final class AppState {
             return output
         } catch {
             entry.message = error.localizedDescription
-            if case .llm(_, _, .passThrough) = step.kind {
+            if case .llm(_, _, .passThrough, _) = step.kind {
                 NSLog("VoiceTools: \(step.kind.title) failed, passing input through: \(error)")
                 entry.status = .passedThrough
                 finish(payload)
@@ -787,7 +787,7 @@ final class AppState {
     static func pickerID(_ kind: StepKind) -> String? {
         switch kind {
         case .parakeet: "local:parakeet"
-        case .openRouterSTT(let model), .llm(let model, _, _), .openRouterSpeech(let model, _, _): model
+        case .openRouterSTT(let model), .llm(let model, _, _, _), .openRouterSpeech(let model, _, _): model
         case .localSpeech(let engine, _, _): "local:\(engine.rawValue)"
         case .speak: "local:macos"
         default: nil
@@ -915,9 +915,9 @@ final class AppState {
             guard case .audio(let samples) = payload else { throw PipelineError.expected(.audio) }
             return .text(try await OpenRouterClient.shared.transcribe(wav: WAV.encode(samples), model: model))
 
-        case .llm(let model, let prompt, _):
+        case .llm(let model, let prompt, _, let vocabulary):
             if owns(track) { run?.modelInfo = String(model.split(separator: "/").last ?? "") }
-            return .text(try await complete(model: model, prompt: prompt, input: try text(of: payload)))
+            return .text(try await complete(model: model, prompt: prompt, input: try text(of: payload), vocabulary: vocabulary ?? true))
 
         case .route(let routes):
             let input = try text(of: payload)
@@ -948,7 +948,7 @@ final class AppState {
                 run?.stepTitles[index] = "\(label) · \(model)"
                 run?.modelInfo = "\(route.name) → \(model) · " + (jevMs.map { "Jev \($0) ms \(Int(confidence * 100))%" } ?? "Jev failed")
             }
-            return .text(try await complete(model: route.model, prompt: route.prompt, input: input))
+            return .text(try await complete(model: route.model, prompt: route.prompt, input: input, vocabulary: route.vocabulary ?? true))
 
         case .branch(let question, let branches):
             let input = try text(of: payload)
@@ -1050,12 +1050,19 @@ final class AppState {
         }
     }
 
+    /// The shared vocabulary in an LLM's instructions: where `{{vocabulary}}` is, else appended as a glossary when
+    /// `append` (a step can turn that off: a strong model often spells names right and the list only adds tokens).
+    static func withVocabulary(_ prompt: String, append: Bool, glossary: [String]) -> String {
+        let list = glossary.joined(separator: ", ")
+        if prompt.contains("{{vocabulary}}") { return prompt.replacingOccurrences(of: "{{vocabulary}}", with: list) }
+        guard append, !glossary.isEmpty else { return prompt }
+        return prompt + "\n\nGlossary (always use these exact spellings): " + list + "."
+    }
+
     /// An LLM call as the LLM step makes it: the shared vocabulary rides along as a glossary, so the model keeps
     /// your spellings; `{{input}}` in the prompt places the text, otherwise it's sent as the user message.
-    private func complete(model: String, prompt: String, input: String) async throws -> String {
-        let glossary = VocabularyStore.shared.glossary
-        let instructions = glossary.isEmpty ? prompt
-            : prompt + "\n\nGlossary (always use these exact spellings): " + glossary.joined(separator: ", ") + "."
+    private func complete(model: String, prompt: String, input: String, vocabulary: Bool) async throws -> String {
+        let instructions = Self.withVocabulary(prompt, append: vocabulary, glossary: VocabularyStore.shared.glossary)
         if prompt.contains("{{input") {
             return try await OpenRouterClient.shared.complete(model: model, system: nil, user: Template.render(instructions, input: input))
         }
