@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.14**
+- **Fixed for real: typing in the middle of LLM instructions jumped the cursor to the end.** The earlier fixes (1.17.7, 1.17.11) worked when text was inserted by other means but not for actual typing: right after each key, the editor was handed the text from before that key, which also sometimes swallowed the first letter you typed. The instructions field (LLM, Route and Text template) is now a plain macOS text view that keeps your cursor and every keystroke. It looks and works as before, including Insert {{input}}, the highlighted tokens, resizing and Undo.
+
 **1.17.13**
 - **Errors are easier to see and read.** When a track stops on an error, the HUD now shows just the first line, stays up for 8 seconds instead of 4, and has a **details ›** link. Click it to open History with that run expanded, showing the full error and every step.
 - **Failures that passed the text through no longer look like success.** If an LLM step fails while set to pass its input through, the HUD now says so (for example "claude-opus-5.5 failed, passed through"), with the same **details ›** link.

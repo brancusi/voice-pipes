@@ -205,11 +205,8 @@ struct VPTextEditor: View {
     var minHeight: CGFloat = 64
     var tokens: [String] = []
     private var focusKey: String?
-    @FocusState private var focused: Bool
-    /// What the editor shows. Step settings bind through computed bindings that are rebuilt on every keystroke, and
-    /// TextEditor takes each one as text set from outside and moves the cursor to the end; editing a copy keeps it.
-    @State private var draft: String?
-    /// The NSTextView behind the TextEditor: SwiftUI has no cursor position on macOS 14.
+    @State private var focused = false
+    /// The text view, for the Insert buttons (SwiftUI has no cursor position on macOS 14).
     @State private var textView = TextViewRef()
     /// Set by dragging the bottom edge; nil until then (the default height).
     @State private var height: CGFloat?
@@ -244,22 +241,8 @@ struct VPTextEditor: View {
     }
 
     private var editor: some View {
-        TextEditor(text: Binding { draft ?? text } set: { new in
-            draft = new
-            if text != new { text = new }
-            highlight()
-        })
-            // Changed elsewhere (config.toml, vp): show that.
-            .onChange(of: text) { _, new in
-                if draft != nil, new != draft { draft = new }
-                DispatchQueue.main.async { highlight() }
-            }
-            .font(.system(size: 12, design: .monospaced))
-            .foregroundStyle(Palette.fg)
-            .scrollContentBackground(.hidden)
-            .focused($focused)
-            .background(TextViewLocator { textView.view = $0; highlight() })
-            .padding(.horizontal, 3).padding(.top, 5).padding(.bottom, 9)
+        PromptTextView(text: $text, current: text, focused: $focused, tokens: tokens, ref: textView)
+            .padding(.leading, 3).padding(.top, 5).padding(.bottom, 9)
             .frame(height: max(minHeight, height ?? Self.defaultHeight))
             .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg000))
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.line, lineWidth: 1))
@@ -300,64 +283,134 @@ struct VPTextEditor: View {
         view.window?.makeFirstResponder(view)
         view.insertText(token, replacementRange: view.selectedRange())
     }
-
-    /// Tokens drawn in the accent on a tinted ground (display only: the text stays plain).
-    private func highlight() {
-        guard !tokens.isEmpty, let view = textView.view, let layout = view.layoutManager else { return }
-        let string = view.string as NSString
-        let all = NSRange(location: 0, length: string.length)
-        layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: all)
-        layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: all)
-        for token in tokens {
-            var search = all
-            while true {
-                let found = string.range(of: token, options: [], range: search)
-                guard found.location != NSNotFound else { break }
-                layout.addTemporaryAttributes([.backgroundColor: NSColor(Palette.purple).withAlphaComponent(0.18),
-                                               .foregroundColor: NSColor(Palette.purple)], forCharacterRange: found)
-                search = NSRange(location: NSMaxRange(found), length: all.length - NSMaxRange(found))
-            }
-        }
-    }
 }
 
 final class TextViewRef {
     weak var view: NSTextView?
 }
 
-/// Finds the NSTextView a SwiftUI TextEditor draws with: the one around this background view.
-private struct TextViewLocator: NSViewRepresentable {
-    let found: (NSTextView) -> Void
+/// The prompt editor's text view. Step settings bind through the track store, and right after a key SwiftUI can
+/// hand the editor the text as it was *before* that key; SwiftUI's TextEditor wrote that back, losing the key and
+/// putting the cursor at the end. Here an earlier state of our own text is recognised and ignored, a real change
+/// from elsewhere is shown, and the selection is kept.
+struct PromptTextView: NSViewRepresentable {
+    @Binding var text: String
+    /// The text as a plain value: SwiftUI updates the view when this changes (a binding alone looks unchanged).
+    let current: String
+    @Binding var focused: Bool
+    var tokens: [String]
+    let ref: TextViewRef
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { if let textView = Self.textView(near: view) { found(textView) } }
-        return view
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        // TextKit 1: its layout manager draws the tokens (temporary attributes) without touching the text.
+        let textView = FocusReportingTextView(usingTextLayoutManager: false)
+        textView.delegate = context.coordinator
+        textView.onFocus = { [weak coordinator = context.coordinator] in coordinator?.focusChanged($0) }
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.drawsBackground = false
+        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.textColor = NSColor(Palette.fg)
+        textView.insertionPointColor = NSColor(Palette.fg)
+        textView.textContainerInset = NSSize(width: 2, height: 2)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+        textView.string = text
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = textView
+        ref.view = textView
+        context.coordinator.highlight(textView)
+        return scroll
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    /// The text view overlapping this one most, searched from a few levels up.
-    private static func textView(near view: NSView) -> NSTextView? {
-        guard view.window != nil else { return nil }
-        let frame = view.convert(view.bounds, to: nil)
-        var ancestor = view.superview
-        for _ in 0..<5 {
-            guard let current = ancestor else { break }
-            let candidates = all(in: current).filter { $0.convert($0.bounds, to: nil).intersects(frame) }
-            if let best = candidates.max(by: { overlap($0, frame) < overlap($1, frame) }) { return best }
-            ancestor = current.superview
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let textView = scroll.documentView as? NSTextView else { return }
+        ref.view = textView
+        // Changed elsewhere (config.toml, vp, a reload): show it, keeping the cursor where it was if it still fits.
+        // A stale echo of what the view held a moment ago is not a change.
+        let text = current
+        if textView.string != text, !textView.hasMarkedText(), !context.coordinator.recent.contains(text) {
+            let selection = textView.selectedRange()
+            textView.string = text
+            let length = (text as NSString).length
+            textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
+            context.coordinator.highlight(textView)
         }
-        return nil
+        textView.textColor = NSColor(Palette.fg)
+        // Asked to focus (vp open --field, a new step): take it once the view is in a window.
+        if focused, let window = textView.window, window.firstResponder !== textView {
+            DispatchQueue.main.async { window.makeFirstResponder(textView) }
+        }
     }
 
-    private static func all(in view: NSView) -> [NSTextView] {
-        (view as? NSTextView).map { [$0] } ?? view.subviews.flatMap(all)
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: PromptTextView
+        init(_ parent: PromptTextView) { self.parent = parent }
+
+        /// What the view held before its last few edits: the binding may still report one of these for a moment.
+        var recent: [String] = []
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            recent.append(parent.text)
+            if recent.count > 16 { recent.removeFirst(recent.count - 16) }
+            if parent.text != textView.string { parent.text = textView.string }
+            highlight(textView)
+        }
+
+        func focusChanged(_ isFocused: Bool) {
+            DispatchQueue.main.async { if self.parent.focused != isFocused { self.parent.focused = isFocused } }
+        }
+
+        /// Tokens drawn in the accent on a tinted ground (display only: the text stays plain).
+        func highlight(_ textView: NSTextView) {
+            guard !parent.tokens.isEmpty, let layout = textView.layoutManager else { return }
+            let string = textView.string as NSString
+            let all = NSRange(location: 0, length: string.length)
+            layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: all)
+            layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: all)
+            for token in parent.tokens {
+                var search = all
+                while true {
+                    let found = string.range(of: token, options: [], range: search)
+                    guard found.location != NSNotFound else { break }
+                    layout.addTemporaryAttributes([.backgroundColor: NSColor(Palette.purple).withAlphaComponent(0.18),
+                                                   .foregroundColor: NSColor(Palette.purple)], forCharacterRange: found)
+                    search = NSRange(location: NSMaxRange(found), length: all.length - NSMaxRange(found))
+                }
+            }
+        }
+    }
+}
+
+/// Tells the editor when it gains or loses the keyboard (for the focus ring and `vp ui`).
+private final class FocusReportingTextView: NSTextView {
+    var onFocus: ((Bool) -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { onFocus?(true) }
+        return became
     }
 
-    private static func overlap(_ textView: NSTextView, _ frame: NSRect) -> CGFloat {
-        let r = textView.convert(textView.bounds, to: nil).intersection(frame)
-        return r.width * r.height
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { onFocus?(false) }
+        return resigned
     }
 }
 

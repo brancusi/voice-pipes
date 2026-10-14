@@ -135,7 +135,18 @@ private struct FlashModifier: ViewModifier {
 /// Gives a field a name `vp open … --field <name>` can focus, and reports it as focused for `vp ui`.
 struct FocusKeyModifier: ViewModifier {
     let key: String?
-    var focused: FocusState<Bool>.Binding
+    var focused: Binding<Bool>
+
+    init(key: String?, focused: FocusState<Bool>.Binding) {
+        self.key = key
+        self.focused = Binding { focused.wrappedValue } set: { focused.wrappedValue = $0 }
+    }
+
+    /// For fields SwiftUI can't focus itself (an NSTextView, see PromptTextView).
+    init(key: String?, focused: Binding<Bool>) {
+        self.key = key
+        self.focused = focused
+    }
 
     func body(content: Content) -> some View {
         content

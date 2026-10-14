@@ -171,6 +171,14 @@ home holding *copies* of the data files; under `SNAPSHOTS` the Keychain returns 
 prompt) and checks don't run. `NavigationSplitView`, and a `ScrollView` as the window's root, render blank this way:
 render the sidebar and page side by side in an `HStack` instead (`MainWindowView.snapshotBody`).
 
+**Driving the UI headless (typing, clicks) without disturbing the person at the Mac.** Same package and flags, plus:
+`NSApp.setActivationPolicy(.prohibited)`, never `activate`, a borderless window at (-10000, -10000) shown with
+`orderBack`, and events sent straight to it with `window.sendEvent(NSEvent.keyEvent(…))`; `makeFirstResponder` works
+without the window being key. Use **real key events**, not `insertText`: the TextEditor cursor bug only happened with
+key events, so `insertText` tests passed while typing was broken. An off-screen window doesn't redraw for changes made
+to the store from outside an event, so test "changed elsewhere" through view state (e.g. a notification the holder
+view reacts to).
+
 **TOMLDecoder hands back the parent table for a keyed container on a scalar.** Decoding a generic TOML tree by trying
 `container(keyedBy:)` first recursed forever (stack overflow) on `version = 1`. → `TOMLValue` tries scalars first,
 then arrays, then tables.
@@ -197,12 +205,13 @@ the app spun at 100% CPU forever (sampled in 1.17.4, opening the LLM model picke
 run-loop turn, coalesced; more than six resizes in a second keep the larger height; the hosting view's own
 `sizingOptions` are off so `place()` is the only thing sizing the panel.
 
-**TextEditor and computed bindings.** Step settings bind through `Binding { value } set: { kind = … }`, rebuilt on
-every keystroke; SwiftUI's TextEditor takes each new binding as text set from outside and puts the cursor at the
-end, so typing mid-prompt jumped to the end. → `VPTextEditor` and `VPTextField` each edit their own `draft` and sync
-both ways; never bind a raw TextField/TextEditor in step settings. Test such fixes through the real `TrackStore` and
-`TrackDetailView`: a field bound to plain `@State` kept its cursor even while the store-bound one jumped. Its tokens are highlighted with the layout manager's temporary attributes
-(display only), on the NSTextView found behind the TextEditor (`TextViewLocator`; no cursor API on macOS 14).
+**Multi-line editors and computed bindings.** Step settings bind through `Binding { value } set: { kind = … }` into
+the track store. Right after a key, SwiftUI can hand an editor the text as it was *before* that key; SwiftUI's
+TextEditor wrote it back, which lost the key and put the cursor at the end (only with real key events, see above).
+A `draft` copy didn't help. → `VPTextEditor` draws with `PromptTextView`, our own NSTextView (TextKit 1) that ignores
+a binding value matching one of its own recent states, shows real outside changes keeping the selection, and gives
+the Insert buttons a cursor; tokens are highlighted with the layout manager's temporary attributes. `VPTextField`
+(a TextField) keeps a `draft` and passes with real keys. Test through the real `TrackStore` and `TrackDetailView`.
 
 **stdin in `vp`.** Agents' shells may leave stdin an open, empty pipe; reading it would hang. → Only read piped text
 that's there within 200 ms (or after an explicit `-`).
