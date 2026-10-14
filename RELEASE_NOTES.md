@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.8**
+- **More room for instructions, and you can resize it.** The instructions field for LLM steps (and Route and Text template) now opens about ten lines tall, up from four. Drag the bar on its bottom edge to make it as tall as you like; it remembers the height. Longer text scrolls inside it.
+
 **1.17.7**
 - **Fixed: typing in the middle of instructions jumped the cursor to the end.** In an LLM step's instructions (and a Route's, and a Text template), every character typed anywhere but the end sent the cursor to the end of the text. The cursor now stays where you're typing.
 - **Insert `{{input}}` with a button.** Under the instructions there's now an **Insert {{input}}** button that puts it right at the cursor (Text template also offers `{{input_json}}`). `{{input}}` is highlighted in the text, so it's easy to see where your words will go. You can still type it by hand.

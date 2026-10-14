@@ -189,7 +189,8 @@ struct VPTextField: View {
     }
 }
 
-/// A multi-line editor for prompts (Return adds a line), styled as a field; grows with its text. With `tokens`
+/// A multi-line editor for prompts (Return adds a line), styled as a field. Drag its bottom edge to make it taller
+/// or shorter (remembered per kind of field); it scrolls past that. With `tokens`
 /// (`{{input}}`…), each shows as a highlighted token, and a button under the field inserts it at the cursor.
 struct VPTextEditor: View {
     @Binding var text: String
@@ -202,6 +203,13 @@ struct VPTextEditor: View {
     @State private var draft: String?
     /// The NSTextView behind the TextEditor: SwiftUI has no cursor position on macOS 14.
     @State private var textView = TextViewRef()
+    /// Set by dragging the bottom edge; nil until then (the default height).
+    @State private var height: CGFloat?
+    @State private var dragStart: CGFloat?
+    /// About ten lines: room for real instructions without dragging.
+    static let defaultHeight: CGFloat = 170
+    /// One remembered height per kind of field ("prompt", "route.prompt", "template"), not per step.
+    private var heightKey: String? { focusKey.map { "editor.height." + $0.filter { !$0.isNumber } } }
 
     init(text: Binding<String>, minHeight: CGFloat = 64, tokens: [String] = []) {
         _text = text
@@ -241,16 +249,38 @@ struct VPTextEditor: View {
             .font(.system(size: 12, design: .monospaced))
             .foregroundStyle(Palette.fg)
             .scrollContentBackground(.hidden)
-            .scrollDisabled(true)
             .focused($focused)
             .background(TextViewLocator { textView.view = $0; highlight() })
-            .padding(.horizontal, 3).padding(.vertical, 5)
-            .frame(minHeight: minHeight)
-            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 3).padding(.top, 5).padding(.bottom, 9)
+            .frame(height: max(minHeight, height ?? Self.defaultHeight))
             .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg000))
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.line, lineWidth: 1))
+            .overlay(alignment: .bottom) { resizeGrip }
             .vpFocusRing(focused)
             .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
+            .onAppear {
+                if height == nil, let heightKey, let saved = UserDefaults.standard.object(forKey: heightKey) as? Double { height = saved }
+            }
+    }
+
+    /// The bottom edge: drag it to resize.
+    private var resizeGrip: some View {
+        Capsule().fill(Palette.fgMuted.opacity(0.45)).frame(width: 28, height: 3)
+            .frame(maxWidth: .infinity).frame(height: 9)
+            .contentShape(Rectangle())
+            .onHover { inside in inside ? NSCursor.resizeUpDown.push() : NSCursor.pop() }
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { drag in
+                    let start = dragStart ?? max(minHeight, height ?? Self.defaultHeight)
+                    dragStart = start
+                    height = min(max(minHeight, start + drag.translation.height), 1200)
+                }
+                .onEnded { _ in
+                    dragStart = nil
+                    if let heightKey, let height { UserDefaults.standard.set(Double(height), forKey: heightKey) }
+                })
+            .help("Drag to resize")
+            .accessibilityLabel("Resize")
     }
 
     /// Through the text view, as if typed: the cursor lands after the token and Undo takes it back.
