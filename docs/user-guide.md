@@ -85,7 +85,7 @@ filter (names and descriptions), ↑↓ and Return to add, Esc to close. Drag a 
 | Block | Takes → gives | What it does |
 |---|---|---|
 | **Microphone** | — → audio | Records the default input at 16 kHz mono. Must be first. |
-| **Text** | — → text | Uses the first source that has text: **Selected text** (via Accessibility, falling back to a ⌘C round trip for apps like Chrome), **Current page** (the focused window's web content), **Clipboard**, **Previous clipboard**. |
+| **Text** | — → text | Uses the first source that has text: **Selected text** (via Accessibility, falling back to a ⌘C round trip for apps like Chrome), **Current page** (the focused window's web content), **Clipboard**, **Previous clipboard**. The ⌘C fallback puts your clipboard back afterwards. Add step also offers **Selected text** and **Clipboard** on their own: the same block with just that source ticked. |
 | **Transcribe** | audio → text | One block, one model list: **Parakeet v3 on this Mac** or any OpenRouter transcription model. Parakeet has a **Mode** — *On release* (default, most accurate), *Chunk at pauses*, *Streaming*. |
 | **Fix words** | text → text | Instant find-and-replace from your **Vocabulary** (below). |
 | **LLM** | text → text | Any OpenRouter language model with your instructions. `{{input}}` in the instructions places the text (the **Insert {{input}}** button under the field puts it at the cursor; drag the field's bottom edge to make it taller, and it remembers the height); otherwise the text is sent as the user message. Your Vocabulary is added as a glossary. **If this step fails**: pass the input through, or stop. |

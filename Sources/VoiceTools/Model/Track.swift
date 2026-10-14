@@ -244,6 +244,9 @@ enum StepKind: Codable, Hashable {
     static let catalog: [StepKind] = [
         .microphone(input: nil),
         .text(sources: [.selection, .page, .clipboard]),
+        // The same block with one source, offered by name: the commonest inputs after the microphone.
+        .text(sources: [.selection]),
+        .text(sources: [.clipboard]),
         .parakeet(chunkOnPauseMs: 500, mode: .onRelease),
         .llm(model: "anthropic/claude-haiku-4.5", prompt: "", onFailure: .passThrough),
         .route(routes: Route.answerRoutes),

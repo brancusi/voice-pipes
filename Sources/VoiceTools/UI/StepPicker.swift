@@ -18,6 +18,8 @@ extension StepKind {
     var pickerName: String {
         switch self {
         case .microphone: "Microphone"
+        case .text([.selection]): "Selected text"
+        case .text([.clipboard]): "Clipboard"
         case .text: "Text"
         case .parakeet, .openRouterSTT: "Transcribe"
         case .llm: "LLM"
@@ -36,6 +38,8 @@ extension StepKind {
     var pickerDetail: String {
         switch self {
         case .microphone: "Record while the hotkey is held or toggled"
+        case .text([.selection]): "What's selected in the app you're in; clipboard untouched"
+        case .text([.clipboard]): "Whatever is on the clipboard now"
         case .text: "Selected text, then the page, then the clipboard"
         case .parakeet, .openRouterSTT: "Parakeet on this Mac or any OpenRouter model"
         case .llm: "Rewrite, answer or translate with your instructions"

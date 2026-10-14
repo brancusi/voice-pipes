@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.9**
+- **Start a track from your selection or your clipboard.** Add step now lists **Selected text** and **Clipboard** as inputs of their own. Selected text takes whatever is highlighted in the app you're in and leaves your clipboard as it was; Clipboard takes what you last copied. Either one hands its text to the next step, like the microphone does. (They're the Text block with one source ticked, so you can still combine sources in one block.)
+
 **1.17.8**
 - **More room for instructions, and you can resize it.** The instructions field for LLM steps (and Route and Text template) now opens about ten lines tall, up from four. Drag the bar on its bottom edge to make it as tall as you like; it remembers the height. Longer text scrolls inside it.
 
