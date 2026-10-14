@@ -58,7 +58,9 @@ A track can have any number of hotkeys, each one of:
   text (read the page aloud, summarize what's selected) runs again on each press: pressing while it reads stops that
   and starts over with whatever is selected now, where Toggle would pause.
 
-Esc cancels a recording. Pressing a track's trigger while it's **speaking** pauses, and again resumes from the
+Esc cancels a recording. While a run is processing, other triggers are ignored so they can't land in the middle of
+it (the HUD says *busy*); click **×** on the HUD (or run `vp stop`) to stop it. A stopped run still goes into History
+with the text it had, marked *Stopped*. Pressing a track's trigger while it's **speaking** pauses, and again resumes from the
 same word. A trigger that another app already owns, or that two tracks share, shows a warning in the editor (naming
 the other track) and in Setup → Checks. Modifier-only keys (like Right ⌘ alone) aren't supported.
 
@@ -200,7 +202,7 @@ its read-aloud buttons.
 |---|---|
 | `■ REC 00:04` + level bars | Recording |
 | `■ REC 00:11 …your words▌` | Recording with a streaming or chunked Parakeet mode: the words so far, with a cursor |
-| `PROC 312ms` | Processing since you let go |
+| `PROC 312ms` **×** | Processing since you let go; **×** stops the run |
 | `OK 186ms` | Done — total processing time; fades in under a second |
 | `READ 42%` / `PAUSED 42%` / `VOICE ···` | Reading aloud / paused / preparing the voice, with **⏸/▶** and **⏹** buttons (pressing the track's hotkey again also pauses and resumes) |
 | `ERR …` | What went wrong (stays a few seconds) |
@@ -335,7 +337,7 @@ the background.
 | `vp say "…" [--model --voice --speed]` | Speak (default Pocket TTS on this Mac) |
 | `vp listen` · `vp ask "<question>"` | Record until you stop talking and print the transcript; `ask` speaks the question first |
 | `vp transcribe <file>` | Transcribe an audio file on this Mac (or `--model <openrouter-id>`) |
-| `vp stop` · `pause` · `resume` | Control speech and recording |
+| `vp stop` · `pause` · `resume` | Control speech and recording; `vp stop` also stops a run that's processing |
 | `vp speed <0.6–2.0>` · `vp next` · `vp prev` | Steer what's being read aloud |
 | `vp reading [keys / click-away / key / shortcut / reset]` | When the HUD takes the keys while reading, and which keys |
 | `vp history [--limit n \| --all] [--track --search --since]` · `history show <n>` · `history usage` · `history export` | Any run ever with its cost; one run's log; totals; whole runs as JSON lines |

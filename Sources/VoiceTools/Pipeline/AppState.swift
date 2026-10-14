@@ -19,6 +19,9 @@ enum Payload {
 struct ActiveRun {
     enum Phase: Equatable { case recording, processing, speaking, done, failed(String) }
 
+    /// Which run this is: a run that was stopped or replaced keeps its steps' results to itself (see `RunScope`).
+    let id = UUID()
+
     let trackID: Track.ID
     let trackName: String
     let colorHex: String
@@ -47,6 +50,17 @@ struct ActiveRun {
     /// The mic a take recorded from, and the app in front when the run started (for History and the archive).
     var microphone: String?
     var app = NSWorkspace.shared.frontmostApplication?.localizedName
+    /// What transcription heard and when processing began, so a run stopped mid-step can still go into History.
+    var heard: String?
+    var stepsStarted: Date?
+    /// A trigger was pressed while this run was processing (and was ignored): the HUD says how to stop it.
+    var busyPress: Date?
+}
+
+/// The run a pipeline task belongs to. Its steps only touch the HUD's run while it's still that one, so a run that
+/// was stopped (or hung and finished late) can't paste, log or show over the next.
+enum RunScope {
+    @TaskLocal static var id: UUID?
 }
 
 @MainActor
@@ -172,9 +186,15 @@ final class AppState {
     /// Show the setup window: a first launch, or a permission is missing and setup was never finished.
     let needsOnboarding: Bool
 
+    /// The run on show is this task's: the same track, and (inside `runSteps`) not stopped or replaced since.
+    func owns(_ track: Track) -> Bool {
+        guard let run, run.trackID == track.id else { return false }
+        return RunScope.id.map { $0 == run.id } ?? true
+    }
+
     /// Only for this track's run, and only in range: another run may have replaced it meanwhile.
     private func setStepMs(_ index: Int, _ ms: Int, for track: Track) {
-        guard run?.trackID == track.id, index < (run?.stepMs.count ?? 0) else { return }
+        guard owns(track), index < (run?.stepMs.count ?? 0) else { return }
         run?.stepMs[index] = ms
     }
 
@@ -455,6 +475,11 @@ final class AppState {
             return
         }
         guard capture == nil else { return }
+        // A run still processing keeps the HUD and its paste: starting another would land in the middle of it.
+        if run?.phase == .processing {
+            run?.busyPress = Date()
+            return
+        }
         start(track, mode: mode, label: label)
     }
 
@@ -569,12 +594,32 @@ final class AppState {
         run = nil
     }
 
+    /// Stops a run that's processing (the HUD's ×): cancels the step it's on, keeps what it had in History, and
+    /// frees the HUD at once, even if the step never answers.
+    func stopProcessing() {
+        guard let current = run, current.phase == .processing, capture == nil else { return }
+        stepWork?.cancel()
+        stepWork = nil
+        // A `vp say` run isn't a saved track: nothing to keep.
+        if let track = store.tracks.first(where: { $0.id == current.trackID }) {
+            record(track, startedAt: current.stepsStarted ?? current.processingStarted, heard: current.heard, failure: "Stopped")
+        }
+        emit(["event": "run.failed", "track": current.trackName, "error": "Stopped"])
+        run = nil
+    }
+
     private func endCaptureHotkeys() {
         if let cancelHotkey { hotkeys.remove(cancelHotkey) }
         cancelHotkey = nil
     }
 
     private func finishCapture() async {
+        // Scoped from here: a stop during the final transcription must also keep the steps from running.
+        guard RunScope.id == nil, let id = run?.id else { return await finishCaptureSteps() }
+        await RunScope.$id.withValue(id) { await finishCaptureSteps() }
+    }
+
+    private func finishCaptureSteps() async {
         guard let capture else { return }
         self.capture = nil
         endCaptureHotkeys()
@@ -614,17 +659,39 @@ final class AppState {
 
     @discardableResult
     func runSteps(_ track: Track, from start: Int, payload initial: Payload, startedAt: Date = Date()) async -> RunOutcome {
+        guard RunScope.id == nil, let id = run?.id, run?.trackID == track.id else {
+            return await stepsOfRun(track, from: start, payload: initial, startedAt: startedAt)
+        }
+        return await RunScope.$id.withValue(id) { await stepsOfRun(track, from: start, payload: initial, startedAt: startedAt) }
+    }
+
+    /// The step running now, so Stop can cancel it (a cloud call ends at once).
+    @ObservationIgnored private var stepWork: Task<Payload, Error>?
+
+    private func stepsOfRun(_ track: Track, from start: Int, payload initial: Payload, startedAt: Date) async -> RunOutcome {
         var payload = initial
         var index = start
         var heard: String?
-        if run?.trackID == track.id { run?.log = prelude(track, from: start, payload: initial) }
+        // Stopped from the HUD (it went into History then), or replaced: nothing more from this run.
+        func stopped() -> RunOutcome? {
+            guard RunScope.id != nil, !owns(track) else { return nil }
+            return RunOutcome(text: nil, totalMs: Int(Date().timeIntervalSince(startedAt) * 1000), failure: "Stopped")
+        }
+        if owns(track) {
+            run?.log = prelude(track, from: start, payload: initial)
+            run?.stepsStarted = startedAt
+        }
         while index < track.steps.count {
+            if let outcome = stopped() { return outcome }
             let step = track.steps[index]
-            if run?.trackID == track.id { run?.currentStep = index }
+            if owns(track) { run?.currentStep = index }
             let t0 = Date()
             do {
-                payload = try await runLogged(step, payload: payload, track: track, depth: 0, index: index)
+                let work = Task { try await runLogged(step, payload: payload, track: track, depth: 0, index: index) }
+                if owns(track) { stepWork = work }
+                payload = try await work.value
             } catch {
+                if let outcome = stopped() { return outcome }
                 // Keep what the run had so far, so a dictation whose paste failed can still be copied.
                 let total = record(track, startedAt: startedAt, heard: heard, failure: error.localizedDescription)
                 show(failure: error.localizedDescription, for: track)
@@ -632,11 +699,15 @@ final class AppState {
                 return RunOutcome(text: run?.liveText, totalMs: total, failure: error.localizedDescription)
             }
             // A Branch's own time is Jev's; the steps it ran are listed after it with theirs.
-            let jevMs = run?.trackID == track.id ? run?.branchDetail[index]?.jevMs : nil
+            let jevMs = owns(track) ? run?.branchDetail[index]?.jevMs : nil
             setStepMs(index, jevMs ?? Int(Date().timeIntervalSince(t0) * 1000), for: track)
+            if let outcome = stopped() { return outcome }
             if let text = payload.text {
                 run?.liveText = text
-                if step.kind.category == "Transcribe" { heard = text }
+                if step.kind.category == "Transcribe" {
+                    heard = text
+                    run?.heard = text
+                }
             }
             index += 1
         }
@@ -648,7 +719,7 @@ final class AppState {
         emit(["event": "run.done", "track": track.slug ?? track.name, "ms": total, "text": finalText ?? ""])
         Task {
             try? await Task.sleep(for: .milliseconds(650))
-            if run?.phase == .done, run?.trackID == track.id { run = nil }
+            if run?.phase == .done, owns(track) { run = nil }
         }
         return RunOutcome(text: finalText, totalMs: total, failure: nil)
     }
@@ -659,6 +730,7 @@ final class AppState {
     /// itself and its steps. An LLM set to pass through on failure hands its input on (logged as such); any other
     /// failure is logged and rethrown.
     private func runLogged(_ step: Step, payload: Payload, track: Track, depth: Int, index: Int?) async throws -> Payload {
+        try Task.checkCancellation()
         if case .branch = step.kind { return try await execute(step.kind, payload: payload, track: track, depth: depth) }
         let meter = UsageMeter()
         let t0 = Date()
@@ -668,7 +740,7 @@ final class AppState {
                                        input: Self.describe(payload), status: .ok, voice: Self.logVoice(step.kind))
         func finish(_ output: Payload?) {
             entry.ms = Int(Date().timeIntervalSince(t0) * 1000)
-            if let index, depth == 0, case .route = step.kind, let title = run?.stepTitles[safe: index], run?.trackID == track.id { entry.title = title }
+            if let index, depth == 0, case .route = step.kind, let title = run?.stepTitles[safe: index], owns(track) { entry.title = title }
             entry.output = output.flatMap(Self.describe)
             entry.usage = meter.total ?? (Self.runsOnThisMac(step.kind) ? RunRecord.Usage(local: true) : nil)
             entry.model = meter.total?.model ?? Self.pickerID(step.kind)
@@ -676,7 +748,7 @@ final class AppState {
             if case .localSpeech = step.kind { entry.firstSoundMs = speaker.firstSoundMs }
             if case .openRouterSpeech = step.kind { entry.firstSoundMs = speaker.firstSoundMs }
             entry.decision = lastDecision
-            if run?.trackID == track.id { run?.log.append(entry) }
+            if owns(track) { run?.log.append(entry) }
         }
         do {
             let output = try await UsageMeter.$current.withValue(meter) {
@@ -808,7 +880,7 @@ final class AppState {
     @discardableResult
     private func record(_ track: Track, startedAt: Date, heard: String?, failure: String?) -> Int {
         let total = Int(Date().timeIntervalSince(startedAt) * 1000)
-        guard let text = run?.liveText, !text.isEmpty, run?.trackID == track.id else { return total }
+        guard let text = run?.liveText, !text.isEmpty, owns(track) else { return total }
         let steps = zip(run?.stepTitles ?? [], run?.stepMs ?? []).enumerated().flatMap { index, pair -> [RunRecord.StepTiming] in
             // The microphone's time is how long you spoke, not processing.
             guard let ms = pair.1, !(index == 0 && track.steps.first?.kind.isMicrophone == true) else { return [] }
@@ -844,7 +916,7 @@ final class AppState {
             return .text(try await OpenRouterClient.shared.transcribe(wav: WAV.encode(samples), model: model))
 
         case .llm(let model, let prompt, _):
-            if run?.trackID == track.id { run?.modelInfo = String(model.split(separator: "/").last ?? "") }
+            if owns(track) { run?.modelInfo = String(model.split(separator: "/").last ?? "") }
             return .text(try await complete(model: model, prompt: prompt, input: try text(of: payload)))
 
         case .route(let routes):
@@ -872,7 +944,7 @@ final class AppState {
                                               jevMs: jevMs ?? Int(Date().timeIntervalSince(t0) * 1000),
                                               others: routes.indices.filter { $0 != chosen }.map { routes[$0].name })
             let model = route.model.split(separator: "/").last ?? ""
-            if let index = run?.currentStep, run?.trackID == track.id, index < (run?.stepTitles.count ?? 0) {
+            if let index = run?.currentStep, owns(track), index < (run?.stepTitles.count ?? 0) {
                 run?.stepTitles[index] = "\(label) · \(model)"
                 run?.modelInfo = "\(route.name) → \(model) · " + (jevMs.map { "Jev \($0) ms \(Int(confidence * 100))%" } ?? "Jev failed")
             }
@@ -896,12 +968,12 @@ final class AppState {
             let branch = branches[chosen]
             let pick = confidence.map { "Jev \(jevMs) ms → \(branch.name) \(Int($0 * 100))%" } ?? "Jev failed → \(branch.name)"
             let index = run?.currentStep ?? 0
-            if !nested, run?.trackID == track.id, index < (run?.stepTitles.count ?? 0) {
+            if !nested, owns(track), index < (run?.stepTitles.count ?? 0) {
                 run?.stepTitles[index] = "Branch · \(pick)"
                 run?.modelInfo = pick
                 run?.branchDetail[index] = (jevMs, [])
             }
-            if run?.trackID == track.id {
+            if owns(track) {
                 run?.log.append(RunRecord.LogEntry(
                     title: "Branch · \(pick)", category: kind.category, depth: depth, ms: jevMs, input: Self.describe(payload),
                     decision: RunRecord.Decision(kind: "branch", question: question, chosen: branch.name, confidence: confidence, jevMs: jevMs,
@@ -913,12 +985,12 @@ final class AppState {
             for step in branch.steps {
                 let s0 = Date()
                 current = try await runLogged(step, payload: current, track: track, depth: depth + 1, index: nil)
-                if !nested, run?.trackID == track.id {
+                if !nested, owns(track) {
                     run?.branchDetail[index]?.steps.append(RunRecord.StepTiming(title: "\(branch.name) › \(step.kind.title)",
                                                                               ms: Int(Date().timeIntervalSince(s0) * 1000),
                                                                               category: step.kind.category))
                 }
-                if let text = current.text { run?.liveText = text }
+                if let text = current.text, owns(track) { run?.liveText = text }
             }
             return current
 
@@ -949,7 +1021,7 @@ final class AppState {
         case .speak(let voiceID, let rate):
             let input = try text(of: payload)
             speakingTrack = track.id
-            run?.phase = .speaking
+            if owns(track) { run?.phase = .speaking }
             await speaker.speakSystem(input, voiceID: voiceID, rate: rate, label: track.name)
             speakingTrack = nil
             return .none
@@ -957,7 +1029,7 @@ final class AppState {
         case .localSpeech(let engine, let voice, let rate):
             let input = try text(of: payload)
             speakingTrack = track.id
-            run?.phase = .speaking
+            if owns(track) { run?.phase = .speaking }
             defer { speakingTrack = nil }
             try await speaker.speakLocal(input, engine: engine, voice: voice, rate: rate, label: track.name)
             return .none
@@ -965,13 +1037,14 @@ final class AppState {
         case .openRouterSpeech(let model, let voice, let rate):
             let input = try text(of: payload)
             speakingTrack = track.id
-            run?.phase = .speaking
+            if owns(track) { run?.phase = .speaking }
             defer { speakingTrack = nil }
             try await speaker.speakCloud(input, model: model, voice: voice, rate: rate, label: track.name)
             return .none
 
         case .showHUD:
-            run?.liveText = try text(of: payload)
+            let shown = try text(of: payload)
+            if owns(track) { run?.liveText = shown }
             try? await Task.sleep(for: .seconds(3))
             return payload
         }

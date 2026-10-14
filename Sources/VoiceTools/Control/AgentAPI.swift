@@ -36,9 +36,10 @@ extension AppState {
         case "say":
             reply.result(try await agentSay(args))
         case "stop":
-            let was = speaker.state != .idle || capture != nil || agentRecording
+            let was = speaker.state != .idle || capture != nil || agentRecording || run?.phase == .processing
             speaker.clear()
             cancelCapture()
+            stopProcessing()
             if agentRecording { agentCancelled = true }
             reply.result(["stopped": was])
         case "pause", "resume":

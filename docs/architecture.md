@@ -67,7 +67,10 @@ finishCapture: stop mic; ignore < 0.25 s; live transcriber → finish (falls bac
         ▼
 runSteps: for each step, execute(kind, payload) → payload   (Payload = .none | .audio([Float]) | .text(String))
           per-step timings → HUD + History; a failing step stops the run (LLM can pass its input through) and its
-          text so far still goes to History
+          text so far still goes to History. Each run has an id, set as the task-local `RunScope.id`; steps touch
+          `app.run` only while it's still theirs (`owns(track)`), so a run stopped from the HUD's × (`stopProcessing`
+          cancels the current step) or one that hangs and answers late can't paste or show over the next. Triggers
+          are ignored while a run is processing.
 ```
 
 Steps are typed by `StepKind.input` / `.output` (`DataKind`), and `Track.validationError` rejects a mismatched
@@ -134,7 +137,8 @@ One-time migrations run at load, each guarded by a `UserDefaults` flag:
 
 - The app is `LSUIElement` (no Dock icon). While the main window is open it switches to `.regular` so it's in the
   Dock and ⌘Tab, and back to `.accessory` when it closes; the window never hides on deactivate.
-- The HUD is a borderless, non-activating `NSPanel` at `.statusBar` level that ignores the mouse; it fades out.
+- The HUD is a borderless, non-activating `NSPanel` at `.statusBar` level that ignores the mouse except while
+  its buttons show (reading aloud; × while processing); it fades out.
 - Paste and selection capture post synthetic ⌘V/⌘C from a **private** event source after the trigger's modifiers
   are released, using the key code that types `v`/`c` in the current layout. They require Accessibility; without
   it, paste throws a visible error and leaves the text on the clipboard.

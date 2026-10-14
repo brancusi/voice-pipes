@@ -20,15 +20,15 @@ final class HUDController {
 
     private func observe() {
         guard let app else { return }
-        let (visible, speaking, expanded) = withObservationTracking {
-            (app.run != nil, app.run?.phase == .speaking, HUDView.expanded(app))
+        let (visible, speaking, processing, expanded) = withObservationTracking {
+            (app.run != nil, app.run?.phase == .speaking, app.run?.phase == .processing, HUDView.expanded(app))
         } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
         self.expanded = expanded
         visible ? show() : hide()
         // Clickable only while its buttons are showing; otherwise clicks go straight through.
-        panel?.ignoresMouseEvents = !speaking
+        panel?.ignoresMouseEvents = !(speaking || processing)
         // The keyboard while reading: taken at once in "always" mode; given back when the reading ends.
         if speaking != wasSpeaking {
             wasSpeaking = speaking
@@ -278,7 +278,11 @@ struct HUDView: View {
             }
         case .processing:
             TimelineView(.animation(minimumInterval: 0.05)) { context in
-                HUDTag(state: .processing, label: "PROC", detail: HUDTag.ms(context.date.timeIntervalSince(run.processingStarted)))
+                let elapsed = HUDTag.ms(context.date.timeIntervalSince(run.processingStarted))
+                // A trigger pressed meanwhile was ignored: say so for a moment, and how to stop this one.
+                let busy = run.busyPress.map { context.date.timeIntervalSince($0) < 3 } ?? false
+                HUDTag(state: .processing, label: "PROC", detail: busy ? "\(elapsed) · busy, × stops it" : elapsed,
+                       onStop: app.stopProcessing)
             }
         case .speaking:
             let speaker = app.speaker
@@ -309,6 +313,8 @@ struct HUDTag: View {
     /// Dictation so far (streaming modes), shown with its tail visible and a sage cursor.
     var liveText: String?
     var controls: PlaybackControls?
+    /// A × that stops the run (while processing).
+    var onStop: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 7) {
@@ -322,6 +328,7 @@ struct HUDTag: View {
                 BlinkingCursor()
             }
             if let controls { controls.padding(.leading, 2) }
+            if let onStop { PlaybackControls.button("xmark", help: "Stop this run", action: onStop).padding(.leading, 2) }
             if controls != nil, HUDKeys.shared.active {
                 Text("KEYS").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Color(hex: 0xC3A3D4))
                     .padding(.horizontal, 5).frame(height: 16)
@@ -377,17 +384,17 @@ struct PlaybackControls: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            button(paused ? "play.fill" : "pause.fill", help: paused ? "Resume" : "Pause", action: onToggle)
+            Self.button(paused ? "play.fill" : "pause.fill", help: paused ? "Resume" : "Pause", action: onToggle)
                 .disabled(!canPause)
-            button("stop.fill", help: "Stop", action: onStop)
+            Self.button("stop.fill", help: "Stop", action: onStop)
             if let onExpand {
-                button(expanded ? "chevron.down" : "text.alignleft", help: expanded ? "Hide the text" : "Follow along: show the text and speed",
+                Self.button(expanded ? "chevron.down" : "text.alignleft", help: expanded ? "Hide the text" : "Follow along: show the text and speed",
                        action: onExpand)
             }
         }
     }
 
-    private func button(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+    static func button(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .bold))
