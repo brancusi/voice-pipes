@@ -1,6 +1,6 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
-**1.17.12**
+**1.17.13**
 - **Errors are easier to see and read.** When a track stops on an error, the HUD now shows just the first line, stays up for 8 seconds instead of 4, and has a **details ›** link. Click it to open History with that run expanded, showing the full error and every step.
 - **Failures that passed the text through no longer look like success.** If an LLM step fails while set to pass its input through, the HUD now says so (for example "claude-opus-5.5 failed, passed through"), with the same **details ›** link.
 - **New Errors filter in History.** Next to the track chips, **Errors** shows only runs that stopped on an error or had a step pass its input through.

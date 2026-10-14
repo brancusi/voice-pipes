@@ -386,21 +386,29 @@ private struct HistoryView: View {
         UINav.shared.historySearch = query
     }
 
+    /// All, the tracks, then Errors. Typed apart from `filters` (CI's compiler timed out on it inline).
+    @ViewBuilder private var filterChips: some View {
+        let names: [String] = ["All"] + Array(trackNames.prefix(5))
+        ForEach(names, id: \.self) { (name: String) in trackChip(name) }
+        VPChip(title: "Errors", selected: problemsOnly) { problemsOnly.toggle() }
+            .fixedSize()
+            .help("Runs that stopped on an error, or where a failed step passed its input through")
+    }
+
+    private func trackChip(_ name: String) -> some View {
+        let all = name == "All"
+        let selected: Bool = all ? (trackFilter == nil && !problemsOnly) : (trackFilter == name)
+        return VPChip(title: name, selected: selected) {
+            if all { problemsOnly = false }
+            trackFilter = (all || trackFilter == name) ? nil : name
+        }
+        .fixedSize()
+    }
+
     /// Search and track chips; narrow, search gets its own line and the chips wrap (never truncated).
     @ViewBuilder private func filters(narrow: Bool) -> some View {
         let search = VPTextField("Search everything you've said", text: $query).focusKey("search")
-        let chips = Group {
-            ForEach(["All"] + Array(trackNames.prefix(5)), id: \.self) { name in
-                VPChip(title: name, selected: name == "All" ? trackFilter == nil && !problemsOnly : trackFilter == name) {
-                    if name == "All" { problemsOnly = false }
-                    trackFilter = name == "All" || trackFilter == name ? nil : name
-                }
-                .fixedSize()
-            }
-            VPChip(title: "Errors", selected: problemsOnly) { problemsOnly.toggle() }
-                .fixedSize()
-                .help("Runs that stopped on an error, or where a failed step passed its input through")
-        }
+        let chips = filterChips
         if narrow {
             VStack(alignment: .leading, spacing: 8) {
                 search
