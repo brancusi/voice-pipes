@@ -540,7 +540,7 @@ private struct StepConfigView: View {
                             options: [(.passThrough, "Pass input through"), (.stop, "Stop the track")])
             }
             FieldLabel("Instructions", help: "{{input}} places the text; otherwise it's sent as the user message.") {
-                VPTextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) })
+                VPTextEditor(text: Binding { prompt } set: { kind = .llm(model: model, prompt: $0, onFailure: policy) }, tokens: ["{{input}}"])
                     .focusKey("prompt")
             }
 
@@ -620,8 +620,7 @@ private struct StepConfigView: View {
 
         case .template(let template):
             FieldLabel("Template", help: "{{input}} or {{input_json}} places the text.") {
-                VPTextField("{{input}}", text: Binding { template } set: { kind = .template($0) }, axis: .vertical,
-                            font: .system(size: 12, design: .monospaced), minHeight: 64)
+                VPTextEditor(text: Binding { template } set: { kind = .template($0) }, tokens: ["{{input}}", "{{input_json}}"])
                     .focusKey("template")
             }
 
@@ -860,7 +859,7 @@ private struct RouteEditor: View {
                         .focusKey("route\(index + 1).when")
                 }
                 FieldLabel("Instructions", help: "{{input}} places the text.") {
-                    VPTextField("Instructions", text: $route.prompt, axis: .vertical, font: .system(size: 12, design: .monospaced), minHeight: 64)
+                    VPTextEditor(text: $route.prompt, tokens: ["{{input}}"])
                         .focusKey("route\(index + 1).prompt")
                 }
             } else {

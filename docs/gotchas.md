@@ -197,6 +197,12 @@ the app spun at 100% CPU forever (sampled in 1.17.4, opening the LLM model picke
 run-loop turn, coalesced; more than six resizes in a second keep the larger height; the hosting view's own
 `sizingOptions` are off so `place()` is the only thing sizing the panel.
 
+**TextEditor and computed bindings.** Step settings bind through `Binding { value } set: { kind = … }`, rebuilt on
+every keystroke; SwiftUI's TextEditor takes each new binding as text set from outside and puts the cursor at the
+end, so typing mid-prompt jumped to the end. → `VPTextEditor` edits its own `draft` and syncs both ways; use it for
+any multi-line text in step settings. Its tokens are highlighted with the layout manager's temporary attributes
+(display only), on the NSTextView found behind the TextEditor (`TextViewLocator`; no cursor API on macOS 14).
+
 **stdin in `vp`.** Agents' shells may leave stdin an open, empty pipe; reading it would hang. → Only read piped text
 that's there within 200 ms (or after an explicit `-`).
 

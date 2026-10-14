@@ -189,27 +189,61 @@ struct VPTextField: View {
     }
 }
 
-/// A multi-line editor for prompts (Return adds a line), styled as a field; grows with its text.
+/// A multi-line editor for prompts (Return adds a line), styled as a field; grows with its text. With `tokens`
+/// (`{{input}}`…), each shows as a highlighted token, and a button under the field inserts it at the cursor.
 struct VPTextEditor: View {
     @Binding var text: String
     var minHeight: CGFloat = 64
+    var tokens: [String] = []
     private var focusKey: String?
     @FocusState private var focused: Bool
+    /// What the editor shows. Step settings bind through computed bindings that are rebuilt on every keystroke, and
+    /// TextEditor takes each one as text set from outside and moves the cursor to the end; editing a copy keeps it.
+    @State private var draft: String?
+    /// The NSTextView behind the TextEditor: SwiftUI has no cursor position on macOS 14.
+    @State private var textView = TextViewRef()
 
-    init(text: Binding<String>, minHeight: CGFloat = 64) {
+    init(text: Binding<String>, minHeight: CGFloat = 64, tokens: [String] = []) {
         _text = text
         self.minHeight = minHeight
+        self.tokens = tokens
     }
 
     func focusKey(_ key: String) -> Self { var copy = self; copy.focusKey = key; return copy }
 
     var body: some View {
-        TextEditor(text: $text)
+        VStack(alignment: .leading, spacing: 4) {
+            editor
+            if !tokens.isEmpty {
+                HStack(spacing: 2) {
+                    Text("Insert").font(VPFont.caption).foregroundStyle(Palette.fgMuted).padding(.trailing, 2)
+                    ForEach(tokens, id: \.self) { token in
+                        Button(token) { insert(token) }
+                            .buttonStyle(.vpGhost)
+                            .help("Insert \(token) at the cursor")
+                    }
+                }
+            }
+        }
+    }
+
+    private var editor: some View {
+        TextEditor(text: Binding { draft ?? text } set: { new in
+            draft = new
+            if text != new { text = new }
+            highlight()
+        })
+            // Changed elsewhere (config.toml, vp): show that.
+            .onChange(of: text) { _, new in
+                if draft != nil, new != draft { draft = new }
+                DispatchQueue.main.async { highlight() }
+            }
             .font(.system(size: 12, design: .monospaced))
             .foregroundStyle(Palette.fg)
             .scrollContentBackground(.hidden)
             .scrollDisabled(true)
             .focused($focused)
+            .background(TextViewLocator { textView.view = $0; highlight() })
             .padding(.horizontal, 3).padding(.vertical, 5)
             .frame(minHeight: minHeight)
             .fixedSize(horizontal: false, vertical: true)
@@ -217,6 +251,75 @@ struct VPTextEditor: View {
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.line, lineWidth: 1))
             .vpFocusRing(focused)
             .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
+    }
+
+    /// Through the text view, as if typed: the cursor lands after the token and Undo takes it back.
+    private func insert(_ token: String) {
+        guard let view = textView.view else {
+            text += token
+            return
+        }
+        view.window?.makeFirstResponder(view)
+        view.insertText(token, replacementRange: view.selectedRange())
+    }
+
+    /// Tokens drawn in the accent on a tinted ground (display only: the text stays plain).
+    private func highlight() {
+        guard !tokens.isEmpty, let view = textView.view, let layout = view.layoutManager else { return }
+        let string = view.string as NSString
+        let all = NSRange(location: 0, length: string.length)
+        layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: all)
+        layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: all)
+        for token in tokens {
+            var search = all
+            while true {
+                let found = string.range(of: token, options: [], range: search)
+                guard found.location != NSNotFound else { break }
+                layout.addTemporaryAttributes([.backgroundColor: NSColor(Palette.purple).withAlphaComponent(0.18),
+                                               .foregroundColor: NSColor(Palette.purple)], forCharacterRange: found)
+                search = NSRange(location: NSMaxRange(found), length: all.length - NSMaxRange(found))
+            }
+        }
+    }
+}
+
+final class TextViewRef {
+    weak var view: NSTextView?
+}
+
+/// Finds the NSTextView a SwiftUI TextEditor draws with: the one around this background view.
+private struct TextViewLocator: NSViewRepresentable {
+    let found: (NSTextView) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { if let textView = Self.textView(near: view) { found(textView) } }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    /// The text view overlapping this one most, searched from a few levels up.
+    private static func textView(near view: NSView) -> NSTextView? {
+        guard view.window != nil else { return nil }
+        let frame = view.convert(view.bounds, to: nil)
+        var ancestor = view.superview
+        for _ in 0..<5 {
+            guard let current = ancestor else { break }
+            let candidates = all(in: current).filter { $0.convert($0.bounds, to: nil).intersects(frame) }
+            if let best = candidates.max(by: { overlap($0, frame) < overlap($1, frame) }) { return best }
+            ancestor = current.superview
+        }
+        return nil
+    }
+
+    private static func all(in view: NSView) -> [NSTextView] {
+        (view as? NSTextView).map { [$0] } ?? view.subviews.flatMap(all)
+    }
+
+    private static func overlap(_ textView: NSTextView, _ frame: NSRect) -> CGFloat {
+        let r = textView.convert(textView.bounds, to: nil).intersection(frame)
+        return r.width * r.height
     }
 }
 

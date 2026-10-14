@@ -371,11 +371,14 @@ final class AnchoredPanel {
         panel.appearance = window.effectiveAppearance
         let view = content({ [weak self] in self?.close() }, { [weak self] height in self?.report(height: height) })
         let host = NSHostingView(rootView: view.vpWindow())
-        // Only place() sizes the panel: the hosting view also resizing it to fit was a second driver to fight with.
+        // Measured once with the hosting view's own sizing on (off, it measures 0 × 0), so the panel opens in place.
+        let measured = host.fittingSize.height
+        // Then only place() sizes the panel: the hosting view also resizing it was a second driver to fight with.
         host.sizingOptions = []
         panel.contentView = host
         self.panel = panel
-        place(height: host.fittingSize.height)
+        // Not measurable yet: stay invisible until the first reported height places it, rather than flash at 0,0.
+        if measured > 0 { place(height: measured) } else { panel.alphaValue = 0 }
         window.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
         resignObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
@@ -417,6 +420,7 @@ final class AnchoredPanel {
         let y = above ? anchorRect.maxY + 4 : anchorRect.minY - 4 - height
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
         panel.invalidateShadow()
+        panel.alphaValue = 1
     }
 
     func close() {

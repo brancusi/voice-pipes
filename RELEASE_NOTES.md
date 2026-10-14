@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.7**
+- **Fixed: typing in the middle of instructions jumped the cursor to the end.** In an LLM step's instructions (and a Route's, and a Text template), every character typed anywhere but the end sent the cursor to the end of the text. The cursor now stays where you're typing.
+- **Insert `{{input}}` with a button.** Under the instructions there's now an **Insert {{input}}** button that puts it right at the cursor (Text template also offers `{{input_json}}`). `{{input}}` is highlighted in the text, so it's easy to see where your words will go. You can still type it by hand.
+- **The model and Add step lists now open right under the button**, instead of appearing in the bottom-left corner for a moment first.
+
 **1.17.6**
 - **Fixed: the app could still freeze when opening the model list for an LLM step.** 1.17.4 made the list itself fast, but the pop-up that holds it could get stuck resizing itself: it fitted itself to the list, which made the list measure itself again, over and over, at full CPU. The pop-up now resizes once things have settled, and stops if it keeps changing. The same fix applies to the Add step pop-up.
 
