@@ -301,7 +301,9 @@ a:hover {
 .hero__lede { color: var(--sand); max-width: 60ch; }
 .hero__small { font-size: 13px; color: var(--fg-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.scene { display: block; width: 100%; height: clamp(260px, 34vw, 520px); }
+/* Never shorter than the art's 96 × 30 at full width (100vw × 30 / 96), or slice crops the top and the Wrangler's
+   head on wide screens; narrower screens crop the sides instead, as before. */
+.scene { display: block; width: 100%; height: max(clamp(260px, 34vw, 520px), 31.25vw); }
 .note { transform: translate(var(--at), calc(-1 * var(--at))); }
 
 /* Hero demo: five illustrative takes stacked in one grid cell, so switching never moves the page. */
