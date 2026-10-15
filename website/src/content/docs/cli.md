@@ -1,7 +1,7 @@
 ---
 title: "The vp command"
 nav: "CLI reference"
-description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.8.1."
+description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.17.15."
 order: 2
 ---
 
@@ -9,7 +9,7 @@ order: 2
 manage the config, vocabulary, keys and history. It is built to be driven by agents as well as people: compact
 output, next-step hints, errors on stdout, and no prompts. Not installed yet? See [Install](/docs/install).
 
-This page matches Voice Pipes **1.8.1**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
+This page matches Voice Pipes **1.17.15**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
 one command's usage and flags.
 
 ## At a glance
@@ -39,6 +39,10 @@ vp history --limit 5
 vp history show 1
 vp config check
 
+# Search every run you've ever made; keep it all as Markdown, a file a day
+vp history --search "release notes" --since 7d
+vp history archive --to ~/Documents/dictation
+
 # What agents read aloud to you unasked, and when the HUD takes the keyboard
 vp agents read-aloud attention
 vp reading keys hover
@@ -57,20 +61,22 @@ running, `vp` starts it in the background, without taking focus, and waits up to
 | Works without the app | Starts the app if needed |
 | --- | --- |
 | `vp`, `vp help`, `vp --version`, `vp status` (reports the config only) | `run`, `say`, `stop`, `pause`, `resume` |
-| `tracks` (list, show, enable, disable) | `listen`, `ask`, `transcribe`, `watch` |
-| `history` (list, show, usage) | `vocab train`, `config reload` |
+| `tracks` (list, show, enable, disable, duplicate) | `listen`, `ask`, `transcribe`, `watch` |
+| `history` (list, show, usage, export, `archive --to`) | `vocab train`, `config reload`, `history archive` |
 | `vocab` (list, add, remove, test) | `models`, `voices` for macOS and OpenRouter voices |
 | `config` (show, path, check, schema, backups, restore, open) | `auth`, `secret` |
 | `voices` for `pocket` and `supertonic` | `open`, `close`, `ui`, `update` |
 | `reading` (edits config.toml) | |
+| `inputs` | |
 | `install`, `agents` (including `read-aloud`, which edits config.toml) | |
 
 `vp speed`, `vp next` and `vp prev` are the exceptions: they change what's playing, so they never start the app and
-fail with `app_not_running` when it isn't running. Commands that edit config.toml (`tracks enable`, `reading`,
+fail with `app_not_running` when it isn't running. Commands that edit config.toml (`tracks enable`, `tracks duplicate`, `reading`,
 `agents read-aloud`, `config restore`) work with the app closed; a running app picks the change up within a second.
 
 The app runs one thing at a time. If a track, `vp say`, `vp listen` or a hotkey run is already going, a command that
-needs it fails with `busy`; run `vp stop` or wait.
+needs it fails with `busy`; run `vp stop` or wait. (A hotkey pressed while a run is still processing is ignored the
+same way, and the HUD says *busy, × stops it*.)
 
 ## Output
 
@@ -98,7 +104,7 @@ vp --version
 ```
 
 ```text
-version: 1.8.1
+version: 1.17.15
 ```
 
 ## Errors and exit codes
@@ -143,6 +149,8 @@ The main codes:
 | `app_closed` | The app closed the connection mid-request |
 | `busy` | Something is already running; `vp stop` or wait |
 | `no_such_track`, `invalid_track`, `takes_no_text`, `run_failed` | `vp run` problems; `run_failed` says which block failed |
+| `hotkey_clash` | `vp tracks enable` would give two enabled tracks the same hotkey; the hint names the other track (or add `--force`) |
+| `history_unavailable`, `archive_off` | `vp history` can't open the history database; `vp history archive` without `--to` while Setup → Archive is off |
 | `no_microphone`, `no_speech`, `cancelled` | Recording: no permission or device, nothing heard, or stopped with `vp stop` or Esc |
 | `bad_speed`, `bad_model`, `no_such_voice`, `speak_failed` | `vp say` and `vp ask` |
 | `not_speaking` | `vp speed`, `vp next` or `vp prev` when nothing is being read aloud |
@@ -193,7 +201,7 @@ Without the app it doesn't start it; it reports the config instead:
 ```text
 app: not running
 config: ~/.config/voice-pipes/config.toml · ok
-tracks: 3
+tracks: 4
 help[2]:
   Run `open -a "Voice Pipes"` (or any command that needs it starts it)
   Run `vp config check`
@@ -209,8 +217,11 @@ vp tracks
 vp tracks show <id>
 
 # Switch a track on or off (edits config.toml)
-vp tracks enable <id>
+vp tracks enable <id> [--force]
 vp tracks disable <id>
+
+# Copy a track, right below the original; the copy starts switched off
+vp tracks duplicate <id> [--name "…"]
 ```
 
 A track is named by its `id` from config.toml, or its name. `show` also says whether the track takes text
@@ -223,7 +234,13 @@ the block inside the medium branch is `2.medium.1`. A branch inside a branch car
 (`2.hard.1.short`).
 
 `enable` and `disable` edit config.toml (a backup is kept first) and answer with `changed: true` or `false`; a
-disabled track keeps its settings, but its hotkeys do nothing.
+disabled track keeps its settings, but its hotkeys do nothing. `enable` refuses with `hotkey_clash` when another
+enabled track already uses one of its hotkeys (only one of them would run); disable the other track, change a hotkey,
+or add `--force` to switch it on anyway.
+
+`duplicate` copies a track with all its blocks, names it "<name> copy" (or `--name`), and answers with the copy's
+`track` id and `enabled: false`: it starts off so it doesn't fight the original for its hotkey. Give it a hotkey of
+its own in config.toml, then `vp tracks enable` it.
 
 ### vp run
 
@@ -312,7 +329,7 @@ Prints `text`, `seconds` of audio and `ms`. The file never leaves the Mac unless
 ### vp stop, vp pause, vp resume
 
 ```sh
-# Stop speaking or recording; answers stopped: true or false
+# Stop speaking, recording or a run that's processing; answers stopped: true or false
 vp stop
 
 # Pause reading aloud
@@ -321,6 +338,10 @@ vp pause
 # Carry on
 vp resume
 ```
+
+`vp stop` does what the HUD's **×** does: a run that's still processing (a cloud model that hangs, say) stops
+straight away, nothing gets pasted, and what it had so far (your transcript, for instance) goes into History marked
+*Stopped*.
 
 ### vp speed
 
@@ -397,18 +418,28 @@ error).
 
 ```sh
 # Recent runs, newest first
-vp history [--limit <n>] [--track <id>] [--search <text>] [--since 30m|2h|3d]
+vp history [--limit <n> | --all] [--track <id>] [--search <text>] [--since 30m|2h|3d]
 
 # One run's log, step by step (1 is the newest)
 vp history show <n> [--full]
 
 # What your runs used and cost: today, 7 days, 30 days
 vp history usage
+
+# Whole runs as JSON lines, oldest first (takes the same filters)
+vp history export [--track <id>] [--search <text>] [--since 3d]
+
+# Every run as Markdown, a file a day: into your archive folder, or a copy anywhere
+vp history archive [--to <folder>]
 ```
 
-Recent runs, read from the history file (the app keeps the last 1,000). The list shows `n`, when, the track, `ms`,
-`cost` and the text (10 runs unless `--limit`). `cost` is `local` for a run that used nothing in the cloud, and blank
-for runs from before 1.7.2, which have no log. `--since` takes a number and `s`, `m`, `h` or `d`.
+Every run you've ever made, read straight from the app's history database
+(`~/Library/Application Support/VoiceTools/history.sqlite`), so it works whether the app is running or not. Since
+1.9.0 History keeps everything; runs from before then are the last 1,000 the old history file held. The list shows
+`n`, when, the track, `ms`, `cost` and the text (10 runs unless `--limit`; `--all` for every match), and `count`
+says how many match and how many there are in all. `cost` is `local` for a run that used nothing in the cloud, and
+blank for runs from before 1.7.2, which have no log. A run that failed or was stopped ends with `· failed: …`.
+`--track` takes a track's id or name; `--search` matches the text; `--since` takes a number and `s`, `m`, `h` or `d`.
 
 `show <n>` prints one run: what was heard, the text, any failure, and its `log`, a row per block with its `ms`,
 what it `used` and what it gave (`out`). Blocks inside a branch are indented under it; a Branch or Route row names
@@ -421,6 +452,15 @@ Costs are what OpenRouter calls cost. Jev's picks (billed by TypeSafe) and your 
 
 `usage` is a table of `runs`, `tokens_in`, `tokens_out`, `cost` (exact) and `speech_estimate` (≈) for today, the
 last 7 days and the last 30 days. It counts what's in History, so clearing History clears it too.
+
+`export` prints every matching run whole, one JSON object per line, oldest first: its number `n`, the text, what
+was heard, the timings and the step-by-step log. Pipe it into `jq` or a file.
+
+`archive` writes every run into Markdown files, one a day, in year and month folders (`2026/10/2026-10-09.md`), the
+same files **Setup → Archive → Save every run as text** keeps. Without `--to` it rebuilds your archive folder through
+the app (it fails with `archive_off` if the archive is off); with `--to <folder>` it writes a copy there, app
+running or not. Either way it answers with the `folder`, the number of `runs` and `days`, and running it again
+rewrites the same files, so nothing is duplicated.
 
 ### vp vocab
 
@@ -485,6 +525,18 @@ vp models [--capability text|transcription|speech] [--search <text>] [--limit <n
 OpenRouter models you can pick for a block, with prices: `id`, `name`, `price` (20 unless `--limit`;
 `--capability` defaults to `text`). It also names what runs on this Mac for that job (`on_this_mac`): Parakeet for
 transcription; Pocket TTS, Supertonic and macOS voices for speech.
+
+### vp inputs
+
+```sh
+vp inputs
+```
+
+The microphones on this Mac, by the names config.toml's `input` takes: `input`, a `note` (`kept ready`, or that a
+Bluetooth headset starts a moment after the press), whether it's `connected`, and which `tracks` use it. `System`
+follows whatever macOS uses. `app_input` is the app's own choice (`input` under `[settings]`); a microphone block's
+`input` overrides it for one track. A mic a track names that isn't plugged in is listed as not connected: that track
+records from the system input until it's back. See [config.toml](/docs/config).
 
 ### vp voices
 
@@ -574,7 +626,7 @@ open block and the focused field. No screen recording or Accessibility access is
 | `track <id>` | `--step <n>` opens a block; `--route <n>` a route card in a Route block; `--field <name>` puts the cursor in a field (`name`, or a block's `prompt`, `url`, `headers`, `body`, `response_field`, `template`); `--section title\|triggers\|pipeline` |
 | `history` | `--track <id>`, `--search <text>`, `--run <n>` (n from `vp history`) |
 | `vocabulary` | `--word <word>`, `--add` |
-| `setup` | `--section checks\|connections\|cli\|models\|appearance\|reading\|updates`, `--field <name>` (such as `openrouter-key`) |
+| `setup` | `--section checks\|connections\|cli\|models\|microphone\|archive\|appearance\|reading\|updates`, `--field <name>` (such as `openrouter-key`) |
 | `onboarding` | `--step welcome\|permissions\|models\|keys\|agents\|try` |
 | `reading` | The HUD's follow-along card: it shows with the current reading, or the next one, and stays open for later readings until closed |
 | `menu`, `about`, `config` | `config` opens config.toml in your editor |

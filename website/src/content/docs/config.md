@@ -2,7 +2,7 @@
 title: "config.toml"
 headline: "the config file"
 nav: "Config file"
-description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.8.1."
+description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the microphone, archive, reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.17.15."
 order: 3
 ---
 
@@ -12,10 +12,10 @@ Everything you build in Voice Pipes is in two plain-text files you can edit, ver
 | --- | --- |
 | `~/.config/voice-pipes/config.toml` | Tracks, their hotkeys and blocks, and settings |
 | `~/.config/voice-pipes/vocabulary.toml` | The words Fix words corrects |
-| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.8.1 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
+| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.17.15 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
 | `backups/` | Earlier versions of both files |
 
-This page matches Voice Pipes **1.8.1**. `config.toml` is the app's setup, one to one: every track, block, branch
+This page matches Voice Pipes **1.17.15**. `config.toml` is the app's setup, one to one: every track, block, branch
 and hotkey the app's window shows is in it, with the [settings](#settings). Keys and secrets never are.
 
 The path is always `~/.config/voice-pipes`, whatever `XDG_CONFIG_HOME` says: the app is started by launchd, which
@@ -73,7 +73,7 @@ hotkeys = [{ keys = "option+space", mode = "hold" }]
 | `name` | Required. Shown in the menu bar, the HUD and History |
 | `color` | `apricot`, `dusk-blue`, `lavender`, `sage`, `marigold`, `rose`, `red-rock`, or `"#RRGGBB"` |
 | `enabled` | `true` or `false`. A disabled track keeps its settings, but its hotkeys do nothing |
-| `hotkeys` | A list of `{ keys = "…", mode = "hold" \| "toggle" }`. `keys` is modifiers (`control`, `option`, `shift`, `command`) then one key, joined with `+`: `a`–`z`, `0`–`9`, `space`, `return`, `tab`, `escape`, `delete`, `f1`–`f20`, `left`, `right`, `up`, `down`, and punctuation names such as `minus`, `equal`, `comma`, `period` or `slash`. `hold` records while held; `toggle` starts on one press and stops on the next. `hotkeys = []` leaves a track to the menu bar panel and `vp run` |
+| `hotkeys` | A list of `{ keys = "…", mode = "hold" \| "toggle" \| "once" }`. `keys` is modifiers (`control`, `option`, `shift`, `command`) then one key, joined with `+`: `a`–`z`, `0`–`9`, `space`, `return`, `tab`, `escape`, `delete`, `f1`–`f20`, `left`, `right`, `up`, `down`, and punctuation names such as `minus`, `equal`, `comma`, `period` or `slash`. `hold` records while held; `toggle` starts on one press and stops on the next (or pauses and resumes a reading); `once` runs the track once from the start on each press: a microphone track records until you pause, and pressing during a reading starts over with what's selected now. `hotkeys = []` leaves a track to the menu bar panel and `vp run` |
 | `[[track.step]]` | One per block, in order. Each block takes the previous block's output |
 
 The file also takes `version = 1` and the [settings](#settings) tables.
@@ -84,12 +84,12 @@ Inputs give audio or text, `transcribe` turns audio into text, and the rest take
 
 | `type` | Settings | Takes → gives |
 | --- | --- | --- |
-| `microphone` | | nothing → audio |
-| `text` | `sources`: any of `"selection"`, `"page"`, `"clipboard"`, `"previous-clipboard"`; the first with text wins | nothing → text |
+| `microphone` | `input`: `"system"` (whatever macOS uses) or a mic's name from `vp inputs`. Leave it out to use [`input` in settings](#settings) | nothing → audio |
+| `text` | `sources`: any of `"selection"`, `"page"`, `"clipboard"`, `"previous-clipboard"`; the first with text wins. Add step's **Selected text** is `["selection"]` (your clipboard is left as it was) and **Clipboard** is `["clipboard"]` | nothing → text |
 | `transcribe` | `model`: `"parakeet"` (on this Mac) or an OpenRouter id. Parakeet only: `mode` = `on-release`, `pause-chunks` or `streaming`, and `pause_ms` = 300–1200 for `pause-chunks` | audio → text |
 | `fix-words` | Uses vocabulary.toml, on this Mac | text → text |
-| `llm` | `model` (an OpenRouter id), `prompt` (`{{input}}` places the text; without it the text is the user message), `on_failure` = `pass-through` or `stop` | text → text |
-| `route` | `[[track.step.route]]` entries, each with `name`, `when`, `model`, `prompt`. Jev picks one route by its `when`; without a Jev key the first route answers | text → text |
+| `llm` | `model` (an OpenRouter id), `prompt` (`{{input}}` places the text; without it the text is the user message), `on_failure` = `pass-through` or `stop`, `vocabulary` = `true` (the default) or `false` ([your vocabulary in prompts](#your-vocabulary-in-llm-prompts)) | text → text |
+| `route` | `[[track.step.route]]` entries, each with `name`, `when`, `model`, `prompt` and optionally `vocabulary`. Jev picks one route by its `when`; without a Jev key the first route answers | text → text |
 | `branch` | `question`, then `[[track.step.branch]]` entries, each with `name`, `when` and its own `[[track.step.branch.step]]` blocks. Jev answers the question and picks a branch by its `when`; that branch's blocks run, then the track carries on. Without a Jev key the first branch runs. [More below](#branch-one-track-several-paths) | text → what the branches give |
 | `http` | `url`, `method` (`GET`, `POST`, `PUT`, `PATCH`), `headers = { … }`, `body`, `response_field`. `{{input}}` (URL-encoded in the url) or `{{input_json}}`; `${secret:name}` and `${env:NAME}` | text → text (the reply) |
 | `template` | `template = "…{{input}}…"` | text → text |
@@ -161,7 +161,27 @@ Existing setups keep their own Read aloud: an update doesn't rewrite your tracks
 `branch` block like the one above into your Read aloud before its `speak` block, or ask your agent to.
 
 A `route` is the simpler choice when every path is one LLM call: Jev picks which model answers. A `branch` picks a
-whole run of blocks.
+whole run of blocks. The starter Quick answer (⌥Q, hold; added in 1.15.0) is a route: Jev sends each question to
+`quick` (`anthropic/claude-haiku-4.5`), `web` (`perplexity/sonar`, which searches the web) or `deep`
+(`anthropic/claude-sonnet-5.5`), and Pocket reads the answer. Without a Jev key, `quick` answers everything.
+
+## Your vocabulary in LLM prompts
+
+By default every `llm` block and every route adds your [vocabulary](#vocabularytoml) to its instructions as a
+glossary ("always use these exact spellings"), so the model keeps your names. A capable model usually spells them
+right anyway, so you can switch that off (the block's **Vocabulary** switch in the app):
+
+```toml
+  [[track.step]]
+  type = "llm"
+  model = "anthropic/claude-haiku-4.5"
+  prompt = "Tidy this note. Names to spell exactly: {{vocabulary}}\n\n{{input}}"
+  vocabulary = false
+```
+
+`{{vocabulary}}` puts the list exactly where you write it, comma-separated, whatever `vocabulary` says; when the
+prompt has it, the list isn't added again at the end. Leaving `vocabulary` out means `true`, so tracks from before
+1.17.10 work as they did. The Fix words block is separate: it uses vocabulary.toml only in tracks that include it.
 
 ## Choosing a model
 
@@ -187,10 +207,16 @@ The top of the file holds the settings, here with their defaults (the app writes
 ```toml
 [settings]
 appearance = "auto"            # auto (follow macOS) | daylight | sundown
+microphone = "always"          # always | after-use | off
+input = "system"               # "system" or a mic's name (`vp inputs`)
 
 [settings.agents]
 read_aloud = "attention"       # off | long | attention | all
 long_text = 600                # characters; longer than this counts as long
+
+[settings.archive]
+enabled = false
+folder = "~/Documents/Voice Pipes"
 
 [settings.reading]
 take_keys = "always"           # always | hover | click | never
@@ -211,8 +237,9 @@ end = ["shift+g"]
 
 | Table | What it sets |
 | --- | --- |
-| `[settings]` | `appearance`: Auto follows your Mac, Daylight is light, Sundown is dark |
+| `[settings]` | `appearance`: Auto follows your Mac, Daylight is light, Sundown is dark. `microphone`: keep the mic open between takes, so a take starts the moment you press and keeps the half second before it: `always`, `after-use` (for 5 minutes after each take) or `off` (opened for each take). Bluetooth headsets are never kept open, since that switches them to call-quality audio. `input`: which mic tracks record from, `"system"` (follows macOS) or a mic's name from `vp inputs`; a Microphone block's own `input` wins. A named mic that isn't plugged in falls back to the system input until it's back |
 | `[settings.agents]` | What agents read aloud to you without being asked, and what counts as long (at least 50 characters). `vp agents read-aloud` sets it; [Agents](/docs/agents#what-agents-read-aloud) has what each mode means |
+| `[settings.archive]` | A plain-text copy of every run (Setup → Archive): one Markdown file a day in `folder`, sorted by year and month (`2026/10/2026-10-09.md`), with the time, track, mic, app, models and text. Off until you turn it on; `vp history archive` writes your whole history the same way |
 | `[settings.reading]` | When the HUD takes the keyboard while something is read aloud, what clicking another app does, and the keys for each action while the HUD has them (plain keys are fine: they only work then). `vp reading` sets it; [Reading aloud](/docs/reading) has the details |
 | `[settings.reading.global]` | One shortcut per action that works in any app, but only while something is read. Give each a modifier (`control`, `option` or `command`): `vp config check` warns about one without (function keys aside) |
 

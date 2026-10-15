@@ -1,16 +1,16 @@
 ---
 title: "Reading aloud"
 nav: "Reading aloud"
-description: "Follow and steer anything Voice Pipes reads aloud: the read-along card, jumping between sentences, live speed, the HUD's keys and when it takes them, shortcuts, and the same controls from vp and config.toml. Matches Voice Pipes 1.8.1."
+description: "Follow and steer anything Voice Pipes reads aloud: the read-along card, jumping between sentences, live speed, the HUD's keys and when it takes them, shortcuts, and the same controls from vp and config.toml. Matches Voice Pipes 1.17.15."
 order: 4
 ---
 
-Voice Pipes reads aloud for the Read aloud track (⌥R, toggle), any track that ends in Speak, `vp say`, the question
+Voice Pipes reads aloud for the Read aloud track (⌥R, toggle), the Quick answer track's replies (⌥Q), any track that ends in Speak, `vp say`, the question
 in `vp ask`, and agents that use it. Every reading works the same way: the HUD at the bottom of the screen shows it,
 and you can follow the text, jump around, change the speed and stop, with the mouse, the keyboard or `vp`. Nothing
 here brings Voice Pipes to the front: the app you're in stays active.
 
-This page matches Voice Pipes **1.8.1**.
+This page matches Voice Pipes **1.17.15**.
 
 ## Follow along
 
@@ -22,7 +22,8 @@ and it follows the voice again when the pointer leaves.
 - **Click a sentence** to carry on reading from there, with any voice.
 - **− and +** change the speed on the spot, from 0.6× to 2×, for this reading only. The track's own speed stays as
   set.
-- **Pause and stop** are the HUD's buttons. Pressing the track's hotkey again also pauses and resumes.
+- **Pause and stop** are the HUD's buttons. Pressing the track's hotkey again also pauses and resumes; with a
+  **Once** hotkey it starts over instead, reading whatever is selected now ([hotkeys](/docs/config#a-track)).
 
 The card stays open for later readings until you close it (˅). From a terminal, `vp open reading` shows it and
 `vp close reading` hides it.

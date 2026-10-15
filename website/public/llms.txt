@@ -13,5 +13,6 @@
 - [Install from a terminal](https://voicepipes.app/docs/install)
 - [The vp command](https://voicepipes.app/docs/cli)
 - [config.toml: tracks and settings](https://voicepipes.app/docs/config)
+- [Reading aloud: follow and steer it](https://voicepipes.app/docs/reading)
 - [vp for agents](https://voicepipes.app/docs/agents)
 - [Key setup (OpenRouter, TypeSafe Jev)](https://voicepipes.app/setup)

@@ -43,7 +43,7 @@ Tell them what it does, then ask "Shall I install it?":
 
 > It downloads the newest Voice Pipes from GitHub, checks that it's signed by its developer and notarized by Apple
 > (it refuses to install anything else), puts the app in Applications, adds the `vp` command and an agent skill, and
-> starts the app in the menu bar. No password, no prompts. About 13 MB, then up to about 1 GB of on-device speech
+> starts the app in the menu bar. No password, no prompts. About 14 MB, then up to about 1 GB of on-device speech
 > models download in the background.
 
 ```sh
@@ -106,16 +106,19 @@ vp tracks
 Each track has an `id`, a `name` and `hotkeys`, e.g. `option+space hold`. Several are separated by ` / `.
 - `hold`: hold the keys while talking, let go to finish.
 - `toggle`: press once to start, again to stop (Esc cancels).
+- `once`: press once; a microphone track records until they pause.
 
 Write them the Mac way: ⌥ Option, ⇧ Shift, ⌘ Command, ⌃ Control. On a fresh install they're ⌥ Space (hold) for
-Fast dictation, ⌥ ⇧ Space (toggle) for Clean dictation and ⌥ R (toggle) for Read aloud.
+Fast dictation, ⌥ ⇧ Space (toggle) for Clean dictation, ⌥ R (toggle) for Read aloud and ⌥ Q (hold) for Quick
+answer (it needs an OpenRouter key, so leave it out of the demo).
 
 **Dictation.** Take the first track whose name says "dictation" and its first hotkey. First note how many runs there
 are: `vp history --limit 1` prints `count: 1 of N matching (N total)`; remember N. Then tell them, with their keys:
 
 > Click into any text field (a note, an email, this chat), hold **⌥ Space**, say a sentence, and let go.
 
-(For a `toggle` hotkey: "press **…** once, say a sentence, and press it again".) Then every 3 seconds, for up to 2
+(For a `toggle` hotkey: "press **…** once, say a sentence, and press it again"; for `once`: "press **…** once,
+say a sentence, and pause".) Then every 3 seconds, for up to 2
 minutes, run `vp history --limit 1 --full` until the total is above N. That's their run: tell them what Voice Pipes
 heard (`text`) and how fast it was (`ms`: on-device transcription is usually 100 to 300 ms), and that it was pasted
 where they were typing.
@@ -129,7 +132,9 @@ speech model isn't ready yet. Say so, wait until it reads `loaded`, and try agai
 
 (For a `hold` hotkey: "hold **…**; it reads while you hold".)
 
-**Not working?** `vp history show 1` shows how the last run went, step by step. `vp status` shows the `checks:`
+**Not working?** `vp history show 1` shows how the last run went, step by step. If it heard nothing, the wrong
+microphone may be in use (AirPods, a display's mic): `vp inputs` lists the mics; they pick one in Setup →
+Microphone → Input (`vp open setup --section microphone`). `vp status` shows the `checks:`
 count; `vp open setup --section checks` shows each check and its fix.
 
 ## 6. Wrap up
@@ -138,6 +143,7 @@ Tell them, briefly:
 
 - Their hotkeys (from `vp tracks`), and that the menu bar icon (the little wrangler) lists them too.
 - If they'd like to change a hotkey: the menu bar icon → Open Voice Pipes… → the track, or ask you.
+- They can use a particular mic: `vp inputs` lists them; Setup → Microphone → Input picks one (or one per track).
 - Everything they dictate is kept in History (`vp history`, or the window's History page) if a paste ever misses.
 - Optional, for cloud models (cleanup, quick answers, cloud voices): an OpenRouter key. `vp auth login openrouter`
   opens the sign-in in their browser. Guide: https://voicepipes.app/setup
@@ -160,6 +166,7 @@ vp say "All set. Hold the hotkey and talk whenever you like."
 | Tracks and their hotkeys | `vp tracks` |
 | Say something out loud | `vp say "…"` (`--model macos` until `pocket: loaded`) |
 | The latest runs; one run in detail | `vp history --limit 5`; `vp history show 1` |
+| Microphones, and which tracks use which | `vp inputs` |
 | Show a setup step or a Setup section | `vp open onboarding --step welcome\|permissions\|models\|keys\|agents\|try`; `vp open setup --section checks` |
 | Reinstall or update | the step 2 command again |
 | Uninstall (keeps their settings and history) | `curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh \| bash -s -- --uninstall` |

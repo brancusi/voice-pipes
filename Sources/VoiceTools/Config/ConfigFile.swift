@@ -831,7 +831,8 @@ enum ConfigFile {
         #              keys: modifiers (control, option, shift, command) then one key, joined with +:
         #                    a–z, 0–9, space, return, tab, escape, delete, f1–f20, left, right, up, down,
         #                    minus, equal, comma, period, slash, semicolon, quote, backslash, grave, …
-        #              mode: hold (records while held) | toggle (press to start, again to stop)
+        #              mode: hold (records while held) | toggle (press to start, again to stop) |
+        #                    once (each press runs it from the start; a mic records until you pause)
         #    step      one [[track.step]] per block, in order. Each block takes the previous block's output:
         #              inputs give audio or text, transcribe turns audio into text, the rest take text.
         #

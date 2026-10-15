@@ -98,9 +98,10 @@ target folder, it is left alone and the installer stops with an error after inst
 ## The first launch: two permissions only you can grant
 
 macOS doesn't let a script grant Microphone or Accessibility access, so on the first launch Voice Pipes opens
-**Set up Voice Pipes** and asks for them one at a time:
+**Welcome to Voice Pipes** and asks for them one at a time:
 
-- **Microphone**: records while you hold or toggle a hotkey, and for `vp listen`, `vp ask` and microphone tracks.
+- **Microphone**: records while you use a hotkey, and for `vp listen`, `vp ask` and microphone tracks. It records
+  from the Mac's input unless you pick a mic in Setup → Microphone (or per track); `vp inputs` lists them.
 - **Accessibility**: pastes at your cursor and reads the selected text.
 
 **Open Settings…** opens the right Privacy & Security page with a small helper beside it. If Voice Pipes isn't in
@@ -144,13 +145,13 @@ vp --version
 vp
 ```
 
-`vp --version` prints the app's version (1.8.1 as of this page). `vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
+`vp --version` prints the app's version (1.17.15 as of this page). `vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
 next. The [CLI reference](/docs/cli) has every command.
 
 ## Updates
 
 The app updates itself: it checks for a new version every 5 minutes, and when one is out the menu bar panel offers
-**Install…**. `vp update` checks now. Because `vp` is a link to the app's binary, it is updated with the app.
+**Install…** (so does the bar along the bottom of the main window, with **Check now**). `vp update` checks now. Because `vp` is a link to the app's binary, it is updated with the app.
 Permissions carry over between versions.
 
 The rest follows the app each time it starts: it refreshes the installed [agent skill](/docs/agents#install-the-skill)

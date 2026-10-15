@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.15**
+- **The agent skill knows the latest features.** Agents that use Voice Pipes (Claude Code, Codex and others) now know that `vp stop` also stops a run that's processing, that the app runs one thing at a time (and answers `busy`), the **Once** hotkey mode, the Selected text and Clipboard inputs, `vp tracks duplicate`, hotkey clashes, `vp inputs` for choosing a mic, and how to spot failed or passed-through runs in History. The skill updates itself when the app does.
+- The config reference written into `config.toml` lists the **Once** mode everywhere it lists hold and toggle.
+
 **1.17.14**
 - **Fixed for real: typing in the middle of LLM instructions jumped the cursor to the end.** The earlier fixes (1.17.7, 1.17.11) worked when text was inserted by other means but not for actual typing: right after each key, the editor was handed the text from before that key, which also sometimes swallowed the first letter you typed. The instructions field (LLM, Route and Text template) is now a plain macOS text view that keeps your cursor and every keystroke. It looks and works as before, including Insert {{input}}, the highlighted tokens, resizing and Undo.
 

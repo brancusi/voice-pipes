@@ -287,7 +287,8 @@ enum AgentsInstaller {
         - `vp ask "Deploy to staging or production?"` speaks the question, records the user's reply until they stop
           talking, and prints `answer:`. Use it when you need a decision and the user may not be at the screen.
           `--max 30` caps the recording; `--silence 1.2` is how long a pause ends it.
-        - `vp listen` records and transcribes without speaking first. `vp stop` stops speech or recording.
+        - `vp listen` records and transcribes without speaking first. `vp stop` stops speech, recording, or a run
+          that's still processing (like the HUD's ×; what it had so far goes into History marked Stopped).
         - `vp speed 1.4` changes the speed of what's playing.
 
         ## Read aloud: the user's standing preference
@@ -351,6 +352,10 @@ enum AgentsInstaller {
         - `vp transcribe recording.m4a` transcribes a file on the Mac (Parakeet, fast, private).
         - `vp history --limit 5` shows recent runs (what was said, what came out, timings); `vp history show <n>`. History
           goes back to the first run: `--search`, `--track`, `--since 3d`, `--all`, and `vp history export` for whole runs as JSON lines (`vp history archive [--to <folder>]`: all of it as Markdown, a file a day).
+          A run that failed or was stopped ends with `· failed: …`; `vp history show <n>` says which block failed and
+          whether it stopped the run or passed its input on (`on_failure = "pass-through"`), with the full error.
+        - The app runs one thing at a time: while a run is going, `vp run`/`say`/`listen` fail with `busy` (and the
+          user's hotkeys are ignored until it finishes). Wait, or `vp stop`.
         - `vp watch` streams run events as they happen.
 
         ## Build or change a pipeline for the user
@@ -361,7 +366,9 @@ enum AgentsInstaller {
         the user to click through the app to build something. `vocabulary.toml` beside it holds the word fixes.
 
         1. Understand the job: what goes in (their voice, selected text, the clipboard), what should happen to it,
-           where it goes (pasted, copied, spoken, posted to a service), and the hotkey (hold or toggle).
+           where it goes (pasted, copied, spoken, posted to a service), and the hotkey: `hold` (talk while held),
+           `toggle` (press to start, again to stop) or `once` (each press runs it from the start; good for "read my
+           selection" or "summarize this", and a mic track records until they pause).
         2. Look at what exists: `vp tracks`, `vp tracks show <id>` (blocks numbered; branches as 2.easy, 2.hard.1),
            and the file itself. Changing a track: read its `[[track]]` table and edit only what was asked.
         3. Write the blocks (the reference below lists every block and setting). Keep the file's layout and comments;
@@ -380,7 +387,8 @@ enum AgentsInstaller {
         - Voice in: `microphone` then `transcribe` (`model = "parakeet"` on this Mac, fast and private; or an
           OpenRouter id for cloud accuracy), usually `fix-words` next (their vocabulary). `microphone` takes
           `input = "<name>"` for a specific mic (`vp inputs`); without it, [settings] input.
-        - Text in: `text` with `sources` (selection, page, clipboard; first with text wins).
+        - Text in: `text` with `sources` (first with text wins). `sources = ["selection"]` is the app's Selected
+          text block (what's highlighted, clipboard left alone); `["clipboard"]` is its Clipboard block.
         - Change the text: `llm` (any OpenRouter model, `vp models --capability text --search <name>`; `{{input}}` in
           the prompt places the text; `on_failure = "pass-through"` keeps a track working offline; their vocabulary
           goes along as a glossary unless `vocabulary = false`, and `{{vocabulary}}` places it), `template`, `http`.
@@ -398,7 +406,11 @@ enum AgentsInstaller {
         - Secrets for http blocks: `vp secret set <name>` (pipe the value), then `${secret:<name>}`. Never put keys in
           the file. Provider keys: `vp auth`.
         - Ask before changing or removing the user's existing hotkeys or tracks; adding a new track is fine.
-          `vp config backups` / `vp config restore <n>` undo.
+          `vp config backups` / `vp config restore <n>` undo. To try a variant of an existing track,
+          `vp tracks duplicate <id> [--name "…"]` copies it right below (switched off, so its hotkey doesn't clash);
+          give the copy its own hotkey, then `vp tracks enable <id>`. `enable` refuses with `hotkey_clash` when an
+          enabled track already uses that hotkey (`--force` overrides; only one of them would run).
+        - Mics: `vp inputs` lists them by the names `input` takes, and which tracks use each.
         - Vocabulary: `vp vocab add "Kubernetes" --heard "cuban eighties, cube or netties"`; `vp vocab test "…"`.
 
         ## Show the user (no screen access needed)

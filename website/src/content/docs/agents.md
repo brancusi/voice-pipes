@@ -2,7 +2,7 @@
 title: "Agents"
 headline: "vp for agents"
 nav: "Agents"
-description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.8.1."
+description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.17.15."
 order: 5
 ---
 
@@ -33,7 +33,7 @@ If none of those folders exist, it uses `~/.claude`. `vp agents` shows where the
 The app keeps it current by itself. Each time it starts, it rewrites installed skills that are out of date, so they
 match the installed `vp`, and gives the skill to agents you've installed since (a `~/.codex` that appeared, say) as
 long as it's installed for at least one agent; after `vp agents uninstall` it stays uninstalled. This upkeep runs
-only for a copy of the app in `/Applications` or `~/Applications`. This page matches the skill in Voice Pipes 1.8.1.
+only for a copy of the app in `/Applications` or `~/Applications`. This page matches the skill in Voice Pipes 1.17.15.
 
 The skill ends with the full block and settings reference, generated from the same source as the one at the end of
 config.toml, so the two always match.
@@ -70,7 +70,13 @@ Setup → Checks as "vp points at a moved app", with **Fix…** to relink it (ma
   You steer from the HUD and its keys ([Reading aloud](/docs/reading)); the agent can too: `vp next`, `vp prev`,
   `vp speed <0.6–2.0>`, `vp pause`, `vp resume`, `vp stop`, and `vp close reading` hides the card for later readings.
 - **Run your tracks.** `vp tracks`, then `vp run <id> --text "…"`, which prints the final text. Tracks that end in
-  Paste paste at your cursor, so the skill tells agents to prefer tracks without Paste unless you ask.
+  Paste paste at your cursor, so the skill tells agents to prefer tracks without Paste unless you ask. The app runs
+  one thing at a time: while a run is going, `vp run` fails with `busy`, and `vp stop` stops a run that hangs, as
+  the HUD's **×** does.
+- **Look back through everything you've said.** `vp history` reaches back to your first run, app open or not:
+  `--search`, `--track`, `--since 3d`, `--all`; `vp history show <n>` is one run's log, including which block
+  failed and whether it stopped the run or passed its input on; `vp history export` gives whole runs as JSON lines,
+  and `vp history archive [--to <folder>]` writes them all as Markdown, a file a day.
 - **Build or change a track from a plain-language request**, by editing config.toml ([below](#build-a-track-from-plain-language)).
 - **Change how Voice Pipes reads to you, when you ask.** "Only read me long stuff" → `vp agents read-aloud long`;
   "don't take my keys" → `vp reading keys hover` (or `click` or `never`); "always take them" → `always`. The skill
@@ -121,7 +127,8 @@ Ask for what you want ("make me a track that cleans up my dictation and posts it
 a cloud voice") and the skill walks the agent through it:
 
 1. Work out what goes in (your voice, selected text, the clipboard), what should happen to it, where it goes
-   (pasted, copied, spoken, posted somewhere) and the hotkey.
+   (pasted, copied, spoken, posted somewhere) and the hotkey: hold, toggle, or once (each press runs it from the
+   start).
 2. Look at what's there: `vp tracks`, `vp tracks show <id>` and config.toml itself. When changing a track, edit only
    what you asked for.
 3. Write the blocks in config.toml, with a unique `id` and a hotkey nothing else uses. The skill carries every block
@@ -134,8 +141,13 @@ a cloud voice") and the skill walks the agent through it:
 
 The skill also tells agents which block fits: [`branch`](/docs/config#branch-one-track-several-paths) when different
 input needs different handling, `route` when only the answering model changes, `on_failure = "pass-through"` so an
-LLM step can fail without stopping the track. It asks before changing or removing your existing tracks or hotkeys;
-adding a new track is fine, and `vp config backups` and `vp config restore <n>` undo.
+LLM step can fail without stopping the track, a `text` block with `sources = ["selection"]` or `["clipboard"]`
+(the app's Selected text and Clipboard blocks) to start from text, `vocabulary = false` on an LLM step or route that
+doesn't need your word list (or `{{vocabulary}}` to place it), and `input` on a microphone block for a particular mic
+(`vp inputs`). It asks before changing or removing your existing tracks or hotkeys; adding a new track is fine, and
+`vp config backups` and `vp config restore <n>` undo. To try a variant, an agent can `vp tracks duplicate <id>`: the
+copy starts switched off, so it doesn't fight the original for its hotkey, and `vp tracks enable` refuses a hotkey
+clash unless told `--force`.
 
 ## Patterns
 
@@ -198,7 +210,9 @@ vp history show 1
 
 ## Install everything from an agent
 
-An agent can install Voice Pipes on a Mac where it isn't installed, without prompts:
+An agent can install Voice Pipes on a Mac where it isn't installed, without prompts. To have one walk you through
+it, paste "Install Voice Pipes for me: https://voicepipes.app/install.md" into it ([Install with your agent](/install)).
+The command it runs:
 
 ```sh
 curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash
