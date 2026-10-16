@@ -25,12 +25,14 @@ extension VPCommands {
             })), ("claude_session_hook", .bool(AgentsInstaller.hookInstalled))]), help: ["vp agents install [--hook]"])
         case "install":
             let installed = try AgentsInstaller.installSkill()
+            AgentsInstaller.optedOut = false
             var hook = AgentsInstaller.hookInstalled
             if parsed.has("hook") { try AgentsInstaller.installHook(); hook = true }
             out.emit(.object([("skill", .list(installed.map { .string(ConfigPaths.tilde($0)) })), ("claude_session_hook", .bool(hook))]),
                      help: installed.isEmpty ? ["mkdir -p ~/.claude/skills && vp agents install"] : hook ? [] : ["vp agents install --hook   (Claude Code: show Voice Pipes state at each session start)"])
         case "uninstall":
             let removed = AgentsInstaller.uninstall()
+            AgentsInstaller.optedOut = true  // the app won't put it back at launch; `vp agents install` does
             out.emit(.object([("removed", .list(removed.map { .string(ConfigPaths.tilde($0)) }))]))
         case "context":
             // For the session hook: compact, never starts the app.
@@ -141,12 +143,26 @@ enum AgentsInstaller {
         return chosen.map(\.skillFile)
     }
 
-    /// Keeps installed skills current after an update (the app calls this at launch).
-    /// At launch: rewrite installed skills that are out of date, and give the skill to agents installed since (an
-    /// agent home that appeared, e.g. ~/.codex). Nothing happens if the skill isn't installed anywhere
-    /// (`vp agents uninstall` sticks).
+    /// Left by `vp agents uninstall`, removed by `vp agents install`: the app then leaves the skill out at launch.
+    /// A file beside config.toml rather than a default, so vp (run through a symlink) and the app see the same thing.
+    static var optOutFile: URL { ConfigPaths.directory.appendingPathComponent(".agent-skill-off") }
+    static var optedOut: Bool {
+        get { FileManager.default.fileExists(atPath: optOutFile.path) }
+        set {
+            if newValue {
+                try? FileManager.default.createDirectory(at: ConfigPaths.directory, withIntermediateDirectories: true)
+                FileManager.default.createFile(atPath: optOutFile.path, contents: Data("vp agents uninstall: Voice Pipes won't install its agent skill at launch. vp agents install undoes it.\n".utf8))
+            } else {
+                try? FileManager.default.removeItem(at: optOutFile)
+            }
+        }
+    }
+
+    /// At launch (installed copies only): give the skill to every agent home that exists (~/.claude, ~/.codex,
+    /// ~/.agents), so installing the app is all it takes, and rewrite installed skills that are out of date.
+    /// Nothing is created for agents that aren't installed, and `vp agents uninstall` sticks.
     static func refreshIfInstalled() {
-        guard targets.contains(where: isInstalled) else { return }
+        guard !optedOut else { return }
         for target in targets where isInstalled(target) || FileManager.default.fileExists(atPath: target.home.path) {
             if (try? String(contentsOf: target.skillFile, encoding: .utf8)) != skill {
                 try? FileManager.default.createDirectory(at: target.skillFile.deletingLastPathComponent(), withIntermediateDirectories: true)

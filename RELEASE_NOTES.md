@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.17**
+- **Installing the app now sets up the agent skill too.** Each time Voice Pipes starts, it puts its skill into every coding agent you have (Claude Code, Codex and others that read `~/.agents`), so they know how to use `vp` without a separate install step. Agents you install later get it at the next start. If you'd rather not, `vp agents uninstall` removes it and it stays removed (`vp agents install` brings it back).
+- The website's "Install with your agent" page is gone for now. Download the app, or use the one-line terminal installer; the `vp` command works as before.
+
 **1.17.16**
 - **OpenRouter and Jev keys are optional, and the app no longer looks broken without them.** If a track that uses cloud models (like the starter Quick answer) was switched on and you hadn't added an OpenRouter key, the menu bar icon turned into a warning sign and the panel said FAIL · Needs setup. Now a missing key is just a note in Setup naming the tracks that need it, and those tracks still show NEEDS KEY in the sidebar. Dictation and everything on your Mac works without any key. A key that's there but rejected still shows as a problem.
 

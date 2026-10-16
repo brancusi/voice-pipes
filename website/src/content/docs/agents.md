@@ -2,7 +2,7 @@
 title: "Agents"
 headline: "vp for agents"
 nav: "Agents"
-description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.17.15."
+description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.17.17."
 order: 5
 ---
 
@@ -13,14 +13,15 @@ change your tracks from a plain-language request.
 
 ## Install the skill
 
-The [one-line installer](/docs/install#the-one-line-installer) and **Install command-line tool** in the app both
-install it. On its own:
+Installing the app is enough. Each time Voice Pipes starts, it writes the skill into every agent folder that exists
+(below) and rewrites copies that are out of date, so they match the installed `vp`; an agent you install later (a
+`~/.codex` that appeared, say) gets it at the next start. It creates no folders for agents you don't have. This runs
+only for a copy of the app in `/Applications` or `~/Applications`. The [one-line installer](/docs/install#the-one-line-installer)
+and **Install command-line tool** in the app install it too, and so does:
 
 ```sh
 vp agents install
 ```
-
-It writes `skills/voice-pipes/SKILL.md` into each agent folder that exists:
 
 | Agent | Skill file |
 | --- | --- |
@@ -28,12 +29,8 @@ It writes `skills/voice-pipes/SKILL.md` into each agent folder that exists:
 | Codex | `~/.codex/skills/voice-pipes/SKILL.md` |
 | Others that read `~/.agents` | `~/.agents/skills/voice-pipes/SKILL.md` |
 
-If none of those folders exist, it uses `~/.claude`. `vp agents` shows where the skill is installed.
-
-The app keeps it current by itself. Each time it starts, it rewrites installed skills that are out of date, so they
-match the installed `vp`, and gives the skill to agents you've installed since (a `~/.codex` that appeared, say) as
-long as it's installed for at least one agent; after `vp agents uninstall` it stays uninstalled. This upkeep runs
-only for a copy of the app in `/Applications` or `~/Applications`. This page matches the skill in Voice Pipes 1.17.15.
+`vp agents install` uses `~/.claude` if none of those folders exist. `vp agents` shows where the skill is installed.
+After `vp agents uninstall` the app leaves it out, until `vp agents install`. This page matches the skill in Voice Pipes 1.17.17.
 
 The skill ends with the full block and settings reference, generated from the same source as the one at the end of
 config.toml, so the two always match.
@@ -210,9 +207,7 @@ vp history show 1
 
 ## Install everything from an agent
 
-An agent can install Voice Pipes on a Mac where it isn't installed, without prompts. To have one walk you through
-it, paste "Install Voice Pipes for me: https://voicepipes.app/install.md" into it ([Install with your agent](/install)).
-The command it runs:
+An agent can install Voice Pipes on a Mac where it isn't installed, without prompts, with the terminal installer:
 
 ```sh
 curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash

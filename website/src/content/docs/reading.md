@@ -1,7 +1,7 @@
 ---
 title: "Reading aloud"
 nav: "Reading aloud"
-description: "Follow and steer anything Voice Pipes reads aloud: the read-along card, jumping between sentences, live speed, the HUD's keys and when it takes them, shortcuts, and the same controls from vp and config.toml. Matches Voice Pipes 1.17.15."
+description: "Follow and steer anything Voice Pipes reads aloud: the read-along card, jumping between sentences, live speed, the HUD's keys and when it takes them, shortcuts, and the same controls from vp and config.toml. Matches Voice Pipes 1.17.17."
 order: 4
 ---
 
@@ -10,7 +10,7 @@ in `vp ask`, and agents that use it. Every reading works the same way: the HUD a
 and you can follow the text, jump around, change the speed and stop, with the mouse, the keyboard or `vp`. Nothing
 here brings Voice Pipes to the front: the app you're in stays active.
 
-This page matches Voice Pipes **1.17.15**.
+This page matches Voice Pipes **1.17.17**.
 
 ## Follow along
 

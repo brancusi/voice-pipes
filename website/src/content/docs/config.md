@@ -2,7 +2,7 @@
 title: "config.toml"
 headline: "the config file"
 nav: "Config file"
-description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the microphone, archive, reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.17.15."
+description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the microphone, archive, reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.17.17."
 order: 3
 ---
 
@@ -12,10 +12,10 @@ Everything you build in Voice Pipes is in two plain-text files you can edit, ver
 | --- | --- |
 | `~/.config/voice-pipes/config.toml` | Tracks, their hotkeys and blocks, and settings |
 | `~/.config/voice-pipes/vocabulary.toml` | The words Fix words corrects |
-| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.17.15 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
+| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.17.17 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
 | `backups/` | Earlier versions of both files |
 
-This page matches Voice Pipes **1.17.15**. `config.toml` is the app's setup, one to one: every track, block, branch
+This page matches Voice Pipes **1.17.17**. `config.toml` is the app's setup, one to one: every track, block, branch
 and hotkey the app's window shows is in it, with the [settings](#settings). Keys and secrets never are.
 
 The path is always `~/.config/voice-pipes`, whatever `XDG_CONFIG_HOME` says: the app is started by launchd, which

@@ -1,7 +1,7 @@
 ---
 title: "The vp command"
 nav: "CLI reference"
-description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.17.15."
+description: "Every vp command with its options, inputs, outputs and errors, how vp talks to the app, and TOON and JSON output. Matches Voice Pipes 1.17.17."
 order: 2
 ---
 
@@ -9,7 +9,7 @@ order: 2
 manage the config, vocabulary, keys and history. It is built to be driven by agents as well as people: compact
 output, next-step hints, errors on stdout, and no prompts. Not installed yet? See [Install](/docs/install).
 
-This page matches Voice Pipes **1.17.15**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
+This page matches Voice Pipes **1.17.17**. On your Mac, `vp help` lists the commands and `vp <command> --help` shows
 one command's usage and flags.
 
 ## At a glance
@@ -104,7 +104,7 @@ vp --version
 ```
 
 ```text
-version: 1.17.15
+version: 1.17.17
 ```
 
 ## Errors and exit codes

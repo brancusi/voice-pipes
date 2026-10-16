@@ -145,7 +145,7 @@ vp --version
 vp
 ```
 
-`vp --version` prints the app's version (1.17.15 as of this page). `vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
+`vp --version` prints the app's version (1.17.17 as of this page). `vp` on its own prints live state: whether the app is running, the config's health, your tracks and what to run
 next. The [CLI reference](/docs/cli) has every command.
 
 ## Updates

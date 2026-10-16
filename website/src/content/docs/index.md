@@ -8,7 +8,7 @@ order: 0
 Voice Pipes is a Mac menu bar app that runs **tracks**: hotkey-triggered pipelines of blocks that transcribe, fix
 your words, ask a model, branch on what the text is, paste, speak or call your own endpoint. These docs cover the
 developer side: installing from a terminal, `vp`, the command-line tool, the config file, steering what's read
-aloud, and the skill that teaches coding agents to use it. They match Voice Pipes **1.17.15**.
+aloud, and the skill that teaches coding agents to use it. They match Voice Pipes **1.17.17**.
 
 ```sh
 curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash
