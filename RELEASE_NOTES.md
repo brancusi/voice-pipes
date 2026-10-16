@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.16**
+- **OpenRouter and Jev keys are optional, and the app no longer looks broken without them.** If a track that uses cloud models (like the starter Quick answer) was switched on and you hadn't added an OpenRouter key, the menu bar icon turned into a warning sign and the panel said FAIL · Needs setup. Now a missing key is just a note in Setup naming the tracks that need it, and those tracks still show NEEDS KEY in the sidebar. Dictation and everything on your Mac works without any key. A key that's there but rejected still shows as a problem.
+
 **1.17.15**
 - **The agent skill knows the latest features.** Agents that use Voice Pipes (Claude Code, Codex and others) now know that `vp stop` also stops a run that's processing, that the app runs one thing at a time (and answers `busy`), the **Once** hotkey mode, the Selected text and Clipboard inputs, `vp tracks duplicate`, hotkey clashes, `vp inputs` for choosing a mic, and how to spot failed or passed-through runs in History. The skill updates itself when the app does.
 - The config reference written into `config.toml` lists the **Once** mode everywhere it lists hold and toggle.

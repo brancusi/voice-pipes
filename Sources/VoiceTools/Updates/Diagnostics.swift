@@ -89,10 +89,14 @@ enum Diagnostics {
             }
         }
 
+        // Keys are optional: without one, only the tracks that need it can't run (the sidebar tags them NEEDS KEY), so
+        // a missing key is information, not a problem that turns the menu bar icon into a warning.
         if steps.contains(where: \.usesOpenRouter) {
             if !app.hasOpenRouterKey {
-                checks.append(Check(level: .problem, title: "OpenRouter key missing",
-                                    detail: "Add it in Voice Pipes → Setup → OpenRouter.", fix: .editTracks))
+                let names = tracks.filter { $0.allSteps.contains { $0.kind.usesOpenRouter } }.map(\.name)
+                checks.append(Check(level: .info, title: "No OpenRouter key (optional)",
+                                    detail: "\(names.joined(separator: ", ")) \(names.count == 1 ? "uses" : "use") cloud models and won't run until you add one in Setup → OpenRouter. Everything else works without it.",
+                                    fix: .editTracks))
             } else {
                 switch await OpenRouterClient.shared.validateKey() {
                 case .valid: checks.append(Check(level: .ok, title: "OpenRouter", detail: "Key valid"))
@@ -105,7 +109,7 @@ enum Diagnostics {
         }
 
         if steps.contains(where: { if case .route = $0 { true } else { false } }), !app.hasJevKey {
-            checks.append(Check(level: .warning, title: "Jev key missing",
+            checks.append(Check(level: .info, title: "No Jev key (optional)",
                                 detail: "Route steps use their first route until you add a TypeSafe (Jev) key in Setup.", fix: .editTracks))
         }
 
