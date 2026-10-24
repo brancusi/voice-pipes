@@ -22,17 +22,42 @@ enum Keychain {
         #endif
     }
 
-    static func set(_ value: String?, for account: String) {
+    /// Saves (or, with nil or "", removes) a secret. Returns why it failed, in macOS's words, or nil when it worked;
+    /// a key that silently didn't save looked like a paste that did nothing.
+    @discardableResult
+    static func set(_ value: String?, for account: String) -> String? {
+        #if SNAPSHOTS
+        return nil
+        #else
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        SecItemDelete(base as CFDictionary)
-        guard let value, !value.isEmpty else { return }
-        var add = base
-        add[kSecValueData as String] = Data(value.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+        guard let value, !value.isEmpty else {
+            let status = SecItemDelete(base as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound ? nil : message(status)
+        }
+        let data = Data(value.utf8)
+        // Update in place first: deleting can fail (an item another build made) and leave the old key behind.
+        var status = SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = base
+            add[kSecValueData as String] = data
+            status = SecItemAdd(add as CFDictionary, nil)
+        } else if status != errSecSuccess {
+            SecItemDelete(base as CFDictionary)
+            var add = base
+            add[kSecValueData as String] = data
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
+        if status != errSecSuccess { NSLog("VoiceTools: Keychain save for \(account) failed: \(status)") }
+        return status == errSecSuccess ? nil : message(status)
+        #endif
+    }
+
+    private static func message(_ status: OSStatus) -> String {
+        "\(SecCopyErrorMessageString(status, nil) as String? ?? "Keychain error") (\(status))"
     }
 }
 

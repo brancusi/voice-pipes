@@ -88,7 +88,8 @@ struct SetupView: View {
                     ConnectionHeader(name: "OpenRouter", purpose: "Cloud transcription, LLM and speech models",
                                      status: openRouterStatus)
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
-                             failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key") { app.setOpenRouterKey($0) }
+                             failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key",
+                             error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0) }
                     HStack(spacing: 10) {
                         if catalog.loading { ProgressView().controlSize(.small) }
                         Text(catalogLine).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
@@ -109,7 +110,8 @@ struct SetupView: View {
                     ConnectionHeader(name: "TypeSafe · Jev",
                                      purpose: "Picks the model in Route steps; judges mishearings when you train a word",
                                      status: app.hasJevKey ? (.ok, "saved") : (.info, "not set"))
-                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key") { app.setJevKey($0) }
+                    KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key",
+                             error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0) }
                     if app.hasJevKey {
                         HStack {
                             Spacer()
@@ -382,11 +384,33 @@ struct KeyField: View {
     let placeholder: String
     let failed: Bool
     var focusKey: String? = nil
+    /// Why the last save failed (the Keychain refused it), shown under the field.
+    var error: String? = nil
     let save: (String) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                box
+                // The system's own paste button: it doesn't depend on ⌘V reaching the field, and macOS counts it as
+                // the person pasting (no "paste from other apps" prompt).
+                PasteButton(payloadType: String.self) { strings in
+                    guard let key = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return }
+                    DispatchQueue.main.async { save(key); focused = false }
+                }
+                .labelStyle(.titleOnly)
+                .help("Save the key on the clipboard")
+            }
+            if let error {
+                Text("Couldn't save the key: \(error)").font(VPFont.caption).foregroundStyle(Palette.red)
+                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            }
+        }
+    }
+
+    private var box: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .leading) {
                 if text.isEmpty {

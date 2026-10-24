@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.18**
+- **A Paste button for your keys.** Next to the OpenRouter and TypeSafe key fields (in Setup and in the welcome window) there's now a **Paste** button that saves the key on your clipboard in one click, for when pasting into the field with ⌘V doesn't take.
+- **A key that doesn't save now says so.** Voice Pipes used to ignore the Keychain's answer, so a key it couldn't save just vanished from the field, which looked like the paste did nothing. If the Keychain refuses a key, the reason now shows in red under the field (and `vp auth set` reports it). Replacing a saved key also updates it in place now, rather than deleting it and adding it again.
+
 **1.17.17**
 - **Installing the app now sets up the agent skill too.** Each time Voice Pipes starts, it puts its skill into every coding agent you have (Claude Code, Codex and others that read `~/.agents`), so they know how to use `vp` without a separate install step. Agents you install later get it at the next start. If you'd rather not, `vp agents uninstall` removes it and it stays removed (`vp agents install` brings it back).
 - The website's "Install with your agent" page is gone for now. Download the app, or use the one-line terminal installer; the `vp` command works as before.

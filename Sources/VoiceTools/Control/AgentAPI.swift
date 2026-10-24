@@ -68,6 +68,9 @@ extension AppState {
                 throw AgentError("missing_key", "No key given.", hint: "echo \"$KEY\" | vp auth set \(provider.id)")
             }
             setKey(provider, key)
+            if let error = keyErrors[provider.id == "openrouter" ? SecretKey.openRouter : SecretKey.typesafe] {
+                throw AgentError("keychain_failed", "The Keychain didn't save the key: \(error)", hint: "vp auth status")
+            }
             reply.result(providerData(provider))
         case "auth.remove":
             let provider = try Providers.named(args["provider"] as? String)

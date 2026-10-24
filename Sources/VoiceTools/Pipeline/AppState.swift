@@ -312,13 +312,16 @@ final class AppState {
     private(set) var openRouterKeyHint = AppState.mask(Keychain.get(SecretKey.openRouter))
     private(set) var jevKeyHint = AppState.mask(Keychain.get(SecretKey.typesafe))
 
+    /// Why the last save of a key (by Keychain account) failed; the key field shows it.
+    private(set) var keyErrors: [String: String] = [:]
+
     enum KeyState { case checking, valid, rejected, unreachable }
     /// The OpenRouter key's live check, or nil when there's no key or it hasn't been checked yet.
     private(set) var openRouterKeyState: KeyState?
 
     /// Saves (or, with an empty string, removes) the Jev key.
     func setJevKey(_ key: String) {
-        Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.typesafe)
+        keyErrors[SecretKey.typesafe] = Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.typesafe)
         hasJevKey = JevClient.hasKey
         jevKeyHint = Self.mask(Keychain.get(SecretKey.typesafe))
         refreshChecks()
@@ -326,7 +329,7 @@ final class AppState {
 
     /// Saves (or, with an empty string, removes) the OpenRouter key, then checks it.
     func setOpenRouterKey(_ key: String) {
-        Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.openRouter)
+        keyErrors[SecretKey.openRouter] = Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: SecretKey.openRouter)
         hasOpenRouterKey = Keychain.get(SecretKey.openRouter) != nil
         openRouterKeyHint = Self.mask(Keychain.get(SecretKey.openRouter))
         openRouterKeyState = nil
