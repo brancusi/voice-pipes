@@ -185,7 +185,7 @@ struct OnboardingView: View {
                     keyHeader("OpenRouter", "Clean dictation, Quick answer, cloud voices")
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
                              failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key",
-                             error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0) }
+                             error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0); return app.keyErrors[SecretKey.openRouter] == nil }
                     Link("Get a key at openrouter.ai →", destination: URL(string: "https://openrouter.ai/keys")!)
                         .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.purple)
                 }
@@ -194,7 +194,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     keyHeader("TypeSafe · Jev", "picks the model in Route steps; judges trained words")
                     KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key",
-                             error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0) }
+                             error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0); return app.keyErrors[SecretKey.typesafe] == nil }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
             }

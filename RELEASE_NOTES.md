@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.19**
+- **Keys now have a Save button, and you can see what you pasted.** The OpenRouter and TypeSafe fields used to save the moment you pasted and then clear themselves, so whether it worked or not, it looked like nothing happened. Now a pasted (or typed) key stays in the field with a masked preview and its length, like `sk-or-v1-••••••••••••cdef · 73 characters`, until you click **Save** or press Return. **Revert** or Esc throws it away. **Paste** fills the field from your clipboard. If the Keychain refuses the key, the reason shows in red and the key stays in the field so you can try again.
+
 **1.17.18**
 - **A Paste button for your keys.** Next to the OpenRouter and TypeSafe key fields (in Setup and in the welcome window) there's now a **Paste** button that saves the key on your clipboard in one click, for when pasting into the field with ⌘V doesn't take.
 - **A key that doesn't save now says so.** Voice Pipes used to ignore the Keychain's answer, so a key it couldn't save just vanished from the field, which looked like the paste did nothing. If the Keychain refuses a key, the reason now shows in red under the field (and `vp auth set` reports it). Replacing a saved key also updates it in place now, rather than deleting it and adding it again.

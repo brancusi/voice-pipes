@@ -2,7 +2,7 @@
 title: "Agents"
 headline: "vp for agents"
 nav: "Agents"
-description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.17.18."
+description: "The Voice Pipes agent skill for Claude Code, Codex and other agents: what it teaches, what agents read aloud to you unasked, building tracks from plain language, the optional Claude Code session hook, and patterns. Matches Voice Pipes 1.17.19."
 order: 5
 ---
 
@@ -30,7 +30,7 @@ vp agents install
 | Others that read `~/.agents` | `~/.agents/skills/voice-pipes/SKILL.md` |
 
 `vp agents install` uses `~/.claude` if none of those folders exist. `vp agents` shows where the skill is installed.
-After `vp agents uninstall` the app leaves it out, until `vp agents install`. This page matches the skill in Voice Pipes 1.17.18.
+After `vp agents uninstall` the app leaves it out, until `vp agents install`. This page matches the skill in Voice Pipes 1.17.19.
 
 The skill ends with the full block and settings reference, generated from the same source as the one at the end of
 config.toml, so the two always match.

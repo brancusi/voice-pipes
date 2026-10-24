@@ -89,7 +89,7 @@ struct SetupView: View {
                                      status: openRouterStatus)
                     KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
                              failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key",
-                             error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0) }
+                             error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0); return app.keyErrors[SecretKey.openRouter] == nil }
                     HStack(spacing: 10) {
                         if catalog.loading { ProgressView().controlSize(.small) }
                         Text(catalogLine).font(VPFont.caption).foregroundStyle(Palette.fgMuted)
@@ -111,7 +111,7 @@ struct SetupView: View {
                                      purpose: "Picks the model in Route steps; judges mishearings when you train a word",
                                      status: app.hasJevKey ? (.ok, "saved") : (.info, "not set"))
                     KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key",
-                             error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0) }
+                             error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0); return app.keyErrors[SecretKey.typesafe] == nil }
                     if app.hasJevKey {
                         HStack {
                             Spacer()
@@ -377,8 +377,9 @@ private struct ModelRow: View {
     }
 }
 
-/// An API key field with no Save button. It shows the saved key masked; pasting a new key (or typing one and
-/// pressing Return) replaces it in the Keychain at once. Esc leaves it as it was.
+/// An API key field. It shows the saved key masked; a pasted or typed key stays in the field (with a masked preview,
+/// so you can see what arrived) until you click Save or press Return. Revert or Esc drops it. **Paste** fills the
+/// field from the clipboard with macOS's own paste button, which doesn't depend on ⌘V reaching the field.
 struct KeyField: View {
     let hint: String?
     let placeholder: String
@@ -386,22 +387,29 @@ struct KeyField: View {
     var focusKey: String? = nil
     /// Why the last save failed (the Keychain refused it), shown under the field.
     var error: String? = nil
-    let save: (String) -> Void
-    @State private var text = ""
+    /// Saves the key; false when it didn't save (the field keeps it, and `error` says why).
+    let save: (String) -> Bool
+    @State private var draft = ""
     @FocusState private var focused: Bool
+
+    private var key: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 box
-                // The system's own paste button: it doesn't depend on ⌘V reaching the field, and macOS counts it as
-                // the person pasting (no "paste from other apps" prompt).
                 PasteButton(payloadType: String.self) { strings in
-                    guard let key = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return }
-                    DispatchQueue.main.async { save(key); focused = false }
+                    guard let pasted = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines), !pasted.isEmpty else { return }
+                    DispatchQueue.main.async { draft = pasted; focused = true }
                 }
                 .labelStyle(.titleOnly)
-                .help("Save the key on the clipboard")
+                .help("Put the key on the clipboard in the field")
+                Button("Save", action: commit).buttonStyle(.vpPrimary).disabled(key.isEmpty)
+                Button("Revert") { draft = ""; focused = false }.buttonStyle(.vpGhost).disabled(draft.isEmpty)
+            }
+            if !key.isEmpty {
+                Text("Not saved yet: \(AppState.mask(key) ?? "")  ·  \(key.count) characters  ·  Return saves, Esc reverts")
+                    .font(VPFont.caption).foregroundStyle(Palette.pink)
             }
             if let error {
                 Text("Couldn't save the key: \(error)").font(VPFont.caption).foregroundStyle(Palette.red)
@@ -413,15 +421,15 @@ struct KeyField: View {
     private var box: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .leading) {
-                if text.isEmpty {
+                if draft.isEmpty {
                     Text(hint ?? placeholder).foregroundStyle(hint == nil ? Palette.comment : Palette.fg)
                         .lineLimit(1).allowsHitTesting(false)
                 }
-                SecureField("", text: $text)
+                SecureField("", text: $draft)
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .onSubmit(commit)
-                    .onExitCommand { text = ""; focused = false }
+                    .onExitCommand { draft = ""; focused = false }
             }
             if let note {
                 Text(note.0).font(VPFont.caption).foregroundStyle(note.1).fixedSize()
@@ -431,25 +439,23 @@ struct KeyField: View {
         .frame(height: 34)
         .background(RoundedRectangle(cornerRadius: 4).fill(Palette.bg000))
         .overlay(RoundedRectangle(cornerRadius: 4)
-            .strokeBorder(focused ? Palette.pink : failed ? Palette.red : Palette.line, lineWidth: focused ? 2 : 1))
+            .strokeBorder(focused || !draft.isEmpty ? Palette.pink : failed ? Palette.red : Palette.line,
+                          lineWidth: focused ? 2 : 1))
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
         .modifier(FocusKeyModifier(key: focusKey, focused: $focused))
-        // A paste arrives as one big change; save it straight away. Typing waits for Return.
-        .onChange(of: text) { old, new in if new.count - old.count >= 8 { commit() } }
     }
 
     private var note: (String, Color)? {
-        if focused { return ("paste a new key · esc", Palette.pink) }
+        guard draft.isEmpty else { return nil }
+        if focused { return (hint == nil ? "paste or type your key" : "paste or type a new key", Palette.pink) }
         guard hint != nil else { return nil }
-        return failed ? ("paste again", Palette.red) : ("⌘V to replace", Palette.fgMuted)
+        return failed ? ("rejected · paste a new one", Palette.red) : ("saved", Palette.fgMuted)
     }
 
     private func commit() {
-        let key = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        text = ""
-        guard !key.isEmpty else { return }
-        save(key)
+        guard !key.isEmpty, save(key) else { return }
+        draft = ""
         focused = false
     }
 }

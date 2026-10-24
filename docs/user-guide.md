@@ -259,10 +259,10 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   clashes, track errors. **Fix…** on a permission clears any stale entry macOS kept from an older build, asks
   again and opens the right Settings page. **Copy report** puts a plain-text summary on the clipboard.
 - **Connections** — OpenRouter and TypeSafe (Jev), each with what it's used for and a status (OpenRouter's key is
-  checked live). A saved key shows masked, e.g. `sk-or-v1-••••••••••••3f9a`. To replace it, click the field and
-  paste: the new key is saved to the Keychain at once, with no Save button (or type it and press Return; Esc
-  leaves it as it was). **Paste** beside the field saves whatever key is on the clipboard in one click. If the
-  Keychain refuses a key, the reason shows in red under the field. **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
+  checked live). A saved key shows masked, e.g. `sk-or-v1-••••••••••••3f9a`. To replace it, paste (⌘V, or the
+  **Paste** button, which fills the field from the clipboard) or type the new key: it stays in the field, with a
+  masked preview and its length, until you click **Save** or press Return. **Revert** or Esc drops it. If the
+  Keychain refuses a key, the reason shows in red under the field and the key stays there to try again. **Remove key** deletes it. OpenRouter's model list and **Reload models** sit here too. Jev
   is used by Route and Branch steps and vocabulary training.
 - **On this Mac** — status of Parakeet, Pocket TTS and Supertonic-3, with **Load now**.
 - **Microphone** — **Input**: which mic tracks record from, *System* (follows macOS's input) or a mic by name.
