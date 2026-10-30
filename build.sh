@@ -103,6 +103,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSArchitecturePriority</key><array><string>arm64</string></array>
   <key>LSUIElement</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Voice Pipes records your voice when you press a dictation hotkey.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Voice Pipes pauses Apple Music and Spotify while you record, and resumes them when you stop (Setup → Microphone → Pause music while recording).</string>
 $UPDATE_KEYS
 </dict></plist>
 PLIST
@@ -121,6 +122,7 @@ if [[ "$IDENTITY" == "Developer ID Application"* ]]; then
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>com.apple.security.device.audio-input</key><true/>
+  <key>com.apple.security.automation.apple-events</key><true/>
 </dict></plist>
 ENT
   SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"

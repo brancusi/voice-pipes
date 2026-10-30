@@ -498,6 +498,7 @@ enum VPCommands {
                 ("appearance", .string(config?.appearance.rawValue ?? "?")),
                 ("microphone", .string(config?.microphone.rawValue ?? "?")),
                 ("input", .string(config?.input ?? "?")),
+                ("pause_music", .bool(config?.pauseMusic ?? false)),
                 ("tracks", .int(config?.tracks.count ?? 0)),
             ]), help: ["vp config check", "vp help config   (the block reference)", "vp config backups"])
         case "path":

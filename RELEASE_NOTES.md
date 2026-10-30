@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.20**
+- **Pause music while recording.** A new switch in Setup → Microphone pauses Apple Music and Spotify while you record, and starts them again when you stop, whether you're on headphones or the laptop's mic (where music would also leak into the recording). It works for hotkey takes and for agents' `vp listen` and `vp ask`. Only a player that was actually playing is paused and resumed; one you'd paused stays paused. macOS asks once to let Voice Pipes control each player. Browsers and other players aren't covered: macOS no longer lets apps pause whatever is playing. Off by default; `pause_music = true` in config.toml does the same.
+
 **1.17.19**
 - **Keys now have a Save button, and you can see what you pasted.** The OpenRouter and TypeSafe fields used to save the moment you pasted and then clear themselves, so whether it worked or not, it looked like nothing happened. Now a pasted (or typed) key stays in the field with a masked preview and its length, like `sk-or-v1-••••••••••••cdef · 73 characters`, until you click **Save** or press Return. **Revert** or Esc throws it away. **Paste** fills the field from your clipboard. If the Keychain refuses the key, the reason shows in red and the key stays in the field so you can try again.
 

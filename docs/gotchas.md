@@ -224,3 +224,14 @@ that's there within 200 ms (or after an explicit `-`).
   `writeConfigText`: whatever is on disk and isn't the app's own last write is backed up first (raw bytes if it isn't
   UTF-8), and the write follows a symlink instead of replacing it. A file that isn't UTF-8 is never overwritten at
   launch.
+
+**Pausing other apps' music.** On macOS 15.4+ (checked on 27) a third-party app can't read Now Playing
+(MediaRemote returns nothing), and its `MRMediaRemoteSendCommand` pause, like a synthetic Play/Pause key event, is
+dropped (one worked once, then never again; the real F8 key works). A process's CoreAudio "running output" stays on
+for ~7.5 s after a pause, so it can't tell playing from paused either. → `MusicPause` sends Apple Events to Music and
+Spotify (read `player state`, pause only if `playing`, resume only what it paused), which needs the
+`com.apple.security.automation.apple-events` entitlement and `NSAppleEventsUsageDescription` (both in `build.sh`).
+Browsers aren't covered.
+
+**`swift build` with only the Command Line Tools fails on macOS 27** (`plugin for module 'SwiftUIMacros' not
+found`). → Build locally with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build`.

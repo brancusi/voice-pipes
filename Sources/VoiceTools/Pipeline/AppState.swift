@@ -205,6 +205,7 @@ final class AppState {
     /// A vp recording starts: it owns the microphone; Esc (and `vp stop`) cancel it.
     func beginAgentRecording() {
         agentRecording = true
+        holdMusic(&agentHoldsMusic, true)
         agentCancelled = false
         cancelHotkey = hotkeys.add(KeyCombo(key: .escape, modifiers: []), { [weak self] pressed in
             if pressed { self?.agentCancelled = true }
@@ -213,8 +214,19 @@ final class AppState {
 
     func endAgentRecording() {
         agentRecording = false
+        holdMusic(&agentHoldsMusic, false)
         if let cancelHotkey { hotkeys.remove(cancelHotkey) }
         cancelHotkey = nil
+    }
+
+    /// Whether a take, or an agent's recording, has paused the music players ([settings] pause_music).
+    @ObservationIgnored private var captureHoldsMusic = false
+    @ObservationIgnored private var agentHoldsMusic = false
+
+    private func holdMusic(_ holding: inout Bool, _ on: Bool) {
+        guard on != holding, !on || store.pauseMusic else { return }
+        holding = on
+        if on { MusicPause.shared.hold() } else { MusicPause.shared.release() }
     }
 
     @ObservationIgnored private var registeredSignature: [String]?
@@ -559,6 +571,7 @@ final class AppState {
             return
         }
         run?.microphone = recorder.deviceName
+        holdMusic(&captureHoldsMusic, true)
         let started = Date()
         capture = Capture(track: track, mode: mode, live: live, started: started, recorder: recorder)
         if let pause { endAtPause(pause, started: started) }
@@ -595,6 +608,7 @@ final class AppState {
         guard let current = capture else { return }
         let live = current.live
         _ = current.recorder.stop()
+        holdMusic(&captureHoldsMusic, false)
         live?.cancel()
         endCaptureHotkeys()
         capture = nil
@@ -642,6 +656,7 @@ final class AppState {
         self.capture = nil
         endCaptureHotkeys()
         let samples = capture.recorder.stop()
+        holdMusic(&captureHoldsMusic, false)
         run?.phase = .processing
         run?.processingStarted = Date()
         setStepMs(0, Int(Date().timeIntervalSince(capture.started) * 1000), for: capture.track)

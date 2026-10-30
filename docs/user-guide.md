@@ -274,6 +274,10 @@ the version, your first few hotkeys, **Release notes** and **Check for updates**
   them in call mode, so a track set to a headset starts a moment after you press; a track on the laptop's mic stays
   instant. Every mic an enabled track uses is kept ready. Same as `input` and `microphone` under `[settings]` in
   config.toml, and `input = "…"` in a track's microphone block; `vp inputs` lists the names.
+  **Pause music while recording** (off by default): Apple Music and Spotify pause while you record (a hotkey take,
+  `vp listen`, `vp ask`) and resume when the recording ends; a player that wasn't playing is left alone. macOS asks
+  once to let Voice Pipes control each player (when you switch it on, or after the first take with that player
+  open). Browsers and other players aren't paused. Same as `pause_music` under `[settings]`.
 - **Archive** — **Save every run as text** keeps a plain-text copy of every run beside History: one Markdown file
   per day, by year and month (`2026/10/2026-10-09.md`), in the folder you choose (**Choose…**; default `~/Documents/Voice Pipes`). Each run gets
   its time and track, the microphone, the app in front when you pressed, how long you spoke, how long it took, the

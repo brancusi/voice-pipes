@@ -7,6 +7,7 @@ struct AppConfig: Equatable {
     var microphone: MicReadiness = .always
     /// Which mic tracks record from, unless their Microphone block names one: `AudioInputs.system` or a name.
     var input = AudioInputs.system
+    var pauseMusic = false
     var reading = ReadingSettings()
     var agents = AgentSettings()
     var archive = ArchiveSettings()
@@ -294,6 +295,7 @@ enum ConfigFile {
         var appearance = AppearanceChoice.auto
         var microphone = MicReadiness.always
         var input = AudioInputs.system
+        var pauseMusic = false
         var reading = ReadingSettings()
         var agents = AgentSettings()
         var archive = ArchiveSettings()
@@ -304,6 +306,7 @@ enum ConfigFile {
             if let i = settings.string("input") {
                 if i.trimmingCharacters(in: .whitespaces).isEmpty { settings.error("input", "should be \"system\" or a mic's name (`vp inputs` lists them)") } else { input = i }
             }
+            if let p = settings.bool("pause_music") { pauseMusic = p }
             if case .table(let readingTable)? = settings.raw("reading") {
                 var r = TableReader(readingTable, path: "settings.reading")
                 reading = readReading(&r)
@@ -329,7 +332,7 @@ enum ConfigFile {
                 a.finish(known: ["enabled", "folder"])
                 settings.issues += a.issues
             }
-            settings.finish(known: ["appearance", "microphone", "input", "reading", "agents", "archive"])
+            settings.finish(known: ["appearance", "microphone", "input", "pause_music", "reading", "agents", "archive"])
             top.issues += settings.issues
         } else if root["settings"] != nil {
             top.error("settings", "should be a table: [settings]")
@@ -354,7 +357,7 @@ enum ConfigFile {
 
         let errors = top.issues.filter { $0.severity == .error }
         let warnings = top.issues.filter { $0.severity == .warning }
-        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, input: input, reading: reading, agents: agents, archive: archive, tracks: tracks) : nil, errors: errors, warnings: warnings)
+        return Result(config: errors.isEmpty ? AppConfig(appearance: appearance, microphone: microphone, input: input, pauseMusic: pauseMusic, reading: reading, agents: agents, archive: archive, tracks: tracks) : nil, errors: errors, warnings: warnings)
     }
 
     /// [settings.reading]: when the HUD takes the keyboard, click-away, its keys, and [settings.reading.global].
@@ -601,6 +604,7 @@ enum ConfigFile {
         out += "appearance = \(quote(config.appearance.rawValue))  # auto (follow macOS) | daylight | sundown\n"
         out += "microphone = \(quote(config.microphone.rawValue))  # always | after-use | off: kept open between takes, so a take starts instantly\n"
         out += "input = \(quote(config.input))  # \"system\" (follows macOS) or a mic's name (`vp inputs`); a track's Microphone block can name its own\n"
+        out += "pause_music = \(config.pauseMusic)  # pause Apple Music and Spotify while you record, and resume them after\n"
         out += "\n[settings.agents]  # what agents (Claude Code, Codex, …) read aloud to you without being asked\n"
         out += "read_aloud = \(quote(config.agents.readAloud.rawValue))  # off | long (summaries, reports) | attention (long text + anything that needs you) | all\n"
         out += "long_text = \(config.agents.longText)  # characters; longer than this counts as long\n"
@@ -869,6 +873,7 @@ enum ConfigFile {
         #  Settings (top of the file)
         #    [settings]          appearance = auto | daylight | sundown
         #                        microphone = always | after-use | off (kept open between takes: instant start)
+        #                        pause_music = true | false (pause Apple Music and Spotify while you record)
         #                        input = "system" | a mic's name (`vp inputs`): which mic tracks record from
         #    [settings.agents]   read_aloud = off | long | attention | all · long_text = characters (default 600)
         #                        what agents read aloud without being asked (`vp agents read-aloud <mode>` sets it)

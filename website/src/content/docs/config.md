@@ -2,7 +2,7 @@
 title: "config.toml"
 headline: "the config file"
 nav: "Config file"
-description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the microphone, archive, reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.17.19."
+description: "Tracks, hotkeys and settings live in ~/.config/voice-pipes/config.toml, the vocabulary in vocabulary.toml. The format, every block including Branch, the microphone, archive, reading and agent settings, checking and reloading, backups and secrets. Matches Voice Pipes 1.17.20."
 order: 3
 ---
 
@@ -12,10 +12,10 @@ Everything you build in Voice Pipes is in two plain-text files you can edit, ver
 | --- | --- |
 | `~/.config/voice-pipes/config.toml` | Tracks, their hotkeys and blocks, and settings |
 | `~/.config/voice-pipes/vocabulary.toml` | The words Fix words corrects |
-| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.17.19 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
+| `config.schema.json`, `vocabulary.schema.json` | JSON Schemas beside them, so editors that read TOML schemas (such as VS Code with Even Better TOML) check as you type. In 1.17.20 the config schema doesn't describe `[settings.agents]` or `[settings.reading]` yet, so such an editor may flag those tables; `vp config check` is what the app goes by |
 | `backups/` | Earlier versions of both files |
 
-This page matches Voice Pipes **1.17.19**. `config.toml` is the app's setup, one to one: every track, block, branch
+This page matches Voice Pipes **1.17.20**. `config.toml` is the app's setup, one to one: every track, block, branch
 and hotkey the app's window shows is in it, with the [settings](#settings). Keys and secrets never are.
 
 The path is always `~/.config/voice-pipes`, whatever `XDG_CONFIG_HOME` says: the app is started by launchd, which
@@ -209,6 +209,7 @@ The top of the file holds the settings, here with their defaults (the app writes
 appearance = "auto"            # auto (follow macOS) | daylight | sundown
 microphone = "always"          # always | after-use | off
 input = "system"               # "system" or a mic's name (`vp inputs`)
+pause_music = false            # pause Apple Music and Spotify while you record
 
 [settings.agents]
 read_aloud = "attention"       # off | long | attention | all
@@ -237,7 +238,7 @@ end = ["shift+g"]
 
 | Table | What it sets |
 | --- | --- |
-| `[settings]` | `appearance`: Auto follows your Mac, Daylight is light, Sundown is dark. `microphone`: keep the mic open between takes, so a take starts the moment you press and keeps the half second before it: `always`, `after-use` (for 5 minutes after each take) or `off` (opened for each take). Bluetooth headsets are never kept open, since that switches them to call-quality audio. `input`: which mic tracks record from, `"system"` (follows macOS) or a mic's name from `vp inputs`; a Microphone block's own `input` wins. A named mic that isn't plugged in falls back to the system input until it's back |
+| `[settings]` | `appearance`: Auto follows your Mac, Daylight is light, Sundown is dark. `microphone`: keep the mic open between takes, so a take starts the moment you press and keeps the half second before it: `always`, `after-use` (for 5 minutes after each take) or `off` (opened for each take). Bluetooth headsets are never kept open, since that switches them to call-quality audio. `input`: which mic tracks record from, `"system"` (follows macOS) or a mic's name from `vp inputs`; a Microphone block's own `input` wins. A named mic that isn't plugged in falls back to the system input until it's back. `pause_music`: pause Apple Music and Spotify while you record, and resume what was playing when you stop (macOS asks once per player) |
 | `[settings.agents]` | What agents read aloud to you without being asked, and what counts as long (at least 50 characters). `vp agents read-aloud` sets it; [Agents](/docs/agents#what-agents-read-aloud) has what each mode means |
 | `[settings.archive]` | A plain-text copy of every run (Setup → Archive): one Markdown file a day in `folder`, sorted by year and month (`2026/10/2026-10-09.md`), with the time, track, mic, app, models and text. Off until you turn it on; `vp history archive` writes your whole history the same way |
 | `[settings.reading]` | When the HUD takes the keyboard while something is read aloud, what clicking another app does, and the keys for each action while the HUD has them (plain keys are fine: they only work then). `vp reading` sets it; [Reading aloud](/docs/reading) has the details |

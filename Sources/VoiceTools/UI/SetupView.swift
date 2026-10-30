@@ -145,6 +145,10 @@ struct SetupView: View {
 
     private var microphoneSection: some View {
         let choice = Binding { app.store.microphone } set: { app.store.microphone = $0 }
+        let pauseMusic = Binding { app.store.pauseMusic } set: { on in
+            app.store.pauseMusic = on
+            if on { MusicPause.shared.askForRunningPlayers() }
+        }
         return VStack(alignment: .leading, spacing: 6) {
             SectionLabel("Microphone")
             Card {
@@ -159,6 +163,16 @@ struct SetupView: View {
                     Text(choice.wrappedValue.detail + (choice.wrappedValue == .off ? "" : " Bluetooth headsets are never kept open: it would put them in call mode."))
                         .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                         .fixedSize(horizontal: false, vertical: true)
+                    Hairline().padding(.vertical, 6)
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Pause music while recording").font(VPFont.bodyStrong)
+                            Text("Apple Music and Spotify pause while you record and pick up again when you stop, whether you're on headphones or the built-in mic. A player that wasn't playing is left alone. macOS asks once to let Voice Pipes control each one.")
+                                .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 16)
+                        Toggle("Pause music while recording", isOn: pauseMusic).labelsHidden().toggleStyle(.vpSwitch)
+                    }
                 }
                 .padding(16)
             }

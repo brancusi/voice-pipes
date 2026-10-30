@@ -29,6 +29,7 @@ enum ConfigSchema {
               }
             },
             "input": { "type": "string", "minLength": 1, "default": "system", "description": "Which mic tracks record from: \"system\" (follows macOS) or a mic's name (`vp inputs`). A track's Microphone block can name its own." },
+            "pause_music": { "type": "boolean", "default": false, "description": "Pause Apple Music and Spotify while you record (a hotkey take, `vp listen`, `vp ask`), and resume what was playing when the recording ends. macOS asks once to let Voice Pipes control each player." },
             "microphone": { "enum": ["always", "after-use", "off"], "default": "always", "description": "Keep the microphone open between takes so a take starts instantly and keeps the half second before the press: always, for 5 minutes after each take, or off (opened per take). Bluetooth mics are never kept open." }
           }
         },
