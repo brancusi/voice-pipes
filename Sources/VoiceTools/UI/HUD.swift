@@ -21,9 +21,9 @@ final class HUDController {
     private func observe() {
         guard let app else { return }
         let (visible, speaking, processing, expanded) = withObservationTracking {
-            // "Processing" here means any time the tag has a button: × while processing, "details" on an error.
+            // "Processing" here means any time the tag has a button: × while processing, × and "details" on an error.
             (app.run != nil, app.run?.phase == .speaking,
-             app.run?.phase == .processing || HUDView.detailsID(app.run) != nil, HUDView.expanded(app))
+             app.run?.phase == .processing || HUDView.showsProblem(app.run), HUDView.expanded(app))
         } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
@@ -218,6 +218,15 @@ struct HUDView: View {
     let app: AppState
 
     /// The saved run behind an error or a passed-through failure, for the tag's "details" link.
+    /// An error, or a finished run whose step failed and passed through: the tag stays up a while, with a × to close it.
+    static func showsProblem(_ run: ActiveRun?) -> Bool {
+        switch run?.phase {
+        case .failed: true
+        case .done: run?.problem != nil
+        default: false
+        }
+    }
+
     static func detailsID(_ run: ActiveRun?) -> RunRecord.ID? {
         guard let run, let id = run.recordID else { return nil }
         switch run.phase {
@@ -315,13 +324,13 @@ struct HUDView: View {
             let time = run.totalMs.map { HUDTag.ms(Double($0) / 1000) }
             if let problem = run.problem {
                 HUDTag(state: .failed, label: "OK", detail: [time, problem].compactMap { $0 }.joined(separator: " · "),
-                       onDetails: Self.detailsID(run).map { id in { app.showRunDetails(id) } })
+                       onDetails: Self.detailsID(run).map { id in { app.showRunDetails(id) } }, onClose: app.dismissProblem)
             } else {
                 HUDTag(state: .done, label: "OK", detail: time)
             }
         case .failed(let message):
             HUDTag(state: .failed, label: "ERR", detail: Self.firstLine(message),
-                   onDetails: Self.detailsID(run).map { id in { app.showRunDetails(id) } })
+                   onDetails: Self.detailsID(run).map { id in { app.showRunDetails(id) } }, onClose: app.dismissProblem)
         }
     }
 }
@@ -341,6 +350,8 @@ struct HUDTag: View {
     var onStop: (() -> Void)?
     /// "details ›": the run in History, with its full error.
     var onDetails: (() -> Void)?
+    /// A × that closes an error before it fades by itself.
+    var onClose: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 7) {
@@ -363,6 +374,7 @@ struct HUDTag: View {
                 .help("Open this run in History with the full error")
                 .padding(.leading, 2)
             }
+            if let onClose { PlaybackControls.button("xmark", help: "Close", action: onClose).padding(.leading, 2) }
             if controls != nil, HUDKeys.shared.active {
                 Text("KEYS").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Color(hex: 0xC3A3D4))
                     .padding(.horizontal, 5).frame(height: 16)

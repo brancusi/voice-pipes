@@ -618,6 +618,12 @@ final class AppState {
     /// How long the HUD keeps an error (or a passed-through failure) up: long enough to read and click "details".
     static let problemSeconds: Double = 8
 
+    /// The HUD's × on an error (or a passed-through failure): closes it before it fades by itself.
+    func dismissProblem() {
+        guard HUDView.showsProblem(run) else { return }
+        run = nil
+    }
+
     /// The HUD's "details": History, filtered to errors, with this run open.
     func showRunDetails(_ id: RunRecord.ID) {
         mainSection = .activity

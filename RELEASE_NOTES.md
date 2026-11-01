@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.21**
+- **Close an error on the HUD.** When a track stops with an error (say, Read aloud finds nothing selected and nothing on the clipboard), the HUD now shows a **×** you can click to close it right away, instead of waiting for it to fade by itself. The same × closes the "failed, passed through" note on a finished run.
+
 **1.17.20**
 - **Pause music while recording.** A new switch in Setup → Microphone pauses Apple Music and Spotify while you record, and starts them again when you stop, whether you're on headphones or the laptop's mic (where music would also leak into the recording). It works for hotkey takes and for agents' `vp listen` and `vp ask`. Only a player that was actually playing is paused and resumed; one you'd paused stays paused. macOS asks once to let Voice Pipes control each player. Browsers and other players aren't covered: macOS no longer lets apps pause whatever is playing. Off by default; `pause_music = true` in config.toml does the same.
 
