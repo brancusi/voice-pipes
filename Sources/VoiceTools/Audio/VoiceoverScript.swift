@@ -88,13 +88,51 @@ struct VoiceoverScript {
     }
 
     /// Lowercased, apostrophes and punctuation dropped, split at hyphens, dashes and slashes ("month-by-month" is three
-    /// words, as transcription writes it).
+    /// words, as transcription writes it). Numbers are spelled out ("3" and "three" are the same word, "3rd" is "third",
+    /// "2.5" is "two point five"), whichever way the script or the transcription wrote them.
     static func normalize(_ word: String) -> [String] {
         word.lowercased()
             .replacingOccurrences(of: "’", with: "'")
             .components(separatedBy: CharacterSet(charactersIn: "-–—/"))
-            .map { $0.filter { $0.isLetter || $0.isNumber } }
-            .filter { !$0.isEmpty }
+            .flatMap { part -> [String] in
+                if let spelled = spellNumber(part) { return spelled }
+                let plain = part.filter { $0.isLetter || $0.isNumber }
+                return plain.isEmpty ? [] : [plain]
+            }
+    }
+
+    nonisolated(unsafe) private static let cardinal: NumberFormatter = {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.numberStyle = .spellOut
+        return f
+    }()
+
+    /// "3", "$40", "45%", "1,000", "2.5", "3rd" as words; nil when it isn't a number.
+    private static func spellNumber(_ part: String) -> [String]? {
+        let core = part.trimmingCharacters(in: CharacterSet.alphanumerics.inverted).replacingOccurrences(of: ",", with: "")
+        guard let digit = core.first, digit.isNumber, digit.isASCII else { return nil }
+        let digits = core.prefix { $0.isASCII && ($0.isNumber || $0 == ".") }
+        let suffix = core.dropFirst(digits.count)
+        let spelled: String?
+        if ["st", "nd", "rd", "th"].contains(suffix), let n = Int(digits) {
+            spelled = ordinalWord(n)
+        } else if suffix.isEmpty, digits.filter({ $0 == "." }).count <= 1, let n = Double(digits), n < 1e12 {
+            spelled = cardinal.string(from: NSNumber(value: n))
+        } else {
+            spelled = nil
+        }
+        return spelled?.split(whereSeparator: { $0 == " " || $0 == "-" }).map { $0.filter(\.isLetter) }.filter { !$0.isEmpty }
+    }
+
+    /// 21 → "twenty-first": the cardinal with its last word made ordinal.
+    private static func ordinalWord(_ n: Int) -> String? {
+        guard var words = cardinal.string(from: NSNumber(value: n))?.components(separatedBy: CharacterSet(charactersIn: " -")),
+              let last = words.popLast() else { return nil }
+        let irregular = ["one": "first", "two": "second", "three": "third", "five": "fifth", "eight": "eighth", "nine": "ninth",
+                         "twelve": "twelfth"]
+        let made = irregular[last] ?? (last.hasSuffix("y") ? String(last.dropLast()) + "ieth" : last + "th")
+        return (words + [made]).joined(separator: " ")
     }
 
     static func normalizeHeard(_ text: String) -> [String] {
@@ -253,6 +291,27 @@ struct VoiceoverScript {
             sentenceMatch[s] = Double(take.pairs.filter(\.2).count) / Double(r.count)
             bound = take.start
         }
+        // A sentence not found (reworded, ad-libbed) still has its place: the words heard between the sentences either
+        // side. It takes its best reading there, however loose, starting where that stretch starts, or else is spread
+        // over it; its markers get times, its `matched` says how close it was.
+        for s in sentences.indices where !found[s] {
+            let r = sentenceTokens[s]
+            guard !r.isEmpty else { continue }
+            let lo = link[..<r.lowerBound].compactMap { $0 }.max().map { $0 + 1 } ?? 0
+            let hi = link[r.upperBound...].compactMap { $0 }.min() ?? heard.count
+            guard lo < hi else { continue }
+            found[s] = true
+            if let take = Self.lastTake(tokens[r].map(\.norm), in: heard[lo..<hi].map(\.norm), minimum: -.max / 2) {
+                for (i, h, same) in take.pairs {
+                    link[r.lowerBound + i] = lo + h
+                    exact[r.lowerBound + i] = same
+                }
+                if link[r.lowerBound] == nil { link[r.lowerBound] = lo }
+                sentenceMatch[s] = Double(take.pairs.filter(\.2).count) / Double(r.count)
+            } else {
+                for i in 0..<r.count { link[r.lowerBound + i] = lo + i * (hi - lo) / r.count }
+            }
+        }
 
         // Token times, then word times (a word spans its tokens).
         var tokenStart = [Double?](repeating: nil, count: tokens.count)
@@ -299,7 +358,8 @@ struct VoiceoverScript {
     /// The last reading of a sentence (`script` tokens) in `heard`: a semi-global alignment (the sentence whole, any
     /// stretch of heard), taking the latest end that scores at least half marks and near the best. Pairs are
     /// (script index, heard index, same word).
-    static func lastTake(_ script: [String], in heard: [String]) -> (start: Int, pairs: [(Int, Int, Bool)])? {
+    /// `minimum` lowers the bar (any reading at all, for a sentence whose place is already known).
+    static func lastTake(_ script: [String], in heard: [String], minimum: Int? = nil) -> (start: Int, pairs: [(Int, Int, Bool)])? {
         let n = script.count, m = heard.count
         guard n > 0, m > 0 else { return nil }
         // dp[i][j]: best score of script[..<i] ending at heard[..<j]. Match +2, substitution -1, a skipped word on
@@ -313,8 +373,8 @@ struct VoiceoverScript {
             }
         }
         let best = (1...m).map { dp[n][$0] }.max() ?? 0
-        guard best >= max(2, n) else { return nil }  // at least half the sentence
-        let threshold = max(n, Int((Double(best) * 0.8).rounded(.up)))
+        guard best >= minimum ?? max(2, n) else { return nil }  // at least half the sentence
+        let threshold = minimum == nil ? max(n, Int((Double(best) * 0.8).rounded(.up))) : best
         guard let end = (1...m).last(where: { dp[n][$0] >= threshold }) else { return nil }
         // Back through the table, preferring matches.
         var i = n, j = end

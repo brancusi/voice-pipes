@@ -703,6 +703,7 @@ private struct VoiceoverPanel: View {
         let current = session.phase == .review ? -1 : sentences.lastIndex { $0.start <= position } ?? 0
         VStack(spacing: 0) {
             header
+            if let note = session.note { noteLine(note) }
             Rectangle().fill(Palette.hudFG.opacity(0.12)).frame(height: 0.5)
             ScrollViewReader { proxy in
                 ScrollView {
@@ -787,6 +788,18 @@ private struct VoiceoverPanel: View {
         .font(.system(size: 14, weight: .medium, design: .monospaced))
         .padding(.horizontal, 22).frame(height: 58)
         .background(live ? Self.coral.opacity(0.14) : .clear)
+    }
+
+    /// The reader's own note (`--note`): which take of how many, what it's for. Not part of the script.
+    private func noteLine(_ note: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "note.text").foregroundStyle(Self.lavender)
+            Text(note).foregroundStyle(Palette.hudFG.opacity(0.85)).lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 16, weight: .medium, design: .monospaced))
+        .padding(.horizontal, 22).padding(.vertical, 9)
+        .background(Palette.hudFG.opacity(0.05))
     }
 
     private func badge(_ text: String, color: Color, dot: Bool) -> some View {

@@ -389,10 +389,11 @@ extension AppState {
         let input = args["input"] as? String
         if let input, !AudioInputs.isConnected(input) { throw AgentError("no_such_input", "No microphone named '\(input)'.", hint: "vp inputs") }
         let title = args["title"] as? String ?? out.deletingPathExtension().lastPathComponent
+        let note = (args["note"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         run = nil  // a finished run's fading tag; the voiceover brings its own
         let result: VoiceoverResult
         do {
-            result = try await recordVoiceover(script: script, title: title, out: out, countdown: countdown, input: input)
+            result = try await recordVoiceover(script: script, title: title, note: note?.isEmpty == false ? note : nil, out: out, countdown: countdown, input: input)
         } catch let error as AgentError {
             throw error
         } catch {

@@ -20,9 +20,9 @@ enum VPCommands {
                     summary: "Speak text aloud", values: ["model", "voice", "speed", "text"], handler: say),
         CommandSpec(name: "play", usage: "vp play <audio-file> [--transcript <file>] [--speed 0.6–2.0]",
                     summary: "Play an audio file with its transcript in the read-along card", values: ["transcript", "speed"], handler: play),
-        CommandSpec(name: "record-vo", usage: "vp record-vo --script <file|-> --out <take.wav|.m4a> [--countdown 3] [--title \"…\"] [--input <mic>]",
+        CommandSpec(name: "record-vo", usage: "vp record-vo --script <file|-> --out <take.wav|.m4a> [--countdown 3] [--title \"…\"] [--note \"…\"] [--input <mic>]",
                     summary: "Record a voiceover read from a script in the HUD; writes the take and its word timings",
-                    values: ["script", "out", "countdown", "title", "input"], handler: recordVoiceover),
+                    values: ["script", "out", "countdown", "title", "note", "input"], handler: recordVoiceover),
         CommandSpec(name: "speed", usage: "vp speed <0.6–2.0>", summary: "Change the speed of what's being read aloud, live",
                     handler: { parsed, out in
                         let value = try parsed.positional(0, "speed", usage: "vp speed 1.3")
@@ -285,6 +285,7 @@ enum VPCommands {
         var args: [String: Any] = ["script": script, "out": URL(fileURLWithPath: path).standardizedFileURL.path]
         if let countdown = try parsed.double("countdown") { args["countdown"] = Int(countdown) }
         if let title = parsed["title"] { args["title"] = title }
+        if let note = parsed["note"] { args["note"] = note }
         if let input = parsed["input"] { args["input"] = input }
         let data = try AppClient.request("record-vo", args)
         let accepted = data["accepted"] as? Bool ?? false

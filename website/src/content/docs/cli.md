@@ -324,7 +324,7 @@ vp play walkthrough.mp3 --transcript walkthrough.alignment.json
 ### vp record-vo
 
 ```sh
-vp record-vo --script <file|-> --out <take.wav|take.m4a> [--countdown 3] [--title "…"] [--input <mic>]
+vp record-vo --script <file|-> --out <take.wav|take.m4a> [--countdown 3] [--title "…"] [--note "…"] [--input <mic>]
 ```
 
 A teleprompter for recording a voiceover. The script appears in the HUD's card, a countdown runs, then it records
@@ -345,6 +345,9 @@ the front, so these keys never reach (or come from) another app; click elsewhere
 to take the keys back. The same teleprompter is a block, `teleprompter`, for tracks
 ([config.toml](/docs/config#blocks)).
 
+`--note` puts a line of your own above the script, such as `--note "Recording 2 of 7 · the summary"`: for you while
+you read, never part of the script (it's kept in the timings file as `note`).
+
 The script is plain text. Blank lines separate paragraphs, `**bold**` is shown plain, and `[id]` markers (such as
 `[3]`) are hidden from the card and timed at the word after them, for cueing things on screen to the voice.
 
@@ -354,7 +357,7 @@ take, Parakeet transcribes it whole and Voice Pipes writes `<take>.timings.json`
 
 ```json
 {
-  "text": "So, the receipts. …",
+  "text": "So, the receipts. …", "note": "Recording 1 of 7",
   "duration": 15.42, "sample_rate": 48000,
   "words":   [{"word": "So,", "start": 0.31, "end": 0.52, "matched": true}, …],
   "script":  [{"index": 1, "text": "So, the receipts.", "start": 0.31, "end": 1.6, "matched": 1}, …],
@@ -365,8 +368,10 @@ take, Parakeet transcribes it whole and Voice Pipes writes `<take>.timings.json`
 
 `words` are the script's words with the times they were said (`matched: false` where the word wasn't heard as written;
 a word that wasn't heard at all gets the time between its neighbours). `script` gives each sentence's times and how
-much of it was heard (0–1); a sentence read more than once takes its last reading, and one that wasn't found has
-`null` times. `heard` is the transcription itself. The file plays with its text in the card:
+much of it was heard (0–1); a sentence read more than once takes its last reading. A sentence said differently from
+the script is placed by the words heard between the sentences either side, so its times and markers are still there,
+with a low `matched`; only one not said at all has `null` times. Numbers match however they're written: `3`, `three`
+and `3rd`/`third` are the same words. `heard` is the transcription itself. The file plays with its text in the card:
 `vp play take.wav --transcript take.timings.json`.
 
 It prints `accepted`, `duration`, and for a kept take `audio`, `timings`, `sample_rate`, how many sentences were found,

@@ -12,6 +12,8 @@ final class VoiceoverSession {
 
     let script: VoiceoverScript
     let title: String
+    /// A line for the reader only, above the script ("Recording 2 of 7 · the summary"); never recorded or aligned.
+    let note: String?
     let out: URL
     let countdown: Int
     let input: String
@@ -32,9 +34,10 @@ final class VoiceoverSession {
     @ObservationIgnored var heard: [VoiceoverScript.HeardWord] = []
     @ObservationIgnored var done: CheckedContinuation<Bool, Never>?
 
-    init(script: VoiceoverScript, title: String, out: URL, countdown: Int, input: String) {
+    init(script: VoiceoverScript, title: String, note: String? = nil, out: URL, countdown: Int, input: String) {
         self.script = script
         self.title = title
+        self.note = note
         self.out = out
         self.countdown = countdown
         self.input = input
@@ -57,8 +60,9 @@ extension AppState {
     }
 
     /// Runs a voiceover session until the take is kept or the session cancelled.
-    func recordVoiceover(script: VoiceoverScript, title: String, out: URL, countdown: Int, input: String?) async throws -> VoiceoverResult {
-        let session = VoiceoverSession(script: script, title: title, out: out, countdown: countdown, input: input ?? store.input)
+    func recordVoiceover(script: VoiceoverScript, title: String, note: String? = nil, out: URL, countdown: Int,
+                         input: String?) async throws -> VoiceoverResult {
+        let session = VoiceoverSession(script: script, title: title, note: note, out: out, countdown: countdown, input: input ?? store.input)
         try session.recorder.open(input: session.input)
         session.recorder.onLevel = { [weak session] level in
             Task { @MainActor in
@@ -250,6 +254,7 @@ extension AppState {
         let a = session.alignment
         let json: [String: Any] = [
             "text": session.script.text,
+            "note": session.note.map { $0 as Any } ?? NSNull(),
             "audio": session.out.path,
             "duration": t(session.duration),
             "sample_rate": Int(session.recorder.sampleRate),
