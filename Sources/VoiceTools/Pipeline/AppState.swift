@@ -143,6 +143,9 @@ final class AppState {
             mainSection = store.tracks[safe: min(index, store.tracks.count - 1)].map { .track($0.id) } ?? .track(id)
         }
     }
+    /// A voiceover being recorded (`vp record-vo`): the HUD shows its script and takes its keys.
+    var voiceover: VoiceoverSession?
+
     /// The HUD's read-along card is open; remembered, so the next read-aloud opens the same way.
     var readAlong = UserDefaults.standard.bool(forKey: "hud.readAlong") {
         didSet { UserDefaults.standard.set(readAlong, forKey: "hud.readAlong") }
@@ -153,7 +156,7 @@ final class AppState {
     }
 
     @ObservationIgnored let parakeet = ParakeetService()
-    @ObservationIgnored private let hotkeys = HotkeyManager()
+    @ObservationIgnored let hotkeys = HotkeyManager()
     /// One recorder per mic in use (`AudioInputs.system` or a name), made on first use; `observeMicrophone` keeps the
     /// ones enabled tracks use ready and closes the rest.
     @ObservationIgnored private var recorders: [String: AudioRecorder] = [:]
@@ -480,8 +483,8 @@ final class AppState {
             if ends { Task { await finishCapture() } }
             return
         }
-        // `vp listen` / a vp-started run owns the microphone and the HUD until it's done.
-        if agentRecording { return }
+        // `vp listen` / a vp-started run owns the microphone and the HUD until it's done; so does a voiceover.
+        if agentRecording || voiceover != nil { return }
         guard pressed else { return }
 
         // Once: each press runs it again from the start (what it's reading stops; the new selection is read).

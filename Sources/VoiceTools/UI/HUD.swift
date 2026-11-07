@@ -23,7 +23,7 @@ final class HUDController {
         let (visible, speaking, processing, expanded) = withObservationTracking {
             // "Processing" here means any time the tag has a button: × while processing, × and "details" on an error.
             (app.run != nil, app.run?.phase == .speaking,
-             app.run?.phase == .processing || HUDView.showsProblem(app.run), HUDView.expanded(app))
+             app.run?.phase == .processing || HUDView.showsProblem(app.run) || app.voiceover != nil, HUDView.expanded(app))
         } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
@@ -243,7 +243,7 @@ struct HUDView: View {
 
     /// The read-along card shows while something is being read and the card is open.
     static func expanded(_ app: AppState) -> Bool {
-        app.readAlong && app.run?.phase == .speaking && !app.speaker.sentences.isEmpty
+        app.voiceover != nil || app.readAlong && app.run?.phase == .speaking && !app.speaker.sentences.isEmpty
     }
 
     /// "Esc stop · Space pause · J/K sentence · H/L speed" with the keys in fg and the words muted.
@@ -272,12 +272,17 @@ struct HUDView: View {
         let expanded = Self.expanded(app)
         VStack(spacing: 6) {
             Spacer(minLength: 0)
-            if expanded {
+            if let session = app.voiceover {
+                VoiceoverCard(session: session, app: app)
+                    .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
+                    .transition(.opacity)
+                VoiceoverTag(session: session, speaker: app.speaker)
+            } else if expanded {
                 ReadAlongCard(speaker: app.speaker, keysHint: Self.keysHintText(app.store.reading))
                     .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
                     .transition(.opacity)
             }
-            if let run = app.run {
+            if app.voiceover == nil, let run = app.run {
                 VStack(spacing: 3) {
                     content(run)
                     if let info = run.modelInfo, run.phase != .recording { ModelLine(text: info) }
@@ -610,6 +615,7 @@ private struct SentenceRow: View {
     let current: Int
     let position: Int
     let tint: Color
+    var help = "Read from here"
     let onTap: () -> Void
     @State private var hovering = false
 
@@ -626,7 +632,7 @@ private struct SentenceRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: onTap)
-        .help("Read from here")
+        .help(help)
     }
 
     private var text: Text {
@@ -654,5 +660,130 @@ private struct SentenceRow: View {
             out[word].underlineStyle = Text.LineStyle(pattern: .solid, color: tint.opacity(0.85))
         }
         return out
+    }
+}
+
+/// The voiceover script (`vp record-vo`) in the read-along card's place: the line being read lit, the cursor on the
+/// next word to say. After a take, click a sentence to record again from it.
+private struct VoiceoverCard: View {
+    let session: VoiceoverSession
+    let app: AppState
+    @State private var hovering = false
+    private static let coral = Color(hex: 0xE0694A)
+
+    var body: some View {
+        let position = session.phase == .playing ? app.speaker.position : session.position
+        let sentences = session.script.sentences
+        let current = sentences.lastIndex { $0.start <= position } ?? 0
+        let reviewing = session.phase == .review || session.phase == .playing
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(sentences) { sentence in
+                            SentenceRow(sentence: sentence, current: current, position: position,
+                                        tint: session.phase == .playing ? Color(hex: 0xC3A3D4) : Self.coral,
+                                        help: reviewing ? "Record again from here" : "") {
+                                if reviewing { app.voiceoverRetake(session, from: sentence.id) }
+                            }
+                            .padding(.top, sentence.opensParagraph ? 7 : 0)
+                            .id(sentence.id)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 22)
+                }
+                .scrollIndicators(.never)
+                .mask(
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                        Rectangle().fill(.black)
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                    }
+                )
+                .onHover { hovering = $0 }
+                .onAppear { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
+                .onChange(of: current) { _, new in
+                    guard !hovering else { return }
+                    withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(new, anchor: UnitPoint(x: 0, y: 0.3)) }
+                }
+            }
+            Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
+            HStack(spacing: 6) {
+                Text(hint).foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 6)
+                controls
+            }
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .padding(.horizontal, 10).frame(height: 26)
+        }
+        .font(.system(size: 12, design: .monospaced))
+        .background(
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Palette.hudBG)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.hudFG.opacity(0.14), lineWidth: 0.5))
+        .environment(\.colorScheme, .dark)
+        .frame(width: HUDController.size.width - 20)
+    }
+
+    private var hint: String {
+        switch session.phase {
+        case .countdown: "get ready · Esc cancels"
+        case .recording: "read at your pace · a flub? restart the sentence"
+        case .aligning: "lining the take up with the script…"
+        case .review, .playing:
+            session.problem ?? (hovering ? "click a sentence to record again from it" : "\(session.matchedSentences)/\(session.sentenceCount) sentences found")
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        switch session.phase {
+        case .countdown, .aligning:
+            EmptyView()
+        case .recording:
+            button("⏎ stop") { app.voiceoverReturn(session) }
+            button("R restart") { app.voiceoverRetake(session, from: nil) }
+        case .review, .playing:
+            button("R retake") { app.voiceoverRetake(session, from: nil) }
+            button(session.phase == .playing ? "␣ stop" : "␣ play") { app.voiceoverPlay(session) }
+            button("⏎ keep") { app.voiceoverReturn(session) }
+            button("esc cancel") { app.finishVoiceover(session, accepted: false) }
+        }
+    }
+
+    private func button(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).fixedSize()
+                .padding(.horizontal, 5).frame(height: 16)
+                .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudFG.opacity(0.14)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.hudFG)
+    }
+}
+
+/// The tag under the voiceover card: the countdown, then REC with the clock and the level, then the take.
+private struct VoiceoverTag: View {
+    let session: VoiceoverSession
+    let speaker: Speaker
+
+    var body: some View {
+        switch session.phase {
+        case .countdown(let n):
+            HUDTag(state: .waiting, label: "REC IN", detail: "\(n)", level: session.level)
+        case .recording:
+            TimelineView(.periodic(from: session.recordingStarted, by: 1)) { context in
+                HUDTag(state: .recording, label: "REC", detail: HUDTag.clock(context.date.timeIntervalSince(session.recordingStarted)),
+                       level: session.level)
+            }
+        case .aligning:
+            HUDTag(state: .processing, label: "TAKE", detail: "aligning")
+        case .review:
+            HUDTag(state: session.problem == nil ? .done : .failed, label: "TAKE", detail: HUDTag.clock(session.duration))
+        case .playing:
+            HUDTag(state: .speaking, label: "PLAY", detail: "\(Int(speaker.progress * 100))%")
+        }
     }
 }

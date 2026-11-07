@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.18.0**
+- **Record a voiceover with a teleprompter.** `vp record-vo --script vo.txt --out vo.wav` shows the script in the HUD's card, counts down, and records while the card keeps your place: it listens on your Mac as you read, so the line you're on is lit and the next word marked, through ad-libs, skipped words and restarted sentences. Afterwards press R to retake (or click a sentence to record again from there), Space to hear the take with the script following along, Return to keep it or Esc to cancel. The audio is saved untouched at the microphone's own rate (WAV, or Apple Lossless .m4a), with a timings file beside it giving when each word and sentence of the script was said, and the time of any `[3]`-style markers in the script, for cueing what happens on screen.
+
 **1.17.23**
 - `vp play` given a file that isn't audio now says so plainly (`bad_audio`) instead of showing a raw Core Audio error code.
 

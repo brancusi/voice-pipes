@@ -20,6 +20,9 @@ enum VPCommands {
                     summary: "Speak text aloud", values: ["model", "voice", "speed", "text"], handler: say),
         CommandSpec(name: "play", usage: "vp play <audio-file> [--transcript <file>] [--speed 0.6–2.0]",
                     summary: "Play an audio file with its transcript in the read-along card", values: ["transcript", "speed"], handler: play),
+        CommandSpec(name: "record-vo", usage: "vp record-vo --script <file|-> --out <take.wav|.m4a> [--countdown 3] [--title \"…\"] [--input <mic>]",
+                    summary: "Record a voiceover read from a script in the HUD; writes the take and its word timings",
+                    values: ["script", "out", "countdown", "title", "input"], handler: recordVoiceover),
         CommandSpec(name: "speed", usage: "vp speed <0.6–2.0>", summary: "Change the speed of what's being read aloud, live",
                     handler: { parsed, out in
                         let value = try parsed.positional(0, "speed", usage: "vp speed 1.3")
@@ -264,6 +267,35 @@ enum VPCommands {
         out.emit(.object([("played", .string(data["played"] as? String ?? "")), ("sentences", .int(data["sentences"] as? Int ?? 0)),
                           ("timed", .bool(data["timed"] as? Bool ?? false)), ("ms", .int(data["ms"] as? Int ?? 0))]),
                  help: ["vp pause | vp next | vp speed 1.2 | vp stop   (while it plays)"])
+    }
+
+    static func recordVoiceover(_ parsed: Parsed, _ out: Output) throws {
+        let usage = "vp record-vo --script vo.txt --out vo.wav"
+        guard let source = parsed["script"] else { throw UsageError("missing_script", "Which script?", hint: usage) }
+        let script: String
+        if source == "-" {
+            script = String(data: FileHandle.standardInput.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        } else {
+            guard let text = try? String(contentsOfFile: source, encoding: .utf8) else {
+                throw UsageError("no_such_file", "Can't read \(source).", hint: usage)
+            }
+            script = text
+        }
+        guard let path = parsed["out"] else { throw UsageError("missing_out", "Where should the take go?", hint: usage) }
+        var args: [String: Any] = ["script": script, "out": URL(fileURLWithPath: path).standardizedFileURL.path]
+        if let countdown = try parsed.double("countdown") { args["countdown"] = Int(countdown) }
+        if let title = parsed["title"] { args["title"] = title }
+        if let input = parsed["input"] { args["input"] = input }
+        let data = try AppClient.request("record-vo", args)
+        let accepted = data["accepted"] as? Bool ?? false
+        var fields: [(String, Out)] = [("accepted", .bool(accepted)), ("duration", .double(data["duration"] as? Double ?? 0))]
+        if accepted {
+            fields += [("audio", .string(data["audio"] as? String ?? "")), ("timings", .string(data["timings"] as? String ?? "")),
+                       ("sample_rate", .int(data["sample_rate"] as? Int ?? 0)),
+                       ("sentences", .string("\(data["matched"] as? Int ?? 0)/\(data["sentences"] as? Int ?? 0) found"))]
+        }
+        out.emit(.object(fields + [("markers", Out(any: data["markers"] ?? []))]),
+                 help: accepted ? ["vp play \(data["audio"] as? String ?? "") --transcript \(data["timings"] as? String ?? "")   (hear it with its text)"] : [])
     }
 
     static func simple(_ cmd: String, _ out: Output) throws {

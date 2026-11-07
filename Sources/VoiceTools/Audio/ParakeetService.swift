@@ -53,6 +53,16 @@ actor ParakeetService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Words with their times in the audio (a voiceover take's final pass).
+    func transcribeWords(_ samples: [Float]) async throws -> [WordTiming] {
+        if manager == nil { await load() }
+        guard let manager else { throw ParakeetError.notLoaded }
+        let padded = samples.count < 16_000 ? samples + Array(repeating: 0, count: 16_000 - samples.count) : samples
+        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        let result = try await manager.transcribe(padded, decoderState: &state)
+        return buildWordTimings(from: result.tokenTimings ?? [])
+    }
+
     /// A sliding-window streaming session sharing the already-loaded models (no reload).
     func startStreamingSession() async throws -> SlidingWindowAsrManager {
         if models == nil { await load() }

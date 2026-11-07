@@ -321,6 +321,54 @@ vp open reading
 vp play walkthrough.mp3 --transcript walkthrough.alignment.json
 ```
 
+### vp record-vo
+
+```sh
+vp record-vo --script <file|-> --out <take.wav|take.m4a> [--countdown 3] [--title "…"] [--input <mic>]
+```
+
+A teleprompter for recording a voiceover. The script appears in the HUD's card, a countdown runs, then it records
+while the card follows you: the line you're on is lit and the cursor sits on the next word to say. It's transcribed
+on your Mac as you go, only to keep your place: ad-libs and skipped words don't throw it, and starting a sentence
+again takes it back to that sentence (the restart is the take that counts).
+
+| key | while recording | after the take |
+|---|---|---|
+| Return | stop | keep it (`vp record-vo` returns) |
+| Esc | stop | cancel (the file is removed) |
+| R | start again | retake from the top |
+| Space | | play the take back, the script following along (again to stop) |
+
+Clicking a sentence after a take records again from that sentence, keeping what came before it. A take also stops
+by itself a moment after the last line. These keys are taken from every app while the session is open.
+
+The script is plain text. Blank lines separate paragraphs, `**bold**` is shown plain, and `[id]` markers (such as
+`[3]`) are hidden from the card and timed at the word after them, for cueing things on screen to the voice.
+
+The take is written untouched at the microphone's own rate, mono: `.wav` as 24-bit PCM, `.m4a` or `.caf` as Apple
+Lossless. `--input` picks a microphone by name (`vp inputs`); otherwise `input` from config.toml. When you keep a
+take, Parakeet transcribes it whole and Voice Pipes writes `<take>.timings.json` beside it:
+
+```json
+{
+  "text": "So, the receipts. …",
+  "duration": 15.42, "sample_rate": 48000,
+  "words":   [{"word": "So,", "start": 0.31, "end": 0.52, "matched": true}, …],
+  "script":  [{"index": 1, "text": "So, the receipts.", "start": 0.31, "end": 1.6, "matched": 1}, …],
+  "markers": [{"id": "3", "time": 9.84, "word": "Here's"}, …],
+  "heard":   [{"word": "So", "start": 0.31, "end": 0.52}, …]
+}
+```
+
+`words` are the script's words with the times they were said (`matched: false` where the word wasn't heard as written;
+a word that wasn't heard at all gets the time between its neighbours). `script` gives each sentence's times and how
+much of it was heard (0–1); a sentence read more than once takes its last reading, and one that wasn't found has
+`null` times. `heard` is the transcription itself. The file plays with its text in the card:
+`vp play take.wav --transcript take.timings.json`.
+
+It prints `accepted`, `duration`, and for a kept take `audio`, `timings`, `sample_rate`, how many sentences were found,
+and `markers`.
+
 ### vp listen
 
 ```sh

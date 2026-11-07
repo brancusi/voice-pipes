@@ -306,6 +306,9 @@ enum AgentsInstaller {
         - `vp listen` records and transcribes without speaking first. `vp stop` stops speech, recording, or a run
           that's still processing (like the HUD's ×; what it had so far goes into History marked Stopped).
         - `vp speed 1.4` changes the speed of what's playing.
+        - `vp record-vo --script vo.txt --out vo.wav` records the user reading a voiceover: the script shows in the HUD
+          and follows them; they retake (R), play back (Space), keep (Return) or cancel (Esc). It prints the audio
+          path and `<take>.timings.json`: script words, sentences and `[id]` markers (hidden from the card) with times.
         - `vp play voiceover.mp3 --transcript voiceover.alignment.json` plays an audio file with its text in the
           follow-along card (`vp open reading` first) and waits until done; pause, stop, next, prev and speed work
           on it. The transcript is ElevenLabs `/with-timestamps` alignment JSON or

@@ -37,8 +37,11 @@ extension AppState {
             reply.result(try await agentSay(args))
         case "play":
             reply.result(try await agentPlay(args))
+        case "record-vo":
+            reply.result(try await agentRecordVoiceover(args))
         case "stop":
-            let was = speaker.state != .idle || capture != nil || agentRecording || run?.phase == .processing
+            let was = speaker.state != .idle || capture != nil || agentRecording || run?.phase == .processing || voiceover != nil
+            if let voiceover { finishVoiceover(voiceover, accepted: false) }
             speaker.clear()
             cancelCapture()
             stopProcessing()
@@ -363,6 +366,47 @@ extension AppState {
         }
         return ["played": url.lastPathComponent, "sentences": Speaker.sentences(of: transcript.text).count,
                 "timed": !transcript.marks.isEmpty, "ms": Int(Date().timeIntervalSince(started) * 1000)]
+    }
+
+    /// Records a voiceover read from a script shown in the HUD, until the take is kept or the session cancelled.
+    private func agentRecordVoiceover(_ args: [String: Any]) async throws -> [String: Any] {
+        try ensureIdle()
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+            throw AgentError("no_microphone", "Voice Pipes isn't allowed to use the microphone.", hint: "vp open setup")
+        }
+        let script = VoiceoverScript(args["script"] as? String ?? "")
+        guard !script.tokens.isEmpty else { throw AgentError("missing_script", "The script has no words.", hint: "vp record-vo --script vo.txt --out vo.wav") }
+        guard let path = args["out"] as? String else { throw AgentError("missing_out", "Where should the take go?", hint: "--out take.wav") }
+        let out = URL(fileURLWithPath: path)
+        guard ["wav", "m4a", "caf"].contains(out.pathExtension.lowercased()) else {
+            throw AgentError("bad_out", "--out is a .wav (24-bit PCM) or .m4a/.caf (Apple Lossless) file.")
+        }
+        guard FileManager.default.fileExists(atPath: out.deletingLastPathComponent().path) else {
+            throw AgentError("no_such_folder", "No folder at \(out.deletingLastPathComponent().path).")
+        }
+        let countdown = (args["countdown"] as? Int) ?? (args["countdown"] as? Double).map(Int.init) ?? 3
+        guard (0...10).contains(countdown) else { throw AgentError("bad_value", "--countdown is 0 to 10 seconds.") }
+        let input = args["input"] as? String
+        if let input, !AudioInputs.isConnected(input) { throw AgentError("no_such_input", "No microphone named '\(input)'.", hint: "vp inputs") }
+        let title = args["title"] as? String ?? out.deletingPathExtension().lastPathComponent
+        let result: VoiceoverResult
+        do {
+            result = try await recordVoiceover(script: script, title: title, out: out, countdown: countdown, input: input)
+        } catch let error as AgentError {
+            throw error
+        } catch {
+            throw AgentError("no_microphone", "Microphone unavailable: \(error.localizedDescription)")
+        }
+        var reply: [String: Any] = ["accepted": result.accepted, "duration": (result.duration * 1000).rounded() / 1000]
+        if result.accepted {
+            reply["audio"] = result.audio.path
+            reply["timings"] = result.timings?.path ?? ""
+            reply["sample_rate"] = Int(result.sampleRate)
+            reply["markers"] = (result.alignment?.markers ?? []).map { ["id": $0.id, "time": $0.time.map { ($0 * 1000).rounded() / 1000 as Any } ?? NSNull()] }
+            reply["sentences"] = result.alignment?.sentences.count ?? 0
+            reply["matched"] = result.alignment?.sentences.filter { $0.start != nil }.count ?? 0
+        }
+        return reply
     }
 
     /// Records until you stop talking (or `max` seconds), then transcribes.

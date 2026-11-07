@@ -452,7 +452,7 @@ final class Speaker: NSObject {
     }
 
     /// Sentences with their offsets, for the read-along card.
-    static func sentences(of text: String) -> [Sentence] {
+    nonisolated static func sentences(of text: String) -> [Sentence] {
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
         var result: [Sentence] = []
