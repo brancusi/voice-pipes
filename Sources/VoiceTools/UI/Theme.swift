@@ -236,6 +236,7 @@ extension StepKind {
         case .speak, .openRouterSpeech: "speaker.wave.2"
         case .localSpeech: "speaker.wave.2.bubble"
         case .showHUD: "rectangle.bottomthird.inset.filled"
+        case .teleprompter: "text.below.photo"
         }
     }
 

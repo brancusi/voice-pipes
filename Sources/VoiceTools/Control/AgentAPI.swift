@@ -389,6 +389,7 @@ extension AppState {
         let input = args["input"] as? String
         if let input, !AudioInputs.isConnected(input) { throw AgentError("no_such_input", "No microphone named '\(input)'.", hint: "vp inputs") }
         let title = args["title"] as? String ?? out.deletingPathExtension().lastPathComponent
+        run = nil  // a finished run's fading tag; the voiceover brings its own
         let result: VoiceoverResult
         do {
             result = try await recordVoiceover(script: script, title: title, out: out, countdown: countdown, input: input)

@@ -309,6 +309,8 @@ enum AgentsInstaller {
         - `vp record-vo --script vo.txt --out vo.wav` records the user reading a voiceover: the script shows in the HUD
           and follows them; they retake (R), play back (Space), keep (Return) or cancel (Esc). It prints the audio
           path and `<take>.timings.json`: script words, sentences and `[id]` markers (hidden from the card) with times.
+          The same thing is a block (`type = "teleprompter"`) for tracks: text in, the timings JSON (or transcript,
+          or the take's path) out.
         - `vp play voiceover.mp3 --transcript voiceover.alignment.json` plays an audio file with its text in the
           follow-along card (`vp open reading` first) and waits until done; pause, stop, next, prev and speed work
           on it. The transcript is ElevenLabs `/with-timestamps` alignment JSON or

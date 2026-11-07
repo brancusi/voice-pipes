@@ -32,6 +32,7 @@ extension StepKind {
         case .copy: "Copy to clipboard"
         case .speak, .openRouterSpeech, .localSpeech: "Speak"
         case .showHUD: "Show in HUD"
+        case .teleprompter: "Teleprompter"
         }
     }
 
@@ -52,6 +53,7 @@ extension StepKind {
         case .copy: "Leaves it on the clipboard"
         case .speak, .openRouterSpeech, .localSpeech: "Read it aloud, on this Mac or in the cloud"
         case .showHUD: "Flashes it at the bottom of the screen"
+        case .teleprompter: "Shows it as a script and records you reading it"
         }
     }
 }

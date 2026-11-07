@@ -68,7 +68,7 @@ enum ConfigSchema {
         "step": {
           "type": "object",
           "required": ["type"],
-          "properties": { "type": { "enum": ["microphone", "text", "transcribe", "llm", "route", "branch", "http", "template", "fix-words", "paste", "copy", "speak", "show-hud"] } },
+          "properties": { "type": { "enum": ["microphone", "text", "transcribe", "llm", "route", "branch", "http", "template", "fix-words", "paste", "copy", "speak", "show-hud", "teleprompter"] } },
           "oneOf": [
             { "properties": { "type": { "const": "microphone" }, "input": { "type": "string", "description": "\"system\" (follows macOS) or a mic's name (`vp inputs`). Leave out to use [settings] input. Bluetooth mics are never kept open, so they start a little later." } }, "additionalProperties": false, "description": "Records a microphone. — → audio" },
             { "properties": { "type": { "const": "text" }, "sources": { "type": "array", "items": { "enum": ["selection", "page", "clipboard", "previous-clipboard"] } } }, "additionalProperties": false, "description": "The first source with text. — → text" },
@@ -82,7 +82,8 @@ enum ConfigSchema {
             { "properties": { "type": { "const": "paste" }, "restore_clipboard": { "type": "boolean", "default": true } }, "additionalProperties": false, "description": "Pastes at the cursor. text → text" },
             { "properties": { "type": { "const": "copy" } }, "additionalProperties": false, "description": "text → text" },
             { "properties": { "type": { "const": "speak" }, "model": { "type": "string", "default": "pocket", "description": "pocket | supertonic | macos | an OpenRouter speech model id." }, "voice": { "type": "string" }, "speed": { "type": "number", "minimum": 0.6, "maximum": 2.0, "default": 1.0 } }, "additionalProperties": false, "description": "text → —" },
-            { "properties": { "type": { "const": "show-hud" } }, "additionalProperties": false, "description": "text → text" }
+            { "properties": { "type": { "const": "show-hud" } }, "additionalProperties": false, "description": "text → text" },
+            { "properties": { "type": { "const": "teleprompter" }, "countdown": { "type": "integer", "minimum": 0, "maximum": 10, "default": 3 }, "folder": { "type": "string", "default": "~/Movies/Voiceovers", "description": "Where takes are saved." }, "format": { "enum": ["wav", "m4a"], "default": "wav", "description": "wav: 24-bit PCM. m4a: Apple Lossless. Mono, at the mic's own rate." }, "output": { "enum": ["timings", "transcript", "audio"], "default": "timings", "description": "What it passes on: the timings JSON (script words, sentences, [id] markers with times), what was heard, or the take's path." }, "input": { "type": "string", "description": "\"system\" or a mic's name; leave out for [settings] input." } }, "additionalProperties": false, "description": "Shows the text as a script and records you reading it: countdown, the script follows you, retake/play/keep. [id] markers in the text are hidden and timed. text → text" }
           ]
         }
       }

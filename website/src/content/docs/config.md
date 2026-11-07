@@ -97,6 +97,7 @@ Inputs give audio or text, `transcribe` turns audio into text, and the rest take
 | `copy` | Leaves the text on the clipboard | text → text |
 | `speak` | `model` = `pocket`, `supertonic`, `macos` or an OpenRouter speech model; `voice` (see `vp voices --model <model>`); `speed` = 0.6–2.0 | text → nothing |
 | `show-hud` | Shows the text at the bottom of the screen | text → text |
+| `teleprompter` | `countdown` = 0–10 s (default 3), `folder` (default `"~/Movies/Voiceovers"`), `format` = `"wav"` (24-bit) or `"m4a"` (Apple Lossless), `output` = `"timings"` (the JSON [`vp record-vo`](/docs/cli#vp-record-vo) writes), `"transcript"` or `"audio"` (the take's path), `input` as for `microphone`. Shows the text as a script, records you reading it, and waits for you to keep the take (Esc cancels and stops the track) | text → text |
 
 `vp models --capability text|transcription|speech` lists the OpenRouter ids you can use, with OpenRouter's
 prices. The app's model pickers show more for each model: what a paragraph costs, its speed on your Mac and a quality

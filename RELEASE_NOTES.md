@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.19.0**
+- **Teleprompter is now a block.** Add **Teleprompter** to any track: it takes text, shows it as a script in the big voiceover panel, records you reading it, and hands the next block the timings (or the transcript, or the take's file path). So a track can, say, take selected text, record you reading it, and post the word and marker times to another app. Its settings are the countdown, the folder takes are saved in, WAV or Apple Lossless, what it passes on, and the microphone. `vp record-vo` runs the same thing from the command line.
+- **The voiceover keys stay in the voiceover.** Return, Esc, R and Space used to be taken from every app while the panel was open, so typing elsewhere could stop or retake a take. Now the panel takes the keyboard itself, without bringing Voice Pipes to the front; click elsewhere to type in another app, and click the panel to take the keys back.
+
 **1.18.1**
 - **The voiceover teleprompter is big and clear now.** `vp record-vo` fills a large panel: the script in big type, the words you've read lit and the next one marked in coral, a huge 3-2-1 countdown over the script, then an unmissable red **● LIVE** bar with the clock and a wide level meter, and a red border for as long as it's recording.
 - **It keeps up with you.** The card used to lag behind and lose its place; it now re-listens to the last few seconds several times a second, so the highlight stays within a word or two of your voice. A take also stops by itself once you've read the last line, as it was meant to.

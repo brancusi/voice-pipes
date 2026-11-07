@@ -97,6 +97,7 @@ filter (names and descriptions), ↑↓ and Return to add, Esc to close. Drag a 
 | **Copy to clipboard** | text → text | Leaves the text on the clipboard. |
 | **Speak** | text → — | One block, one model list: **Pocket TTS** or **Supertonic-3** on this Mac, **macOS voices**, or any OpenRouter speech model; then a voice (each with ▶ preview) and a speed. Long text is read in passages. |
 | **Show in HUD** | text → text | Shows the text for a few seconds. |
+| **Teleprompter** | text → text | Shows the text as a script in a large panel, counts down, and records you reading it while the script follows your voice (transcribed on this Mac). Then **R** retakes (or click a sentence to record again from there), **Space** plays the take back, **Return** keeps it, **Esc** cancels (which stops the track). `[3]`-style markers in the text are hidden and timed. Saves the take untouched (WAV 24-bit or Apple Lossless, at the mic's rate) in **Folder** with a `.timings.json` beside it, and **passes on** the timings JSON, the transcript or the file's path. `vp record-vo` runs the same thing from the command line. |
 
 Output blocks pass their text on, so a track can paste *and* POST, for example.
 

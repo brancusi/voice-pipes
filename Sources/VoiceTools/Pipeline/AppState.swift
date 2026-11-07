@@ -920,7 +920,7 @@ final class AppState {
     /// Runs on this Mac with no cloud call (logged as "on this Mac").
     static func runsOnThisMac(_ kind: StepKind) -> Bool {
         switch kind {
-        case .microphone, .text, .parakeet, .fixWords, .template, .paste, .copy, .speak, .localSpeech, .showHUD: true
+        case .microphone, .text, .parakeet, .fixWords, .template, .paste, .copy, .speak, .localSpeech, .showHUD, .teleprompter: true
         case .openRouterSTT, .llm, .route, .branch, .http, .openRouterSpeech: false
         }
     }
@@ -946,11 +946,34 @@ final class AppState {
         return total
     }
 
+    /// A take's file name: when it was recorded, sortable.
+    private static let takeStamp: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return f
+    }()
+
     private func execute(_ kind: StepKind, payload: Payload, track: Track, depth: Int = 0) async throws -> Payload {
         let nested = depth > 0
         switch kind {
         case .microphone:
             throw PipelineError.misplacedInput
+
+        case .teleprompter(let countdown, let folder, let format, let output, let input):
+            let script = VoiceoverScript(try text(of: payload))
+            guard !script.tokens.isEmpty else { throw PipelineError.noText }
+            guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { throw PipelineError.noMicrophone }
+            let directory = URL(fileURLWithPath: (folder as NSString).expandingTildeInPath)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let stamp = Self.takeStamp.string(from: Date())
+            let out = directory.appendingPathComponent("\(track.slug ?? "voiceover")-\(stamp).\(format)")
+            let result = try await recordVoiceover(script: script, title: track.name, out: out, countdown: countdown, input: input)
+            guard result.accepted else { throw PipelineError.voiceoverCancelled }
+            switch output {
+            case .timings: return .text(result.timings.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "")
+            case .transcript: return .text(result.heard.map(\.word).joined(separator: " "))
+            case .audio: return .text(result.audio.path)
+            }
 
         case .text(let sources):
             for source in sources {
@@ -1147,6 +1170,8 @@ enum PipelineError: LocalizedError {
     case expected(DataKind)
     case noRoutes
     case noBranches
+    case voiceoverCancelled
+    case noMicrophone
 
     var errorDescription: String? {
         switch self {
@@ -1155,6 +1180,8 @@ enum PipelineError: LocalizedError {
         case .expected(let kind): "This step expected \(kind.rawValue) input."
         case .noRoutes: "Route · Jev needs at least one route."
         case .noBranches: "Branch · Jev needs at least one branch."
+        case .voiceoverCancelled: "Voiceover cancelled."
+        case .noMicrophone: "Voice Pipes isn't allowed to use the microphone (Setup → Microphone)."
         }
     }
 }

@@ -232,7 +232,7 @@ enum ConfigFile {
         ("marigold", "#E8C26A"), ("rose", "#EC8F7C"), ("red-rock", "#E0694A"),
     ]
     static let stepTypes = ["microphone", "text", "transcribe", "llm", "route", "branch", "http", "template", "fix-words",
-                            "paste", "copy", "speak", "show-hud"]
+                            "paste", "copy", "speak", "show-hud", "teleprompter"]
     static let textSources: [(String, TextSource)] = [
         ("selection", .selection), ("page", .page), ("clipboard", .clipboard), ("previous-clipboard", .previousClipboard),
     ]
@@ -584,6 +584,18 @@ enum ConfigFile {
             }
         case "show-hud":
             kind = .showHUD
+        case "teleprompter":
+            known += ["countdown", "folder", "format", "output", "input"]
+            var countdown = s.int("countdown") ?? 3
+            if !(0...10).contains(countdown) {
+                s.error("countdown", "should be 0–10 seconds")
+                countdown = 3
+            }
+            kind = .teleprompter(countdown: countdown, folder: s.string("folder") ?? TeleprompterOutput.defaultFolder,
+                                 format: s.choice("format", ["wav", "m4a"], default: "wav") ?? "wav",
+                                 output: TeleprompterOutput(rawValue: s.choice("output", TeleprompterOutput.allCases.map(\.rawValue),
+                                                                               default: "timings") ?? "timings") ?? .timings,
+                                 input: s.string("input"))
         default:
             s.error("type", "'\(type)' isn't a block type. Types: \(stepTypes.joined(separator: ", "))\(TableReader.suggestion(type, stepTypes))")
             kind = nil
@@ -750,6 +762,13 @@ enum ConfigFile {
             add("speed", number(rate), "0.6–2.0")
         case .showHUD:
             add("type", quote("show-hud"), "shows the text at the bottom of the screen for a few seconds")
+        case .teleprompter(let countdown, let folder, let format, let output, let input):
+            add("type", quote("teleprompter"), "shows the text as a script and records you reading it")
+            add("countdown", "\(countdown)", "seconds before recording starts")
+            add("folder", quote(folder), "where takes are saved")
+            add("format", quote(format), "wav (24-bit) | m4a (Apple Lossless)")
+            add("output", quote(output.rawValue), "timings (JSON) | transcript | audio (the file's path)")
+            if let input { add("input", quote(input), "\"system\" or a mic's name (`vp inputs`); leave out for [settings] input") }
         }
         return lines.joined(separator: "\n") + "\n"
     }

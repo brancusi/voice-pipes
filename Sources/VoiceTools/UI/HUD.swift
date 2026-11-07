@@ -22,10 +22,11 @@ final class HUDController {
 
     private func observe() {
         guard let app else { return }
-        let (visible, speaking, processing, expanded) = withObservationTracking {
+        let (visible, speaking, processing, expanded, voiceover) = withObservationTracking {
             // "Processing" here means any time the tag has a button: × while processing, × and "details" on an error.
             (app.run != nil, app.run?.phase == .speaking,
-             app.run?.phase == .processing || HUDView.showsProblem(app.run) || app.voiceover != nil, HUDView.expanded(app))
+             app.run?.phase == .processing || HUDView.showsProblem(app.run) || app.voiceover != nil, HUDView.expanded(app),
+             app.voiceover != nil)
         } onChange: { [weak self] in
             Task { @MainActor in self?.observe() }
         }
@@ -34,6 +35,12 @@ final class HUDController {
         // Clickable only while its buttons are showing; otherwise clicks go straight through.
         panel?.ignoresMouseEvents = !(speaking || processing)
         // The keyboard while reading: taken at once in "always" mode; given back when the reading ends.
+        // A voiceover's keys (Return, Esc, R, Space) work only while its panel has the keyboard, which it takes at once,
+        // so typing in another app never stops or retakes a take.
+        if voiceover != wasVoiceover {
+            wasVoiceover = voiceover
+            if voiceover { takeKeys(.reading) } else { releaseKeys() }
+        }
         if speaking != wasSpeaking {
             wasSpeaking = speaking
             app.setReadingShortcuts(speaking)
@@ -44,6 +51,7 @@ final class HUDController {
     // MARK: The keyboard while reading
 
     private var wasSpeaking = false
+    private var wasVoiceover = false
     private var keysReason: HUDKeys.Reason?
     /// The app you were in, to give the keys back to.
     private weak var previousApp: NSRunningApplication?
@@ -52,10 +60,11 @@ final class HUDController {
 
     private var reading: ReadingSettings { app?.store.reading ?? ReadingSettings() }
     private var isSpeaking: Bool { app?.run?.phase == .speaking }
+    private var isVoiceover: Bool { app?.voiceover != nil }
 
     /// Makes the HUD the key window without activating Voice Pipes: the app you're in stays in front.
     private func takeKeys(_ reason: HUDKeys.Reason) {
-        guard let panel, isSpeaking, reading.takeKeys != .never else { return }
+        guard let panel, isVoiceover || (isSpeaking && reading.takeKeys != .never) else { return }
         if keysReason == nil || reason != .hover { keysReason = reason }
         guard !panel.isKeyWindow else { return }
         let front = NSWorkspace.shared.frontmostApplication
@@ -95,6 +104,10 @@ final class HUDController {
         // A ⌘ shortcut isn't for the HUD (and must never reach Voice Pipes' menu, ⌘Q): give the keys back.
         if event.modifierFlags.contains(.command) {
             releaseKeys()
+            return true
+        }
+        if isVoiceover {
+            app?.voiceoverKey(event.keyCode)
             return true
         }
         if let action = reading.action(for: event) { app?.readingAction(action) }
@@ -162,7 +175,7 @@ final class HUDController {
         panel.contentView = host
         panel.onKey = { [weak self] event in self?.handleKey(event) ?? false }
         panel.onClick = { [weak self] in
-            guard let self, self.reading.takeKeys != .never else { return }
+            guard let self, self.isVoiceover || self.reading.takeKeys != .never else { return }
             self.takeKeys(.click)
         }
         // Tracks the pointer even though Voice Pipes isn't the active app (SwiftUI's hover only works when it is).

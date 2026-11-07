@@ -31,7 +31,6 @@ final class VoiceoverSession {
     @ObservationIgnored var lastVoice = Date()
     @ObservationIgnored var heard: [VoiceoverScript.HeardWord] = []
     @ObservationIgnored var done: CheckedContinuation<Bool, Never>?
-    @ObservationIgnored var keys: [UInt32] = []
 
     init(script: VoiceoverScript, title: String, out: URL, countdown: Int, input: String) {
         self.script = script
@@ -53,6 +52,7 @@ extension AppState {
         let timings: URL?
         let duration: Double
         let alignment: VoiceoverScript.Alignment?
+        let heard: [VoiceoverScript.HeardWord]
         let sampleRate: Double
     }
 
@@ -68,42 +68,44 @@ extension AppState {
             }
         }
         voiceover = session
-        run = ActiveRun(trackID: UUID(), trackName: title, colorHex: "#E0694A", stepTitles: ["Voiceover"], phase: .recording,
-                        currentStep: 0, stepMs: [nil], heldBy: "vp")
+        // A track's run keeps the HUD (the panel shows over it); `vp record-vo` gets one of its own.
+        let ownRun = run == nil
+        if ownRun {
+            run = ActiveRun(trackID: UUID(), trackName: title, colorHex: "#E0694A", stepTitles: ["Voiceover"], phase: .recording,
+                            currentStep: 0, stepMs: [nil], heldBy: "vp")
+        } else {
+            run?.phase = .recording
+        }
         run?.microphone = session.recorder.deviceName
-        bindVoiceoverKeys(session)
         startTake(session, from: nil)
         let accepted = await withCheckedContinuation { session.done = $0 }
 
-        session.keys.forEach { hotkeys.remove($0) }
         session.recorder.close()
         if voiceover === session { voiceover = nil }
-        run = nil
+        if ownRun { run = nil } else { run?.phase = .processing }
 
         guard accepted else {
             try? FileManager.default.removeItem(at: out)
-            return VoiceoverResult(accepted: false, audio: out, timings: nil, duration: session.duration, alignment: nil,
+            return VoiceoverResult(accepted: false, audio: out, timings: nil, duration: session.duration, alignment: nil, heard: [],
                                    sampleRate: session.recorder.sampleRate)
         }
         let timings = out.deletingPathExtension().appendingPathExtension("timings.json")
         try writeTimings(session, to: timings)
         return VoiceoverResult(accepted: true, audio: out, timings: timings, duration: session.duration, alignment: session.alignment,
-                               sampleRate: session.recorder.sampleRate)
+                               heard: session.heard, sampleRate: session.recorder.sampleRate)
     }
 
-    // MARK: Keys
+    // MARK: Keys (the HUD takes the keyboard while a voiceover is open; see HUDController)
 
-    /// While the session runs: Return stops a take, then keeps it; Esc stops, then cancels; R retakes; Space plays.
-    private func bindVoiceoverKeys(_ session: VoiceoverSession) {
-        let bindings: [(Int, () -> Void)] = [
-            (kVK_Return, { [weak self] in self?.voiceoverReturn(session) }),
-            (kVK_ANSI_KeypadEnter, { [weak self] in self?.voiceoverReturn(session) }),
-            (kVK_Escape, { [weak self] in self?.voiceoverEscape(session) }),
-            (kVK_ANSI_R, { [weak self] in self?.voiceoverRetake(session, from: nil) }),
-            (kVK_Space, { [weak self] in self?.voiceoverPlay(session) }),
-        ]
-        session.keys = bindings.compactMap { code, action in
-            hotkeys.add(KeyCombo(key: .init(code: UInt32(code)), modifiers: [])) { pressed in if pressed { action() } }
+    /// Return stops a take, then keeps it; Esc stops, then cancels; R retakes; Space plays the take back.
+    func voiceoverKey(_ keyCode: UInt16) {
+        guard let session = voiceover else { return }
+        switch Int(keyCode) {
+        case kVK_Return, kVK_ANSI_KeypadEnter: voiceoverReturn(session)
+        case kVK_Escape: voiceoverEscape(session)
+        case kVK_ANSI_R: voiceoverRetake(session, from: nil)
+        case kVK_Space: voiceoverPlay(session)
+        default: break
         }
     }
 

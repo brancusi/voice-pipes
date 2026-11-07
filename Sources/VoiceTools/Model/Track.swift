@@ -146,6 +146,9 @@ enum StepKind: Codable, Hashable {
     case openRouterSpeech(model: String, voice: String, rate: Float)
     case localSpeech(engine: LocalVoiceEngine, voice: String, rate: Float)
     case showHUD
+    /// Shows the text as a script to read aloud and records the reader (the voiceover panel); passes on `output`.
+    /// `folder` is where takes are saved (a `~` path), `format` "wav" or "m4a"; `input` as for the microphone.
+    case teleprompter(countdown: Int, folder: String, format: String, output: TeleprompterOutput, input: String?)
 
     var isMicrophone: Bool { if case .microphone = self { true } else { false } }
 
@@ -153,7 +156,8 @@ enum StepKind: Codable, Hashable {
         switch self {
         case .microphone, .text: .none
         case .parakeet, .openRouterSTT: .audio
-        case .llm, .route, .branch, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: .text
+        case .llm, .route, .branch, .http, .template, .fixWords, .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD,
+             .teleprompter: .text
         }
     }
 
@@ -162,7 +166,7 @@ enum StepKind: Codable, Hashable {
         case .microphone: .audio
         case .text, .parakeet, .openRouterSTT, .llm, .route, .http, .template, .fixWords: .text
         // Outputs pass their text through so a track can, e.g., paste and then POST.
-        case .paste, .copy, .showHUD: .text
+        case .paste, .copy, .showHUD, .teleprompter: .text
         case .speak, .openRouterSpeech, .localSpeech: .none
         // What every branch ends with (text if a branch has no steps); `none` when they differ.
         case .branch(_, let branches):
@@ -176,7 +180,7 @@ enum StepKind: Codable, Hashable {
         case .microphone, .text: "Input"
         case .parakeet, .openRouterSTT: "Transcribe"
         case .llm, .route, .branch, .http, .template, .fixWords: "Transform"
-        case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD: "Output"
+        case .paste, .copy, .speak, .openRouterSpeech, .localSpeech, .showHUD, .teleprompter: "Output"
         }
     }
 
@@ -204,6 +208,7 @@ enum StepKind: Codable, Hashable {
         case .openRouterSpeech(let model, let voice, _):
             "Speak · \(model.split(separator: "/").last ?? "") · \(OpenRouterCatalog.Model.voiceLabel(voice))"
         case .showHUD: "Show in HUD"
+        case .teleprompter: "Teleprompter"
         }
     }
 
@@ -226,6 +231,7 @@ enum StepKind: Codable, Hashable {
         case .localSpeech(let engine, let voice, _): "Speak · \(engine.voiceLabel(voice))"
         case .openRouterSpeech(_, let voice, _): "Speak · \(OpenRouterCatalog.Model.voiceLabel(voice).components(separatedBy: " (").first ?? voice)"
         case .showHUD: "HUD"
+        case .teleprompter: "Teleprompter"
         }
     }
 
@@ -263,6 +269,7 @@ enum StepKind: Codable, Hashable {
         .copy,
         .localSpeech(engine: .pocket, voice: LocalVoiceEngine.pocket.defaultVoice, rate: 1.0),
         .showHUD,
+        .teleprompter(countdown: 3, folder: TeleprompterOutput.defaultFolder, format: "wav", output: .timings, input: nil),
     ]
 }
 
@@ -604,5 +611,26 @@ extension Step {
             break
         }
         return step
+    }
+}
+
+/// What a Teleprompter block passes on to the next one.
+enum TeleprompterOutput: String, Codable, CaseIterable, Identifiable {
+    /// The timings file's JSON: script words, sentences and markers with their times.
+    case timings
+    /// What was heard, as text.
+    case transcript
+    /// The take's file path.
+    case audio
+
+    var id: String { rawValue }
+    static let defaultFolder = "~/Movies/Voiceovers"
+
+    var label: String {
+        switch self {
+        case .timings: "Timings (JSON)"
+        case .transcript: "Transcript"
+        case .audio: "Audio file path"
+        }
     }
 }

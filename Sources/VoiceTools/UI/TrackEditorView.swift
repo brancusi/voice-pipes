@@ -700,6 +700,32 @@ private struct StepConfigView: View {
 
         case .showHUD:
             Text("Shows the text in the HUD for a few seconds.").font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+
+        case .teleprompter(let countdown, let folder, let format, let output, let input):
+            let set = { (c: Int, f: String, fm: String, o: TeleprompterOutput, i: String?) in
+                kind = .teleprompter(countdown: c, folder: f, format: fm, output: o, input: i)
+            }
+            Text("Shows the text as a script in a large panel, counts down, and records you reading it while the script follows along. Then R retakes, Space plays it back, Return keeps it, Esc cancels. [3]-style markers in the text are hidden and timed.")
+                .font(VPFont.caption).foregroundStyle(Palette.fgMuted).fixedSize(horizontal: false, vertical: true)
+            ConfigRow("Countdown") {
+                VPSegmented(selection: Binding { countdown } set: { set($0, folder, format, output, input) },
+                            options: [0, 3, 5].map { ($0, $0 == 0 ? "none" : "\($0) s") })
+            }
+            FieldLabel("Folder", help: "Where takes are saved, named after the track and the time.") {
+                VPTextField(TeleprompterOutput.defaultFolder, text: Binding { folder } set: { set(countdown, $0, format, output, input) })
+                    .focusKey("folder")
+            }
+            ConfigRow("Format") {
+                VPSegmented(selection: Binding { format } set: { set(countdown, folder, $0, output, input) },
+                            options: [("wav", "WAV 24-bit"), ("m4a", "Apple Lossless")])
+            }
+            ConfigRow("Passes on") {
+                VPSegmented(selection: Binding { output } set: { set(countdown, folder, format, $0, input) },
+                            options: TeleprompterOutput.allCases.map { ($0, $0.label) })
+            }
+            ConfigRow("Input") {
+                InputPicker(selection: Binding { input } set: { set(countdown, folder, format, output, $0) }, appDefault: appInput)
+            }
         }
     }
 

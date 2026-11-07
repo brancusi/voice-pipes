@@ -340,7 +340,10 @@ again takes it back to that sentence (the restart is the take that counts).
 | Space | | play the take back, the script following along (again to stop) |
 
 Clicking a sentence after a take records again from that sentence, keeping what came before it. A take also stops
-by itself a moment after the last line. These keys are taken from every app while the session is open.
+by itself a moment after the last line. The panel takes the keyboard while it's open, without bringing Voice Pipes to
+the front, so these keys never reach (or come from) another app; click elsewhere to type there, and click the panel
+to take the keys back. The same teleprompter is a block, `teleprompter`, for tracks
+([config.toml](/docs/config#blocks)).
 
 The script is plain text. Blank lines separate paragraphs, `**bold**` is shown plain, and `[id]` markers (such as
 `[3]`) are hidden from the card and timed at the word after them, for cueing things on screen to the voice.
