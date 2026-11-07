@@ -127,58 +127,62 @@ struct VoiceoverScript {
 
     // MARK: Following the reader
 
-    /// Follows the reader through the script from live transcription: `cursor` is the last token read (-1 before the
-    /// first). It moves forward a word at a time (skipping a word or two when the words around agree), never back on a
-    /// stray word; it goes back only when the reader restarts a sentence (its first three words, again).
+    /// Follows the reader through the script from live transcription of the last few seconds (a rolling window, so the
+    /// same words come round again: following them again changes nothing). `cursor` is the last token read (-1 before
+    /// the first). It moves forward to where the latest heard words match the script, skipping a word or two when the
+    /// words before agree, never back on a stray word; it goes back only when the reader restarts a sentence (its first
+    /// three words, again).
     struct Follower {
         let script: VoiceoverScript
         private(set) var cursor = -1
-        private var heard: [String] = []
-        private var processed = 0
 
         init(script: VoiceoverScript, from token: Int = -1) {
             self.script = script
             cursor = token
         }
 
-        /// The running transcript (it may revise its last words; already-followed words aren't taken back).
-        mutating func update(_ transcript: String) {
-            heard = VoiceoverScript.normalizeHeard(transcript)
-            processed = min(processed, heard.count)
-            while processed < heard.count {
-                step(heard[..<(processed + 1)])
-                processed += 1
+        /// What transcription heard in the last few seconds.
+        mutating func follow(_ recent: String) {
+            let heard = VoiceoverScript.normalizeHeard(recent)
+            guard !heard.isEmpty, !restarted(heard) else { return }
+            // The last word, or the one before it if the last was an ad-lib or cut off mid-word.
+            for anchor in 0..<min(2, heard.count) {
+                if advance(Array(heard.dropLast(anchor))) { return }
             }
         }
 
-        private mutating func step(_ heard: ArraySlice<String>) {
+        private mutating func advance(_ heard: [String]) -> Bool {
             let tokens = script.tokens
-            guard let last = heard.last else { return }
-            // A restart: the first three words of this sentence (or the one before) again.
-            if heard.count >= 3, cursor >= 0 {
-                let three = Array(heard.suffix(3))
-                let current = script.words[tokens[min(cursor + 1, tokens.count - 1)].word].sentence
-                for s in [current, current - 1] where s >= 0 {
-                    let r = script.sentenceTokens[s]
-                    guard r.count >= 3, r.lowerBound + 2 < cursor else { continue }
-                    if (0..<3).allSatisfy({ VoiceoverScript.same(tokens[r.lowerBound + $0].norm, three[$0]) }) {
-                        cursor = r.lowerBound + 2
-                        return
-                    }
+            guard let last = heard.last, cursor + 1 < tokens.count else { return false }
+            let context = Array(heard.dropLast().suffix(5))
+            // Where we are now competes too, and wins a tie: the same words heard again keep the place.
+            var best: (p: Int, score: Int)?
+            for p in max(0, cursor)...min(cursor + 15, tokens.count - 1) where VoiceoverScript.same(tokens[p].norm, last) {
+                let score = 1 + VoiceoverScript.lcs(context, tokens[max(0, p - 6)..<p].map(\.norm))
+                if score > (best?.score ?? 0) { best = (p, score) }  // ties keep the nearer place
+            }
+            guard let best else { return false }
+            if best.p <= cursor { return true }
+            guard best.score >= 2 || best.p == cursor + 1 else { return false }
+            cursor = best.p
+            return true
+        }
+
+        /// The first three words of this sentence (or the one before), again: the reader started it over.
+        private mutating func restarted(_ heard: [String]) -> Bool {
+            guard heard.count >= 3, cursor >= 0 else { return false }
+            let tokens = script.tokens
+            let three = Array(heard.suffix(3))
+            let current = script.words[tokens[min(cursor + 1, tokens.count - 1)].word].sentence
+            for s in [current, current - 1] where s >= 0 {
+                let r = script.sentenceTokens[s]
+                guard r.count >= 3, r.lowerBound + 2 < cursor else { continue }
+                if (0..<3).allSatisfy({ VoiceoverScript.same(tokens[r.lowerBound + $0].norm, three[$0]) }) {
+                    cursor = r.lowerBound + 2
+                    return true
                 }
             }
-            // On: the next word, or a little further when the words just before agree.
-            let end = min(cursor + 12, tokens.count - 1)
-            guard cursor + 1 <= end else { return }
-            if VoiceoverScript.same(tokens[cursor + 1].norm, last) { cursor += 1; return }
-            let context = Array(heard.dropLast().suffix(3))
-            var best: (p: Int, score: Int)?
-            for p in (cursor + 2)...max(cursor + 2, end) where p <= end && VoiceoverScript.same(tokens[p].norm, last) {
-                let window = tokens[max(0, p - 4)..<p].map(\.norm)
-                let score = context.filter { word in window.contains { VoiceoverScript.same($0, word) } }.count
-                if score >= 1, score > (best?.score ?? 0) { best = (p, score) }
-            }
-            if let best { cursor = best.p }
+            return false
         }
 
         /// Where the card's cursor goes: the start of the next word to read.
@@ -189,6 +193,20 @@ struct VoiceoverScript {
         }
 
         var finished: Bool { cursor >= script.tokens.count - 1 }
+    }
+
+    /// Longest common subsequence length, by `same`.
+    static func lcs(_ a: [String], _ b: [String]) -> Int {
+        guard !a.isEmpty, !b.isEmpty else { return 0 }
+        var previous = Array(repeating: 0, count: b.count + 1)
+        for x in a {
+            var current = [0]
+            for (j, y) in b.enumerated() {
+                current.append(same(x, y) ? previous[j] + 1 : max(previous[j + 1], current[j]))
+            }
+            previous = current
+        }
+        return previous[b.count]
     }
 
     // MARK: Aligning a take

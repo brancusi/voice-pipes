@@ -12,6 +12,8 @@ final class HUDController {
     static let size = NSSize(width: 520, height: 66)
     /// With the read-along card open above the tag.
     static let expandedHeight: CGFloat = 340
+    /// A voiceover (`vp record-vo`): the script is the point, so it's big.
+    static let voiceoverSize = NSSize(width: 920, height: 580)
 
     func attach(_ app: AppState) {
         self.app = app
@@ -123,9 +125,10 @@ final class HUDController {
             screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
         }
         if let frame = screen?.visibleFrame {
-            let height = expanded ? Self.expandedHeight : Self.size.height
-            panel.setFrame(NSRect(x: frame.midX - Self.size.width / 2, y: frame.minY + 14,
-                                  width: Self.size.width, height: height), display: true)
+            let size = app.voiceover != nil ? Self.voiceoverSize
+                : NSSize(width: Self.size.width, height: expanded ? Self.expandedHeight : Self.size.height)
+            panel.setFrame(NSRect(x: frame.midX - size.width / 2, y: frame.minY + 14, width: size.width, height: size.height),
+                           display: true)
         }
         if appearing { pointerAtShow = NSEvent.mouseLocation }
         panel.alphaValue = 1
@@ -269,20 +272,24 @@ struct HUDView: View {
     }
 
     var body: some View {
+        if let session = app.voiceover {
+            VoiceoverPanel(session: session, app: app)
+                .frame(width: HUDController.voiceoverSize.width, height: HUDController.voiceoverSize.height)
+        } else {
+            readings
+        }
+    }
+
+    private var readings: some View {
         let expanded = Self.expanded(app)
-        VStack(spacing: 6) {
+        return VStack(spacing: 6) {
             Spacer(minLength: 0)
-            if let session = app.voiceover {
-                VoiceoverCard(session: session, app: app)
-                    .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
-                    .transition(.opacity)
-                VoiceoverTag(session: session, speaker: app.speaker)
-            } else if expanded {
+            if expanded {
                 ReadAlongCard(speaker: app.speaker, keysHint: Self.keysHintText(app.store.reading))
                     .frame(height: HUDController.expandedHeight - HUDController.size.height - 6)
                     .transition(.opacity)
             }
-            if app.voiceover == nil, let run = app.run {
+            if let run = app.run {
                 VStack(spacing: 3) {
                     content(run)
                     if let info = run.modelInfo, run.phase != .recording { ModelLine(text: info) }
@@ -615,7 +622,6 @@ private struct SentenceRow: View {
     let current: Int
     let position: Int
     let tint: Color
-    var help = "Read from here"
     let onTap: () -> Void
     @State private var hovering = false
 
@@ -632,7 +638,7 @@ private struct SentenceRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: onTap)
-        .help(help)
+        .help("Read from here")
     }
 
     private var text: Text {
@@ -663,127 +669,269 @@ private struct SentenceRow: View {
     }
 }
 
-/// The voiceover script (`vp record-vo`) in the read-along card's place: the line being read lit, the cursor on the
-/// next word to say. After a take, click a sentence to record again from it.
-private struct VoiceoverCard: View {
+/// A voiceover (`vp record-vo`), filling the HUD: what state it's in across the top (a countdown you can't miss, then a
+/// red LIVE with the clock and the level), the script big in the middle with the words read lit and the next one marked,
+/// and the keys along the bottom. After a take, click a sentence to record again from it.
+private struct VoiceoverPanel: View {
     let session: VoiceoverSession
     let app: AppState
     @State private var hovering = false
     private static let coral = Color(hex: 0xE0694A)
+    private static let lavender = Color(hex: 0xC3A3D4)
+    private static let sage = Color(hex: 0xA9BF8A)
+
+    private var live: Bool { session.phase == .recording }
+    private var reviewing: Bool { session.phase == .review || session.phase == .playing }
 
     var body: some View {
         let position = session.phase == .playing ? app.speaker.position : session.position
         let sentences = session.script.sentences
-        let current = sentences.lastIndex { $0.start <= position } ?? 0
-        let reviewing = session.phase == .review || session.phase == .playing
+        // After a take (until it plays) the whole script reads evenly: no line is "current".
+        let current = session.phase == .review ? -1 : sentences.lastIndex { $0.start <= position } ?? 0
         VStack(spacing: 0) {
+            header
+            Rectangle().fill(Palette.hudFG.opacity(0.12)).frame(height: 0.5)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 14) {
                         ForEach(sentences) { sentence in
-                            SentenceRow(sentence: sentence, current: current, position: position,
-                                        tint: session.phase == .playing ? Color(hex: 0xC3A3D4) : Self.coral,
-                                        help: reviewing ? "Record again from here" : "") {
+                            VoiceoverLine(sentence: sentence, current: current, position: position,
+                                          tint: session.phase == .playing ? Self.lavender : Self.coral, clickable: reviewing) {
                                 if reviewing { app.voiceoverRetake(session, from: sentence.id) }
                             }
-                            .padding(.top, sentence.opensParagraph ? 7 : 0)
+                            .padding(.top, sentence.opensParagraph ? 12 : 0)
                             .id(sentence.id)
                         }
                     }
-                    .padding(.horizontal, 12).padding(.vertical, 22)
+                    .padding(.horizontal, 28).padding(.vertical, 60)
                 }
                 .scrollIndicators(.never)
                 .mask(
                     VStack(spacing: 0) {
-                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 50)
                         Rectangle().fill(.black)
-                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 50)
                     }
                 )
                 .onHover { hovering = $0 }
-                .onAppear { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
+                .onAppear { proxy.scrollTo(max(0, current), anchor: UnitPoint(x: 0, y: 0.3)) }
                 .onChange(of: current) { _, new in
-                    guard !hovering else { return }
+                    guard new >= 0 else { return }
                     withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(new, anchor: UnitPoint(x: 0, y: 0.3)) }
                 }
             }
-            Rectangle().fill(Palette.hudFG.opacity(0.1)).frame(height: 0.5)
-            HStack(spacing: 6) {
-                Text(hint).foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 6)
-                controls
-            }
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
-            .padding(.horizontal, 10).frame(height: 26)
+            .overlay { countdown }
+            Rectangle().fill(Palette.hudFG.opacity(0.12)).frame(height: 0.5)
+            footer
         }
-        .font(.system(size: 12, design: .monospaced))
         .background(
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: 4)
                 .fill(Palette.hudBG)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 2))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 4))
         )
-        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.hudFG.opacity(0.14), lineWidth: 0.5))
+        .overlay(border)
         .environment(\.colorScheme, .dark)
-        .frame(width: HUDController.size.width - 20)
+    }
+
+    // MARK: Header: the state, unmissable
+
+    @ViewBuilder private var header: some View {
+        HStack(spacing: 14) {
+            switch session.phase {
+            case .countdown:
+                badge("GET READY", color: Palette.hudFG, dot: false)
+                Text(session.title).foregroundStyle(Palette.hudMuted).lineLimit(1)
+                Spacer()
+                LevelBars(level: session.level, color: Palette.hudMuted)
+            case .recording:
+                TimelineView(.animation(minimumInterval: 0.05)) { context in
+                    let t = context.date.timeIntervalSince(session.recordingStarted)
+                    HStack(spacing: 14) {
+                        HStack(spacing: 9) {
+                            Circle().fill(Self.coral).frame(width: 14, height: 14)
+                                .opacity(0.45 + 0.55 * abs(cos(t * .pi)))
+                            Text("LIVE").font(.system(size: 22, weight: .heavy, design: .monospaced)).foregroundStyle(Self.coral)
+                        }
+                        Text(HUDTag.clock(t)).font(.system(size: 22, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Palette.hudFG).monospacedDigit()
+                        Spacer()
+                        LevelBars(level: session.level, color: Self.coral)
+                    }
+                }
+            case .aligning:
+                badge("LINING UP THE TAKE…", color: Color(hex: 0xE8C26A), dot: false)
+                Spacer()
+            case .review:
+                badge("TAKE  \(HUDTag.clock(session.duration))", color: session.problem == nil ? Self.sage : Color(hex: 0xF0A35E), dot: true)
+                Text(session.problem ?? "\(session.matchedSentences) of \(session.sentenceCount) sentences found")
+                    .foregroundStyle(Palette.hudMuted).lineLimit(1)
+                Spacer()
+            case .playing:
+                badge("PLAYING  \(Int(app.speaker.progress * 100))%", color: Self.lavender, dot: true)
+                Spacer()
+            }
+        }
+        .font(.system(size: 14, weight: .medium, design: .monospaced))
+        .padding(.horizontal, 22).frame(height: 58)
+        .background(live ? Self.coral.opacity(0.14) : .clear)
+    }
+
+    private func badge(_ text: String, color: Color, dot: Bool) -> some View {
+        HStack(spacing: 9) {
+            if dot { Circle().fill(color).frame(width: 12, height: 12) }
+            Text(text).font(.system(size: 20, weight: .heavy, design: .monospaced)).foregroundStyle(color)
+        }
+    }
+
+    // MARK: The countdown, over the script
+
+    @ViewBuilder private var countdown: some View {
+        if case .countdown(let n) = session.phase {
+            ZStack {
+                Rectangle().fill(Palette.hudBG.opacity(0.75))
+                VStack(spacing: 6) {
+                    Text("\(n)").font(.system(size: 170, weight: .heavy, design: .monospaced)).foregroundStyle(Self.coral)
+                        .contentTransition(.numericText(countsDown: true))
+                        .animation(.easeOut(duration: 0.25), value: n)
+                    Text("recording starts in \(n)").font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Palette.hudMuted)
+                }
+            }
+        }
+    }
+
+    // MARK: Footer: the keys
+
+    private var footer: some View {
+        HStack(spacing: 8) {
+            Text(hint).foregroundStyle(Palette.hudMuted).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
+            switch session.phase {
+            case .countdown:
+                button("esc", "cancel") { app.voiceoverEscape(session) }
+            case .aligning:
+                EmptyView()
+            case .recording:
+                button("R", "start over") { app.voiceoverRetake(session, from: nil) }
+                button("⏎", "stop", strong: true) { app.voiceoverReturn(session) }
+            case .review, .playing:
+                button("R", "retake") { app.voiceoverRetake(session, from: nil) }
+                button("space", session.phase == .playing ? "stop" : "play") { app.voiceoverPlay(session) }
+                button("esc", "cancel") { app.finishVoiceover(session, accepted: false) }
+                button("⏎", "keep", strong: true) { app.voiceoverReturn(session) }
+            }
+        }
+        .font(.system(size: 13, weight: .medium, design: .monospaced))
+        .padding(.horizontal, 22).frame(height: 52)
     }
 
     private var hint: String {
         switch session.phase {
-        case .countdown: "get ready · Esc cancels"
-        case .recording: "read at your pace · a flub? restart the sentence"
-        case .aligning: "lining the take up with the script…"
-        case .review, .playing:
-            session.problem ?? (hovering ? "click a sentence to record again from it" : "\(session.matchedSentences)/\(session.sentenceCount) sentences found")
+        case .countdown: "the script follows you as you read"
+        case .recording: "a flub? start the sentence again"
+        case .aligning: ""
+        case .review, .playing: hovering ? "click a sentence to record again from it" : "click a sentence to retake from there"
         }
     }
 
-    @ViewBuilder private var controls: some View {
-        switch session.phase {
-        case .countdown, .aligning:
-            EmptyView()
-        case .recording:
-            button("⏎ stop") { app.voiceoverReturn(session) }
-            button("R restart") { app.voiceoverRetake(session, from: nil) }
-        case .review, .playing:
-            button("R retake") { app.voiceoverRetake(session, from: nil) }
-            button(session.phase == .playing ? "␣ stop" : "␣ play") { app.voiceoverPlay(session) }
-            button("⏎ keep") { app.voiceoverReturn(session) }
-            button("esc cancel") { app.finishVoiceover(session, accepted: false) }
-        }
-    }
-
-    private func button(_ title: String, action: @escaping () -> Void) -> some View {
+    private func button(_ key: String, _ title: String, strong: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).fixedSize()
-                .padding(.horizontal, 5).frame(height: 16)
-                .background(RoundedRectangle(cornerRadius: 2).fill(Palette.hudFG.opacity(0.14)))
-                .contentShape(Rectangle())
+            HStack(spacing: 6) {
+                Text(key).font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 5).frame(height: 18)
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Palette.hudFG.opacity(0.4), lineWidth: 1))
+                Text(title)
+            }
+            .fixedSize()
+            .padding(.horizontal, 10).frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 3).fill(strong ? Self.coral.opacity(0.35) : Palette.hudFG.opacity(0.12)))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(Palette.hudFG)
     }
+
+    @ViewBuilder private var border: some View {
+        if live {
+            TimelineView(.animation(minimumInterval: 0.05)) { context in
+                let t = context.date.timeIntervalSince(session.recordingStarted)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(Self.coral.opacity(0.6 + 0.4 * abs(cos(t * .pi))), lineWidth: 3)
+            }
+        } else {
+            RoundedRectangle(cornerRadius: 4).strokeBorder(Palette.hudFG.opacity(0.16), lineWidth: 0.5)
+        }
+    }
 }
 
-/// The tag under the voiceover card: the countdown, then REC with the clock and the level, then the take.
-private struct VoiceoverTag: View {
-    let session: VoiceoverSession
-    let speaker: Speaker
+/// One sentence of a voiceover script, large. The one being read has a bar; in it, the words read are bright, the next
+/// word to say is in the tint and underlined, the rest softer. Sentences done are dimmed.
+private struct VoiceoverLine: View {
+    let sentence: Speaker.Sentence
+    let current: Int
+    let position: Int
+    let tint: Color
+    let clickable: Bool
+    let onTap: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        switch session.phase {
-        case .countdown(let n):
-            HUDTag(state: .waiting, label: "REC IN", detail: "\(n)", level: session.level)
-        case .recording:
-            TimelineView(.periodic(from: session.recordingStarted, by: 1)) { context in
-                HUDTag(state: .recording, label: "REC", detail: HUDTag.clock(context.date.timeIntervalSince(session.recordingStarted)),
-                       level: session.level)
+        HStack(alignment: .top, spacing: 14) {
+            Rectangle().fill(sentence.id == current ? tint : .clear).frame(width: 3)
+            Text(styled)
+                .font(.system(size: 25, weight: sentence.id == current ? .semibold : .regular, design: .monospaced))
+                .lineSpacing(6)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 3)
+        .background(RoundedRectangle(cornerRadius: 3).fill(Palette.hudFG.opacity(clickable && hovering ? 0.08 : 0)))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onTap)
+    }
+
+    private var styled: AttributedString {
+        var out = AttributedString(sentence.text)
+        if current < 0 {
+            out.foregroundColor = Palette.hudFG.opacity(0.85)
+            return out
+        }
+        if sentence.id < current {
+            out.foregroundColor = Palette.hudMuted.opacity(0.4)
+            return out
+        }
+        out.foregroundColor = Palette.hudFG.opacity(sentence.id == current ? 0.5 : 0.55)
+        guard sentence.id == current else { return out }
+        let text = sentence.text
+        let utf16 = text.utf16
+        let offset = min(max(0, position - sentence.start), utf16.count)
+        guard let cursor = String.Index(utf16.index(utf16.startIndex, offsetBy: offset), within: text)
+                ?? text.indices.last(where: { $0.utf16Offset(in: text) <= offset }) else { return out }
+        // Read so far: bright.
+        if let read = Range(text.startIndex..<cursor, in: out) { out[read].foregroundColor = Palette.hudFG }
+        // The next word: tinted and underlined.
+        let wordEnd = text[cursor...].firstIndex(where: \.isWhitespace) ?? text.endIndex
+        if cursor < wordEnd, let next = Range(cursor..<wordEnd, in: out) {
+            out[next].foregroundColor = tint
+            out[next].underlineStyle = .thick
+        }
+        return out
+    }
+}
+
+/// A wide level meter: bars that light up to the level, the latest at the right.
+private struct LevelBars: View {
+    let level: Float
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 3) {
+            ForEach(0..<24, id: \.self) { i in
+                let lit = level > Float(i) / 24
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(color.opacity(lit ? 1 : 0.18))
+                    .frame(width: 4, height: 8 + CGFloat((i * 7) % 5) * 4)
             }
-        case .aligning:
-            HUDTag(state: .processing, label: "TAKE", detail: "aligning")
-        case .review:
-            HUDTag(state: session.problem == nil ? .done : .failed, label: "TAKE", detail: HUDTag.clock(session.duration))
-        case .playing:
-            HUDTag(state: .speaking, label: "PLAY", detail: "\(Int(speaker.progress * 100))%")
         }
     }
 }

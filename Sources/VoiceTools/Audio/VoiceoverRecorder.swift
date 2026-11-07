@@ -15,8 +15,6 @@ final class VoiceoverRecorder: @unchecked Sendable {
     private let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioRecorder.sampleRate,
                                        channels: 1, interleaved: false)!
 
-    /// 16 kHz blocks of the take (audio thread).
-    var onSamples: (@Sendable ([Float]) -> Void)?
     /// 0…1, while open (audio thread): the meter moves during the countdown too.
     var onLevel: (@Sendable (Float) -> Void)?
 
@@ -48,6 +46,11 @@ final class VoiceoverRecorder: @unchecked Sendable {
     /// The take so far: at the microphone's rate, and at 16 kHz.
     var take: (native: [Float], speech: [Float]) { lock.withLock { (native, speech) } }
 
+    /// The last `seconds` of the take at 16 kHz, for following the reader.
+    func recentSpeech(_ seconds: Double) -> [Float] {
+        lock.withLock { Array(speech.suffix(Int(seconds * AudioRecorder.sampleRate))) }
+    }
+
     /// Keeps the first `seconds` of the take (a retake from a sentence), or none of it.
     func truncate(to seconds: Double) {
         lock.withLock {
@@ -78,7 +81,6 @@ final class VoiceoverRecorder: @unchecked Sendable {
             native.append(contentsOf: block)
             speech.append(contentsOf: small)
         }
-        if !small.isEmpty { onSamples?(small) }
     }
 
     /// Writes mono samples untouched: WAV as 24-bit PCM, `.m4a`/`.caf` as Apple Lossless.

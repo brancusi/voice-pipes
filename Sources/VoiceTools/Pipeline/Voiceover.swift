@@ -27,7 +27,6 @@ final class VoiceoverSession {
 
     @ObservationIgnored let recorder = VoiceoverRecorder()
     @ObservationIgnored var follower: VoiceoverScript.Follower
-    @ObservationIgnored var transcriber: StreamingTranscriber?
     @ObservationIgnored var take = 0
     @ObservationIgnored var lastVoice = Date()
     @ObservationIgnored var heard: [VoiceoverScript.HeardWord] = []
@@ -77,7 +76,6 @@ extension AppState {
         let accepted = await withCheckedContinuation { session.done = $0 }
 
         session.keys.forEach { hotkeys.remove($0) }
-        session.transcriber?.cancel()
         session.recorder.close()
         if voiceover === session { voiceover = nil }
         run = nil
@@ -137,7 +135,6 @@ extension AppState {
             startTake(session, from: sentence)
         case .recording:
             guard sentence == nil else { return }
-            session.transcriber?.cancel()
             startTake(session, from: nil)
         case .review:
             startTake(session, from: sentence)
@@ -179,8 +176,6 @@ extension AppState {
         session.take += 1
         let take = session.take
         session.recorder.pause()
-        session.transcriber?.cancel()
-        session.transcriber = nil
         // Where the take carries on: from the start, or in the pause before the sentence (just after the word before it).
         var cut = 0.0
         var firstToken = -1
@@ -203,23 +198,21 @@ extension AppState {
             // Only now, so Esc during the countdown leaves the last take as it was.
             session.recorder.truncate(to: cut)
             session.follower = follower
-            let transcriber = StreamingTranscriber(parakeet: parakeet) { text in
-                Task { @MainActor in
-                    guard session.take == take, session.phase == .recording else { return }
-                    session.follower.update(text)
-                    session.position = session.follower.position
-                }
-            }
-            session.transcriber = transcriber
-            session.recorder.onSamples = { transcriber.feed($0) }
             session.recordingStarted = Date()
             session.lastVoice = Date()
             session.recorder.record()
             session.phase = .recording
-            // Stops by itself a moment after the last line.
+            // Follow the reader: the last few seconds, transcribed again and again (tens of milliseconds each), so the
+            // card keeps up within a word or two. Stops by itself a moment after the last line.
             while session.take == take, session.phase == .recording {
-                try? await Task.sleep(for: .milliseconds(150))
-                if session.follower.finished, Date().timeIntervalSince(session.lastVoice) > 1.6 { stopTake(session) }
+                try? await Task.sleep(for: .milliseconds(300))
+                let recent = session.recorder.recentSpeech(5)
+                if recent.count > Int(AudioRecorder.sampleRate * 0.4), let text = try? await parakeet.transcribe(recent),
+                   session.take == take, session.phase == .recording {
+                    session.follower.follow(text)
+                    session.position = session.follower.position
+                }
+                if session.follower.finished, Date().timeIntervalSince(session.lastVoice) > 1.5 { stopTake(session) }
             }
         }
     }
@@ -230,8 +223,6 @@ extension AppState {
         session.take += 1
         let take = session.take
         session.recorder.pause()
-        session.transcriber?.cancel()
-        session.transcriber = nil
         session.phase = .aligning
         let audio = session.recorder.take
         session.duration = Double(audio.native.count) / session.recorder.sampleRate
