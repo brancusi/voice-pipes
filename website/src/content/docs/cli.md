@@ -154,7 +154,8 @@ The main codes:
 | `no_microphone`, `no_speech`, `cancelled` | Recording: no permission or device, nothing heard, or stopped with `vp stop` or Esc |
 | `bad_speed`, `bad_model`, `no_such_voice`, `speak_failed` | `vp say` and `vp ask` |
 | `not_speaking` | `vp speed`, `vp next` or `vp prev` when nothing is being read aloud |
-| `no_such_file`, `bad_audio` | `vp transcribe` or `vp config check` can't read the file |
+| `no_such_file`, `bad_audio` | `vp transcribe`, `vp play` or `vp config check` can't read the file |
+| `bad_transcript` | `vp play --transcript` isn't alignment or a word list |
 | `config_invalid`, `vocabulary_invalid`, `vocabulary_unreadable` | The file doesn't check out; fix it, then retry |
 | `no_such_backup` | `vp config restore` with a number that isn't in `vp config backups` |
 | `no_such_provider`, `no_login`, `bad_name` | `vp auth` and `vp secret` |
@@ -292,6 +293,33 @@ the HUD or with `vp stop`.
 By default the HUD also takes the keyboard while it reads (Esc stops, Space pauses, j/k move a sentence, h/l change
 the speed), without bringing Voice Pipes to the front. [Reading aloud](/docs/reading) has the keys and how to change
 when the HUD takes them.
+
+### vp play
+
+```sh
+vp play <audio-file> [--transcript <file>] [--speed 0.6–2.0]
+```
+
+Plays an audio file (MP3, M4A, WAV, AIFF and so on) with its text in the follow-along card, the sentence being heard
+lit and the word underlined, and returns when it ends, printing `played`, `sentences`, `timed` and `ms`. Pause, stop,
+`vp next`, `vp prev`, `vp speed` and the HUD's keys work on it as on a reading, and clicking a sentence plays from there.
+
+`--transcript` is a JSON file in either of two shapes:
+
+- **ElevenLabs alignment**, as `/v1/text-to-speech/{voice}/with-timestamps` returns it:
+  `{"alignment": {"characters": [...], "character_start_times_seconds": [...], ...}}`, or the inner object alone.
+  The word cursor follows it character by character.
+- **A word list**: `{"text": "Hey, it's Maria...", "words": [{"word": "Hey", "start": 0.12, "end": 0.31}, ...]}`. Each
+  word is found in `text` in order, so the card shows the text as written; without `text`, the words are joined with
+  spaces. Times are seconds from the start of the file.
+
+Without `--transcript`, Parakeet transcribes the file on your Mac first and the card's place is estimated from how far
+through the audio it is (`timed: false`). A `...` written as a pause stays inside its sentence.
+
+```sh
+vp open reading
+vp play walkthrough.mp3 --transcript walkthrough.alignment.json
+```
 
 ### vp listen
 

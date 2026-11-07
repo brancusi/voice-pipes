@@ -18,6 +18,8 @@ enum VPCommands {
                     values: ["text", "max", "silence"], handler: runTrack),
         CommandSpec(name: "say", usage: "vp say \"…\" [--model pocket|supertonic|macos|<openrouter-id>] [--voice <id>] [--speed 0.6–2.0]",
                     summary: "Speak text aloud", values: ["model", "voice", "speed", "text"], handler: say),
+        CommandSpec(name: "play", usage: "vp play <audio-file> [--transcript <file>] [--speed 0.6–2.0]",
+                    summary: "Play an audio file with its transcript in the read-along card", values: ["transcript", "speed"], handler: play),
         CommandSpec(name: "speed", usage: "vp speed <0.6–2.0>", summary: "Change the speed of what's being read aloud, live",
                     handler: { parsed, out in
                         let value = try parsed.positional(0, "speed", usage: "vp speed 1.3")
@@ -251,6 +253,17 @@ enum VPCommands {
         let data = try AppClient.request("say", args)
         out.emit(.object([("said", .string(out.trim(text, 120))), ("model", .string(data["model"] as? String ?? "")), ("ms", .int(data["ms"] as? Int ?? 0))]),
                  help: ["vp voices --model <model>   (other voices)"])
+    }
+
+    static func play(_ parsed: Parsed, _ out: Output) throws {
+        let path = try parsed.positional(0, "audio-file", usage: "vp play voiceover.mp3 --transcript voiceover.alignment.json")
+        var args: [String: Any] = ["path": URL(fileURLWithPath: path).standardizedFileURL.path]
+        if let transcript = parsed["transcript"] { args["transcript"] = URL(fileURLWithPath: transcript).standardizedFileURL.path }
+        if let speed = try parsed.double("speed") { args["speed"] = speed }
+        let data = try AppClient.request("play", args)
+        out.emit(.object([("played", .string(data["played"] as? String ?? "")), ("sentences", .int(data["sentences"] as? Int ?? 0)),
+                          ("timed", .bool(data["timed"] as? Bool ?? false)), ("ms", .int(data["ms"] as? Int ?? 0))]),
+                 help: ["vp pause | vp next | vp speed 1.2 | vp stop   (while it plays)"])
     }
 
     static func simple(_ cmd: String, _ out: Output) throws {

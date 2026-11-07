@@ -341,6 +341,7 @@ the background.
 | `vp tracks` · `tracks show <id>` · `tracks enable/disable <id>` · `tracks duplicate <id>` | List, inspect, switch tracks on or off (enable refuses a hotkey clash without `--force`), copy one (starts off) |
 | `vp run <id> [--text "…"]` | Run a track. Text (or piped text) starts at its first block that takes text; a microphone track without text records until you stop talking. Prints the final text |
 | `vp say "…" [--model --voice --speed]` | Speak (default Pocket TTS on this Mac) |
+| `vp play <file> [--transcript <json>] [--speed]` | Play an audio file with its text in the follow-along card (ElevenLabs alignment or a word list; without one, Parakeet transcribes it) |
 | `vp listen` · `vp ask "<question>"` | Record until you stop talking and print the transcript; `ask` speaks the question first |
 | `vp transcribe <file>` | Transcribe an audio file on this Mac (or `--model <openrouter-id>`) |
 | `vp stop` · `pause` · `resume` | Control speech and recording; `vp stop` also stops a run that's processing |

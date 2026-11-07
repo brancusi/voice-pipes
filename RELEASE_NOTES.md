@@ -1,5 +1,9 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.17.22**
+- **Play a recorded voiceover with its text following along.** `vp play <file> --transcript <json>` plays an audio file (MP3, M4A, WAV…) in the HUD's follow-along card, the sentence being heard lit and the word underlined, just like a reading. Pause, stop, next/previous sentence, speed and clicking a sentence all work on it. The transcript can be the timing ElevenLabs returns with its speech (`/with-timestamps`) or a simple list of words with start times; with none, Voice Pipes transcribes the file on your Mac first and keeps pace with the audio.
+- **A "..." pause no longer splits a sentence** in the follow-along card: text written with "..." for the voice to pause on stays on one line, as written.
+
 **1.17.21**
 - **Close an error on the HUD.** When a track stops with an error (say, Read aloud finds nothing selected and nothing on the clipboard), the HUD now shows a **×** you can click to close it right away, instead of waiting for it to fade by itself. The same × closes the "failed, passed through" note on a finished run.
 

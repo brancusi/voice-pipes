@@ -112,5 +112,6 @@ block yourself, or ask your agent to.
 ## For agents
 
 Agents read to you through the same HUD: `vp open reading`, then `printf '%s' "$TEXT" | vp say`, which returns
-when the reading ends. What they read without being asked is your choice, saved once for every agent: see
+when the reading ends. `vp play <file> --transcript <json>` plays a recorded voiceover the same way, its text
+following along in the card. What they read without being asked is your choice, saved once for every agent: see
 [what agents read aloud](/docs/agents#what-agents-read-aloud).

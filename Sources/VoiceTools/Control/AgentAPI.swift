@@ -35,6 +35,8 @@ extension AppState {
             reply.result(try await agentRun(args))
         case "say":
             reply.result(try await agentSay(args))
+        case "play":
+            reply.result(try await agentPlay(args))
         case "stop":
             let was = speaker.state != .idle || capture != nil || agentRecording || run?.phase == .processing
             speaker.clear()
@@ -323,6 +325,41 @@ extension AppState {
         let outcome = await runSteps(track, from: 0, payload: .text(text))
         if let failure = outcome.failure { throw AgentError("speak_failed", failure) }
         return ["said": text, "model": model, "ms": outcome.totalMs]
+    }
+
+    /// Plays an audio file with its transcript in the read-along card: from `transcript` (ElevenLabs alignment or a
+    /// word list), or transcribed here with Parakeet and paced evenly over the audio. Answers when it's finished.
+    private func agentPlay(_ args: [String: Any]) async throws -> [String: Any] {
+        try ensureIdle()
+        guard let path = args["path"] as? String else { throw AgentError("missing_file", "Which file?", hint: "vp play voiceover.mp3") }
+        let url = URL(fileURLWithPath: path)
+        guard FileManager.default.fileExists(atPath: url.path) else { throw AgentError("no_such_file", "No file at \(url.path).") }
+        let speed = Float(args["speed"] as? Double ?? 1.0)
+        guard (0.6...2.0).contains(speed) else { throw AgentError("bad_speed", "Speed is 0.6–2.0.") }
+        let started = Date()
+        let label = url.deletingPathExtension().lastPathComponent
+        run = ActiveRun(trackID: UUID(), trackName: label, colorHex: "#C3A3D4", stepTitles: ["Play"],
+                        phase: .processing, currentStep: 0, stepMs: [nil], heldBy: "vp")
+        let playing = run?.id
+        defer { if run?.id == playing { run = nil } }
+        let transcript: PlaybackTranscript
+        if let file = args["transcript"] as? String {
+            guard FileManager.default.fileExists(atPath: file) else { throw AgentError("no_such_file", "No transcript at \(file).") }
+            do { transcript = try PlaybackTranscript.load(URL(fileURLWithPath: file)) } catch {
+                throw AgentError("bad_transcript", error.localizedDescription, hint: "vp play --help")
+            }
+        } else {
+            let text = try await parakeet.transcribe(try AudioFileReader.samples(url))
+            transcript = PlaybackTranscript(text: text, marks: [])
+        }
+        run?.phase = .speaking
+        do {
+            try await speaker.playFile(url, transcript: transcript, rate: speed, label: label)
+        } catch {
+            throw AgentError("bad_audio", "Can't play \(url.lastPathComponent): \(error.localizedDescription)")
+        }
+        return ["played": url.lastPathComponent, "sentences": Speaker.sentences(of: transcript.text).count,
+                "timed": !transcript.marks.isEmpty, "ms": Int(Date().timeIntervalSince(started) * 1000)]
     }
 
     /// Records until you stop talking (or `max` seconds), then transcribes.

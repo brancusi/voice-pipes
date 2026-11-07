@@ -40,7 +40,7 @@ final class Speaker: NSObject {
 
     var currentSentence: Int { sentences.lastIndex { $0.start <= position } ?? 0 }
 
-    private enum Engine { case none, system, cloud, local }
+    private enum Engine { case none, system, cloud, local, file }
     @ObservationIgnored private var engine: Engine = .none
     @ObservationIgnored private var textLength = 0
 
@@ -70,6 +70,9 @@ final class Speaker: NSObject {
     @ObservationIgnored private var scheduledChars = 0
     @ObservationIgnored private var totalChars = 0
     @ObservationIgnored private var drained: CheckedContinuation<Void, Never>?
+
+    // An audio file (`vp play`): its transcript says when each part of the text is heard.
+    @ObservationIgnored private var transcript: PlaybackTranscript?
 
     @ObservationIgnored private var finished: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var segmentDone: CheckedContinuation<Void, Never>?
@@ -308,6 +311,38 @@ final class Speaker: NSObject {
         pendingBuffers = 0
     }
 
+    // MARK: - Audio file
+
+    /// Plays an audio file with its transcript on the read-along card. Returns when it ends or is cleared.
+    func playFile(_ url: URL, transcript: PlaybackTranscript, rate: Float, label: String) async throws {
+        clear()
+        let player = try AVAudioPlayer(contentsOf: url)
+        begin(transcript.text, rate: rate, engine: .file)
+        generation += 1
+        self.transcript = transcript
+        sourceLabel = label
+        voiceLabel = url.lastPathComponent
+        player.delegate = self
+        player.enableRate = true
+        player.rate = rate
+        self.player = player
+        state = .speaking
+        player.play()
+        progressTimer?.invalidate()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            MainActor.assumeIsolated { self.updateFileProgress() }
+        }
+        await withCheckedContinuation { finished = $0 }
+    }
+
+    /// The voice's place from the transcript's marks, or in proportion to the time played without them.
+    private func updateFileProgress() {
+        guard state == .speaking, let player, player.duration > 0 else { return }
+        let fraction = min(1, player.currentTime / player.duration)
+        position = transcript?.offset(at: player.currentTime) ?? Int(fraction * Double(textLength))
+        progress = fraction
+    }
+
     func previewLocal(engine: LocalVoiceEngine, voice: String) async throws {
         let name = engine.voiceLabel(voice)
         try await speakLocal("Hi, I'm \(name). This is how I'll sound reading to you.", engine: engine, voice: voice,
@@ -354,6 +389,15 @@ final class Speaker: NSObject {
             systemRestartPending = false
             state = .speaking
             speakSystem(from: sentence.start)
+        case .file:
+            guard let player else { return }
+            let duration = player.duration
+            player.currentTime = transcript?.time(at: sentence.start)
+                ?? duration * Double(sentence.start) / Double(max(textLength, 1))
+            if state != .speaking {
+                state = .speaking
+                player.play()
+            }
         case .cloud, .local:
             // End this pass; the speak call's loop starts the next one at the target.
             seekTarget = sentence.start
@@ -382,7 +426,7 @@ final class Speaker: NSObject {
         switch engine {
         case .local:
             timePitch?.rate = new
-        case .cloud:
+        case .cloud, .file:
             playbackRate = new
             player?.rate = new
         case .system:
@@ -420,6 +464,16 @@ final class Speaker: NSObject {
             if !piece.isEmpty {
                 let leading = raw.prefix { $0.isWhitespace }.contains { $0.isNewline }
                 let start = raw.firstIndex { !$0.isWhitespace } ?? range.lowerBound
+                // A "..." written as a pause in the voice isn't the end of a sentence: carry on in the same one.
+                if let last = result.last, !(breakBefore || leading), last.text.hasSuffix("...") || last.text.hasSuffix("…") {
+                    let end = NSRange(range, in: text).upperBound
+                    let joined = (text as NSString).substring(with: NSRange(location: last.start, length: end - last.start))
+                    result[result.count - 1] = Sentence(id: last.id, start: last.start,
+                                                        text: joined.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                        opensParagraph: last.opensParagraph)
+                    breakBefore = raw.reversed().prefix { $0.isWhitespace }.contains { $0.isNewline }
+                    return true
+                }
                 result.append(Sentence(id: result.count, start: NSRange(start..<range.upperBound, in: text).location, text: piece,
                                        opensParagraph: !result.isEmpty && (breakBefore || leading)))
                 breakBefore = raw.reversed().prefix { $0.isWhitespace }.contains { $0.isNewline }
@@ -465,6 +519,7 @@ final class Speaker: NSObject {
         seekTarget = nil
         currentUtterance = nil
         engine = .none
+        transcript = nil
         synthesizer.stopSpeaking(at: .immediate)
         player?.stop()
         player = nil
@@ -569,6 +624,12 @@ extension Speaker: AVAudioPlayerDelegate {
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor in
             guard player === self.player else { return }
+            if self.engine == .file {
+                self.player = nil
+                self.transcript = nil
+                self.finishPlayback()
+                return
+            }
             self.segmentDone?.resume()
             self.segmentDone = nil
         }
