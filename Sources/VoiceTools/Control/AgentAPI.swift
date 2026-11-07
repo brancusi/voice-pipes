@@ -349,14 +349,17 @@ extension AppState {
                 throw AgentError("bad_transcript", error.localizedDescription, hint: "vp play --help")
             }
         } else {
-            let text = try await parakeet.transcribe(try AudioFileReader.samples(url))
-            transcript = PlaybackTranscript(text: text, marks: [])
+            let samples: [Float]
+            do { samples = try AudioFileReader.samples(url) } catch {
+                throw AgentError("bad_audio", "Can't read \(url.lastPathComponent) as audio.")
+            }
+            transcript = PlaybackTranscript(text: try await parakeet.transcribe(samples), marks: [])
         }
         run?.phase = .speaking
         do {
             try await speaker.playFile(url, transcript: transcript, rate: speed, label: label)
         } catch {
-            throw AgentError("bad_audio", "Can't play \(url.lastPathComponent): \(error.localizedDescription)")
+            throw AgentError("bad_audio", "Can't play \(url.lastPathComponent) as audio.")
         }
         return ["played": url.lastPathComponent, "sentences": Speaker.sentences(of: transcript.text).count,
                 "timed": !transcript.marks.isEmpty, "ms": Int(Date().timeIntervalSince(started) * 1000)]
