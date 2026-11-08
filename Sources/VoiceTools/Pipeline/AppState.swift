@@ -263,7 +263,7 @@ final class AppState {
         self.store = store ?? TrackStore()
         historyStore = history ?? HistoryStore()
         archive = DictationArchive(database: historyStore.database)
-        needsOnboarding = startServices && Onboarding.shouldShow(freshInstall: self.store.createdFresh)
+        needsOnboarding = startServices && Onboarding.shouldShow(freshInstall: self.store.createdFresh || Onboarding.consumeFreshStart())
         guard startServices else { return }
         archive.apply(self.store.archive)
         self.store.onArchiveChanged = { [weak self] in self?.archive.apply($0) }

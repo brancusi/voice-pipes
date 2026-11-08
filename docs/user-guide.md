@@ -360,6 +360,7 @@ the background.
 | `vp close <target>` · `vp ui` | Close `main`, `menu`, `reading`, `about`, `onboarding`, an open `sheet`, or `all`; print what's on screen |
 | `vp update` | Check for updates |
 | `vp install` · `vp agents install [--hook]` | Put vp on your PATH; install the agent skill (the app also installs it at launch into every agent folder that exists, unless `vp agents uninstall` was run; that leaves `.agent-skill-off` beside config.toml) |
+| `vp uninstall [--everything] [--keys] [--yes]` | Remove Voice Pipes (also Setup → Uninstall…). Keeps history, pipes, config and keys by default, so a reinstall runs first-run setup with your pipes in place; without `--yes` it only lists what would go |
 | `vp agents read-aloud [off/long/attention/all]` | What agents read aloud to you unasked |
 
 ## Agents

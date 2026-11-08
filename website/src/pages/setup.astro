@@ -92,12 +92,12 @@ const TS = {
           <p class="guide__source">From a terminal, <code>vp auth login openrouter</code> signs in through your browser and saves the key for you (<a href="/docs/cli#vp-auth">CLI reference</a>).</p>
         </div>
         <ol class="card guide__steps">
-          <li><a href={OR.signUp}>Create an OpenRouter account</a>.</li>
-          <li>Add credits on the <a href={OR.credits}>Credits page</a>.</li>
-          <li>Create a key on the <a href={OR.keys}>Keys page</a> and copy it. OpenRouter keys start with <code>sk-or-</code>.</li>
-          <li>In the menu bar, open Voice Pipes and choose <strong>Open Voice Pipes…</strong>, then <strong>Setup</strong>. On a new install, the first-run <strong>Set up Voice Pipes</strong> window has the same field in its <strong>API keys (optional)</strong> step; <strong>Setup → Run setup again…</strong> reopens it.</li>
-          <li>Under <strong>Connections → OpenRouter</strong>, click the field and paste (or click <strong>Paste</strong> beside it), then <strong>Save</strong>. It's saved to your Mac's Keychain at once; there's no Save button.</li>
-          <li>Check the status beside OpenRouter: <span class="c-green">key valid</span> means you're set. <span class="c-orange">OpenRouter rejected it</span> means the key wasn't accepted (mistyped or revoked); <span class="c-orange">can't reach openrouter.ai</span> means the app couldn't connect, so check your network. <strong>↻ Reload models</strong> refreshes the model list.</li>
+          <li>Open the key settings: the <strong>Keys</strong> step of the first-run <strong>Welcome to Voice Pipes</strong> window, or, any time, the menu bar's <strong>Open Voice Pipes…</strong> → <strong>Setup</strong> → <strong>Connections</strong>.</li>
+          <li>Click <strong>Sign in with OpenRouter…</strong>. Your browser opens on OpenRouter: sign in, or <a href={OR.signUp}>create an account</a> right there.</li>
+          <li>Approve Voice Pipes. OpenRouter makes a key named "Voice Pipes" and hands it straight to the app, which saves it in your Mac's Keychain. Nothing to copy; the app shows <span class="c-green">✓ Saved</span>.</li>
+          <li>Add credits on the <a href={OR.credits}>Credits page</a>: the cloud models are paid, and a few dollars lasts a long time for dictation.</li>
+          <li>Check the status beside OpenRouter in Setup: <span class="c-green">key valid</span> means you're set. <span class="c-orange">OpenRouter rejected it</span> means the key wasn't accepted (revoked, or out of credit); <span class="c-orange">can't reach openrouter.ai</span> means the app couldn't connect, so check your network.</li>
+          <li>Rather make the key yourself? Create one on the <a href={OR.keys}>Keys page</a> (it starts with <code>sk-or-</code>), copy it, and paste it into the field under the sign-in button (or click <strong>Paste</strong>), then <strong>Save</strong>.</li>
         </ol>
       </div>
     </section>

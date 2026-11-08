@@ -738,6 +738,26 @@ Links `vp` and `voicepipes` into `/usr/local/bin` if it's writable, else `~/.loc
 links, their `target` and whether the folder is `on_path`. It never replaces another program's file. See
 [Install](/docs/install#link-vp-to-an-app-you-already-have).
 
+### vp uninstall
+
+```sh
+vp uninstall [--everything] [--keys] [--yes]
+```
+
+Removes Voice Pipes from this Mac. Without `--yes` it only lists what would be removed and what kept. With it, it
+quits the app, then removes the on-device models, caches, the agent skill (and Claude Code session hook), the `vp`
+links, resets Voice Pipes' Microphone and Accessibility permissions and its setup state, and moves the app to the
+Trash. Your dictation history, pipes, config and vocabulary stay, as do your API keys and secrets in the Keychain,
+so installing again starts with the first-run setup and your pipes already there: the way to see a new user's
+first launch on your own Mac.
+
+`--everything` also moves `~/Library/Application Support/VoiceTools` and `~/.config/voice-pipes` to the Trash (Finder's
+**Put Back** restores them) and clears all of Voice Pipes' preferences. `--keys` also removes the keys and secrets
+from the Keychain. Setup → Uninstall… does the same with the same choices. A link in a folder you can't write to is
+reported with the `sudo rm` line to remove it yourself. The models are FluidAudio's shared folders
+(`~/Library/Application Support/FluidAudio`, `~/.cache/fluidaudio`); another app built on FluidAudio downloads its
+models again.
+
 ### vp agents
 
 ```sh

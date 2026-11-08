@@ -56,6 +56,16 @@ enum Keychain {
         #endif
     }
 
+    /// Removes every Voice Pipes item (provider keys and your secrets): nil when it worked, or why not.
+    static func removeAll() -> String? {
+        #if SNAPSHOTS
+        return nil
+        #else
+        let status = SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service] as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound ? nil : message(status)
+        #endif
+    }
+
     private static func message(_ status: OSStatus) -> String {
         "\(SecCopyErrorMessageString(status, nil) as String? ?? "Keychain error") (\(status))"
     }

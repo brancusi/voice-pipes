@@ -14,6 +14,15 @@ enum Onboarding {
     }
 
     static func markDone() { UserDefaults.standard.set(true, forKey: doneKey) }
+
+    /// After an uninstall that kept your data (`vp uninstall`), the next launch is a first launch all the same.
+    static func consumeFreshStart() -> Bool {
+        let marker = Uninstaller.freshStartMarker
+        guard FileManager.default.fileExists(atPath: marker.path) else { return false }
+        try? FileManager.default.removeItem(at: marker)
+        UserDefaults.standard.removeObject(forKey: doneKey)
+        return true
+    }
 }
 
 /// Hosts the setup window in AppKit, so it can open at launch without any SwiftUI scene being on screen.
@@ -54,6 +63,12 @@ final class OnboardingController {
     }
 
     func close() { window?.close() }
+
+    func bringForward() {
+        guard let window else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
 }
 
 struct OnboardingView: View {
@@ -177,26 +192,35 @@ struct OnboardingView: View {
                 Text("Keys").font(VPFont.display)
                 Text("optional").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.fgMuted)
             }
-            Text("Fast dictation and Read aloud work without any key. Add these for the cloud tracks. They're kept in your Keychain.")
+            Text("Fast dictation and Read aloud work without any key: skip this and come back from Setup whenever you like. A key adds the cloud tracks. Keys stay in your Keychain.")
                 .font(VPFont.body).lineSpacing(3).foregroundStyle(Palette.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
             Card {
                 VStack(alignment: .leading, spacing: 8) {
-                    keyHeader("OpenRouter", "Clean dictation, Quick answer, cloud voices")
-                    KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
+                    HStack(alignment: .firstTextBaseline) {
+                        keyHeader("OpenRouter", "Clean dictation, Quick answer, cloud voices")
+                        Spacer(minLength: 8)
+                        if app.hasOpenRouterKey { Text("✓ Saved").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.green) }
+                    }
+                    OpenRouterSignIn(app: app)
+                    KeyField(hint: app.openRouterKeyHint, placeholder: "…or paste a key (sk-or-…)",
                              failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key",
                              error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0); return app.keyErrors[SecretKey.openRouter] == nil }
-                    Link("Get a key at openrouter.ai →", destination: URL(string: "https://openrouter.ai/keys")!)
-                        .font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.purple)
+                    KeyGuideLink(title: "Step-by-step: getting an OpenRouter key", url: KeyGuide.openRouter)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 14)
+                .padding(.horizontal, 16).padding(.vertical, 12)
                 Hairline()
                 VStack(alignment: .leading, spacing: 8) {
-                    keyHeader("TypeSafe · Jev", "picks the model in Route steps; judges trained words")
+                    HStack(alignment: .firstTextBaseline) {
+                        keyHeader("TypeSafe · Jev", "picks the model in Route steps; judges trained words")
+                        Spacer(minLength: 8)
+                        if app.hasJevKey { Text("✓ Saved").font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.green) }
+                    }
                     KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key",
                              error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0); return app.keyErrors[SecretKey.typesafe] == nil }
+                    KeyGuideLink(title: "Step-by-step: getting a TypeSafe key", url: KeyGuide.jev)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 14)
+                .padding(.horizontal, 16).padding(.vertical, 12)
             }
         case .agents:
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -398,8 +422,16 @@ struct OnboardingView: View {
     }
 
     private func refresh() {
+        let was = (mic == .authorized, trusted)
         mic = AVCaptureDevice.authorizationStatus(for: .audio)
         trusted = AXIsProcessTrusted()
+        // Just switched on (in System Settings, usually): back to this window, and on to the next step once both are.
+        if (mic == .authorized && !was.0) || (trusted && !was.1) {
+            OnboardingController.shared.bringForward()
+            if step == .permissions, mic == .authorized, trusted {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { if step == .permissions { go(+1) } }
+            }
+        }
         voices = app.localVoiceStates
         if trusted, PermissionHelper.shared.kind == .accessibility { PermissionHelper.shared.hide() }
         if mic == .authorized, PermissionHelper.shared.kind == .microphone { PermissionHelper.shared.hide() }

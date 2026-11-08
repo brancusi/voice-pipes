@@ -20,6 +20,7 @@ struct SetupView: View {
                     appearanceSection.vpSetupSection("appearance")
                     ReadingSettingsSection(app: app).vpSetupSection("reading")
                     updatesSection.vpSetupSection("updates")
+                    uninstallSection.vpSetupSection("uninstall")
                 }
                 .padding(.horizontal, 32).padding(.vertical, 24)
                 .frame(maxWidth: 900, alignment: .leading)
@@ -36,7 +37,7 @@ struct SetupView: View {
     }
 
     /// `vp open setup --section <name>`.
-    static let sections = ["checks", "connections", "cli", "models", "microphone", "archive", "appearance", "reading", "updates"]
+    static let sections = ["checks", "connections", "cli", "models", "microphone", "archive", "appearance", "reading", "updates", "uninstall"]
 
     private func takeRequest(_ proxy: ScrollViewProxy) {
         guard let section = UINav.shared.setupSection else { return }
@@ -87,7 +88,12 @@ struct SetupView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ConnectionHeader(name: "OpenRouter", purpose: "Cloud transcription, LLM and speech models",
                                      status: openRouterStatus)
-                    KeyField(hint: app.openRouterKeyHint, placeholder: "Paste your OpenRouter key (sk-or-…)",
+                    HStack(spacing: 12) {
+                        OpenRouterSignIn(app: app, compact: true)
+                        Spacer()
+                        KeyGuideLink(title: "How to get a key", url: KeyGuide.openRouter)
+                    }
+                    KeyField(hint: app.openRouterKeyHint, placeholder: "…or paste your OpenRouter key (sk-or-…)",
                              failed: app.openRouterKeyState == .rejected, focusKey: "openrouter-key",
                              error: app.keyErrors[SecretKey.openRouter]) { app.setOpenRouterKey($0); return app.keyErrors[SecretKey.openRouter] == nil }
                     HStack(spacing: 10) {
@@ -112,9 +118,10 @@ struct SetupView: View {
                                      status: app.hasJevKey ? (.ok, "saved") : (.info, "not set"))
                     KeyField(hint: app.jevKeyHint, placeholder: "Paste your TypeSafe key", failed: false, focusKey: "typesafe-key",
                              error: app.keyErrors[SecretKey.typesafe]) { app.setJevKey($0); return app.keyErrors[SecretKey.typesafe] == nil }
-                    if app.hasJevKey {
-                        HStack {
-                            Spacer()
+                    HStack {
+                        KeyGuideLink(title: "How to get a key", url: KeyGuide.jev)
+                        Spacer()
+                        if app.hasJevKey {
                             Button { app.setJevKey("") } label: { Text("Remove key").foregroundStyle(Palette.fgMuted) }
                                 .buttonStyle(.vpGhost)
                         }
@@ -288,6 +295,21 @@ struct SetupView: View {
                     Text(updates.enabled ? "signed, notarized · checks every few minutes" : "updates are off in this build")
                         .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
                     Button("Check now") { updates.check() }.buttonStyle(.vpSecondary).disabled(!updates.enabled)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 9)
+            }
+        }
+    }
+
+    private var uninstallSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionLabel("Uninstall")
+            Card {
+                HStack(spacing: 12) {
+                    Text("Remove Voice Pipes from this Mac. You choose whether your dictation history, pipes and config stay.")
+                        .font(VPFont.caption).foregroundStyle(Palette.fgMuted)
+                    Spacer()
+                    Button("Uninstall…") { UninstallPrompt.show() }.buttonStyle(.vpSecondary)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 9)
             }

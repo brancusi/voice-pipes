@@ -164,6 +164,13 @@ To reinstall or repair, run the one-line installer again.
 
 ## Uninstall
 
+In the app: **Setup → Uninstall…**. From a terminal: `vp uninstall` lists what it would remove, and
+`vp uninstall --yes` does it ([reference](/docs/cli#vp-uninstall)). Either way your dictation history, pipes,
+config and keys stay unless you choose otherwise, and everything else goes, models, permissions and setup included,
+so installing again runs the first-run setup as a new user sees it.
+
+The installer can also remove the app (it predates `vp uninstall`, and leaves models, caches and permissions):
+
 ```sh
 curl -fsSL https://github.com/brancusi/voice-tools-releases/releases/latest/download/install.sh | bash -s -- --uninstall
 ```

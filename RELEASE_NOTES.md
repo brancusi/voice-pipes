@@ -1,5 +1,10 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.20.0**
+- **Uninstall from the app.** Setup → Uninstall… (or `vp uninstall`) removes Voice Pipes properly: the app, its on-device models, caches, permissions, setup state, the `vp` command and the agent skill. By default it keeps your dictation history, pipes, config and API keys, so installing again shows the first-run setup exactly as a new user sees it, with your pipes already in place. Choose "remove those too" for a full clean; it moves your data to the Trash, so Put Back undoes it.
+- **Sign in with OpenRouter.** The setup window's Keys step and Setup → Connections have a **Sign in with OpenRouter…** button: your browser opens, you sign in (or sign up) and approve, and the key is saved for you. No copying keys around. Pasting a key still works, and each key has a link to a step-by-step guide.
+- **Smoother permissions.** When you switch on the microphone or Accessibility in System Settings, the setup window comes back to the front by itself, and once both are on it moves on to the next step.
+
 **1.19.1**
 - **A note on the teleprompter.** `vp record-vo --note "Recording 2 of 7 · the summary"` shows a line of your own above the script, so you know which take of how many you're on and what it's for. It's only for you: it isn't read, recorded or aligned.
 - **Markers stay timed when you say it differently.** A sentence reworded as you read it, or with a number written one way and heard the other ("three" and "3"), used to come back with no times, losing its markers. Numbers now match however they're written, and a sentence that still doesn't match is placed by the words you said between its neighbours, so its markers get times (its `matched` score shows how close it was).
