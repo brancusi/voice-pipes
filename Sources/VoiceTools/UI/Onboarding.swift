@@ -233,12 +233,20 @@ struct OnboardingView: View {
             Card { CommandLineCard() }
         case .tryIt:
             Text("Try it").font(VPFont.display)
-            HStack(spacing: 6) {
-                Text("Click in the box, hold")
-                if let hotkey { Keycap(text: hotkey) } else { Text("a hotkey") }
-                Text("say something, and let go.")
+            if let track = tryTrack {
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("Your hotkey").font(VPFont.bodyStrong)
+                            Text("runs “\(track.name)” · change it to anything you like").font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(Palette.fgMuted).lineLimit(1)
+                        }
+                        HotkeyPicker(app: app, trackID: track.id)
+                    }
+                    .padding(16)
+                }
             }
-            .font(VPFont.body).foregroundStyle(Palette.fgMuted)
+            Text(tryInstruction).font(VPFont.body).foregroundStyle(Palette.fgMuted)
             VPTextField("Your words land here", text: $tryText, axis: .vertical, font: .system(size: 14, design: .monospaced), minHeight: 64)
             if let run = tryRun {
                 HStack(spacing: 8) {
@@ -411,9 +419,19 @@ struct OnboardingView: View {
         }
     }
 
-    /// The first hotkey of the first enabled track that has one.
-    private var hotkey: String? {
-        app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty }?.triggers.first?.combo.display
+    /// The track to try: the first enabled one with a hotkey (Fast dictation, out of the box), else the first enabled.
+    private var tryTrack: Track? {
+        app.store.tracks.first { $0.enabled && !$0.triggers.isEmpty } ?? app.store.tracks.first { $0.enabled }
+    }
+
+    private var tryInstruction: String {
+        guard let trigger = tryTrack?.triggers.first else { return "Pick a hotkey above, then click in the box and try it." }
+        let keys = trigger.combo.display
+        return switch trigger.mode {
+        case .hold: "Click in the box, hold \(keys), say something, and let go."
+        case .toggle: "Click in the box, press \(keys), say something, and press it again."
+        case .once: "Click in the box, press \(keys), say something, and pause."
+        }
     }
 
     /// A run that finished while this step was open.

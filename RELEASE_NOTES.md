@@ -1,5 +1,8 @@
 Voice Pipes (formerly Voice Tools): a menu bar app that runs tracks, hotkey-triggered pipelines for dictation and read-aloud.
 
+**1.20.1**
+- **Pick your hotkey while you try it.** The last setup step shows your dictation hotkey in large keys (with "option", "shift" and so on under the symbols), a **Change…** button to press a new combination, and a switch between press-and-hold and toggle. The instruction under it follows what you chose. A combination another track or app already uses is flagged, and a bare letter is refused so it can't take over your typing.
+
 **1.20.0**
 - **Uninstall from the app.** Setup → Uninstall… (or `vp uninstall`) removes Voice Pipes properly: the app, its on-device models, caches, permissions, setup state, the `vp` command and the agent skill. By default it keeps your dictation history, pipes, config and API keys, so installing again shows the first-run setup exactly as a new user sees it, with your pipes already in place. Choose "remove those too" for a full clean; it moves your data to the Trash, so Put Back undoes it.
 - **Sign in with OpenRouter.** The setup window's Keys step and Setup → Connections have a **Sign in with OpenRouter…** button: your browser opens, you sign in (or sign up) and approve, and the key is saved for you. No copying keys around. Pasting a key still works, and each key has a link to a step-by-step guide.

@@ -55,6 +55,15 @@ struct KeyCombo: Codable, Hashable {
         return s.isEmpty ? name : s + (name.count == 1 ? "" : " ") + name
     }
 
+    /// Each key on its own, for drawing them as separate keycaps: ["⇧", "⌘", "C"].
+    var parts: [String] {
+        let order: [(Modifiers, String)] = [(.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
+        return order.filter { modifiers.contains($0.0) }.map(\.1) + [Self.name(for: key.code)]
+    }
+
+    /// A function key (F1–F20) works alone; anything else needs a modifier, or it would take over plain typing.
+    var isUsableAlone: Bool { Self.specialNames[Int(key.code)]?.hasPrefix("F") == true }
+
     static func name(for code: UInt32) -> String {
         if let named = specialNames[Int(code)] { return named }
         // A key the layout only gives a control character for would show as nothing.
